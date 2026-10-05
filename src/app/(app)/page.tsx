@@ -1,0 +1,87 @@
+import Link from "next/link";
+import { prisma } from "@/lib/db";
+import { getAiBalance } from "@/lib/ai-budget";
+import { getDeckStats } from "@/lib/review/queue";
+import { requireUser } from "@/lib/session";
+
+export default async function Home() {
+  const user = await requireUser();
+  const [stats, ai] = await Promise.all([
+    getDeckStats(prisma, user.id),
+    getAiBalance(prisma, user.id),
+  ]);
+  const hasWork = stats.due + stats.learning > 0;
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8 sm:px-6">
+      <header className="mb-8">
+        <p className="korean text-4xl text-celadon-deep">안녕하세요</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Your words</h1>
+      </header>
+
+      <dl className="grid grid-cols-3 gap-3">
+        <Stat label="Due now" value={stats.due} accent={stats.due > 0} />
+        <Stat label="New to learn" value={stats.learning} />
+        <Stat label="Words" value={stats.words} />
+      </dl>
+
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        {hasWork ? (
+          <Link
+            href="/review"
+            className="rounded-md bg-celadon-deep px-6 py-3 text-center font-medium text-paper"
+          >
+            Start review
+          </Link>
+        ) : null}
+        <Link
+          href="/add"
+          className={`rounded-md px-6 py-3 text-center font-medium ${
+            hasWork
+              ? "border border-line bg-surface"
+              : "bg-celadon-deep text-paper"
+          }`}
+        >
+          Add words from a text
+        </Link>
+      </div>
+
+      {!ai.unlimited && (
+        <p className="mt-5 text-xs text-muted">
+          {ai.remaining > 0
+            ? `${ai.remaining} of ${ai.allowance} free AI credits left for finding new words.`
+            : "Free AI credits are used up — reviews keep working as usual."}
+        </p>
+      )}
+
+      {!hasWork && (
+        <p className="mt-5 text-sm text-muted">
+          {stats.words === 0
+            ? "Nothing here yet. Paste a Korean text and pick the words worth learning."
+            : stats.nextDue
+              ? `All caught up. Next review ${formatWhen(stats.nextDue)}.`
+              : "All caught up."}
+        </p>
+      )}
+    </main>
+  );
+}
+
+function Stat({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-line bg-surface px-4 py-3">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className={`mt-1 text-3xl font-bold tabular-nums ${accent ? "text-celadon-deep" : ""}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function formatWhen(date: Date): string {
+  const hours = (date.getTime() - Date.now()) / 3_600_000;
+  if (hours < 1) return "in under an hour";
+  if (hours < 24) return `in ${Math.round(hours)} h`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "tomorrow" : `in ${days} days`;
+}

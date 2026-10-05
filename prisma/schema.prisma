@@ -1,0 +1,458 @@
+// Vocabulary learning app — data model
+//
+// Design principles:
+//   1. Facts come from dictionary APIs; AI only adds what dictionaries lack.
+//      Every stored fact records its provenance so AI output can be audited.
+//   2. One card tests one thing. Cards hang off Sense, not off Entry.
+//   3. Relations between entries are a first-class table, so synonyms,
+//      honorific pairs and (later) shared hanja all reuse one mechanism.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled connection for the app, direct one for migrations (Neon).
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------- user
+
+// Better Auth owns the identity columns below and the Session, Account and
+// Verification models. Generate those with `npx auth generate`
+// rather than writing them by hand — they must match the installed version.
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Language the UI explains things in. Korean learner may prefer en or ru.
+  explanationLang Lang @default(EN)
+
+  // FSRS target retention. 0.9 is the usual default.
+  desiredRetention Float @default(0.9)
+
+  // Stability (in days) above which the plain translation is hidden and only
+  // the target-language definition is shown. Null = never hide.
+  // Set high: hiding the translation makes the card objectively harder and
+  // FSRS will read the resulting lapses as forgetting.
+  hideTranslationAfterStability Float? @default(60)
+
+  // Credits on top of the free allowance (FREE_AI_CREDITS), granted by hand.
+  // 1 credit = 1 US cent of model cost. See src/lib/ai-budget.ts.
+  aiBonusCredits Int @default(0)
+
+  entries    Entry[]
+  categories Category[]
+  cards      Card[]
+  materials  SourceMaterial[]
+  sessions   Session[]
+  accounts   Account[]
+  aiUsage    AiUsage[]
+
+  @@map("user")
+}
+
+enum Lang {
+  KO
+  ES
+  EN
+  RU
+}
+
+// ---------------------------------------------------------------- lexicon
+
+// A headword. Facts here are dictionary-sourced wherever possible.
+
+model Entry {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lemma    String // 먹다 / comer
+  language Lang
+
+  reading      String? // romanisation or pronunciation hint
+  partOfSpeech String?
+
+  // Dictionary level: beginner / intermediate / advanced (KRDict 등급).
+  level String?
+
+  // Sino-Korean origin as the dictionary gives it, e.g. "學生".
+  // Stored raw for now. The hanja module will parse this into its own
+  // entities and link them via EntryRelation — that is why nothing here
+  // assumes one hanja per entry.
+  originalForm String?
+
+  // Politeness / formality. An enum, not free text, so it can be filtered
+  // on, quizzed on, and compared across synonyms.
+  register Register?
+
+  // Free-form user notes. Anything that does not fit a structured field.
+  note String?
+
+  krdictTargetCode String? // dictionary id, for refetching
+  source           Source  @default(KRDICT)
+
+  senses     Sense[]
+  categories EntryCategory[]
+  relsFrom   EntryRelation[] @relation("relFrom")
+  relsTo     EntryRelation[] @relation("relTo")
+
+  materialId String?
+  material   SourceMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, language, lemma, originalForm])
+  @@index([userId, language])
+}
+
+enum Register {
+  NEUTRAL
+  FORMAL // 하십시오체
+  POLITE // 해요체
+  CASUAL // 반말
+  HONORIFIC // 높임말 — 드시다, 주무시다
+  HUMBLE // 겸양어 — 드리다
+  WRITTEN
+  SLANG
+}
+
+enum Source {
+  KRDICT
+  STDICT
+  OPENDICT
+  AI
+  USER
+}
+
+// One meaning of one headword. This is the unit of study: a word with three
+// meanings becomes three sets of cards, not one overloaded card.
+
+model Sense {
+  id      String @id @default(cuid())
+  entryId String
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  order Int @default(0)
+
+  // Dictionary-style definition in the target language.
+  definitionTarget String?
+
+  // Same, in the user's explanation language.
+  definitionKnown String?
+
+  // The bare translation. Hidden once the card is stable enough.
+  translation String?
+
+  // Why this sense, in this context — written by AI from the material the
+  // word was found in. Never a dictionary fact.
+  contextNote String?
+
+  definitionSource Source @default(KRDICT)
+
+  examples Example[]
+  cards    Card[]
+
+  @@index([entryId])
+}
+
+model Example {
+  id      String @id @default(cuid())
+  senseId String
+  sense   Sense  @relation(fields: [senseId], references: [id], onDelete: Cascade)
+
+  text        String
+  translation String?
+  source      Source  @default(KRDICT)
+
+  @@index([senseId])
+}
+
+// ---------------------------------------------------------------- relations
+
+// Self-referencing many-to-many over entries. One table covers synonym sets,
+// honorific pairs, antonyms, and later shared-hanja links.
+
+model EntryRelation {
+  id String @id @default(cuid())
+
+  fromId String
+  from   Entry  @relation("relFrom", fields: [fromId], references: [id], onDelete: Cascade)
+
+  toId String
+  to   Entry  @relation("relTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  type RelationType
+
+  // What actually separates the two. For synonyms this is the payload:
+  // "same meaning, 드시다 is used about someone older than you".
+  distinction String?
+
+  source Source @default(AI)
+
+  @@unique([fromId, toId, type])
+  @@index([toId])
+}
+
+enum RelationType {
+  SYNONYM
+  ANTONYM
+  HONORIFIC_OF // 드시다 → 먹다
+  HUMBLE_OF // 드리다 → 주다
+  SHARES_HANJA // reserved for the hanja module
+  CONFUSABLE // user keeps mixing these two up
+}
+
+// ---------------------------------------------------------------- categories
+
+model Category {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name     String
+  language Lang
+
+  // Seeded categories ship with the app and have no userId.
+  isBuiltIn Boolean @default(false)
+
+  entries EntryCategory[]
+
+  @@unique([userId, language, name])
+  @@index([userId, language])
+}
+
+model EntryCategory {
+  entryId    String
+  entry      Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // True until the user confirms or changes the AI's guess, so the UI can
+  // surface "check these" without re-running the model.
+  assignedByAi Boolean @default(false)
+  confirmed    Boolean @default(false)
+
+  @@id([entryId, categoryId])
+  @@index([categoryId])
+}
+
+// ---------------------------------------------------------------- input
+
+// Whatever the words came from: pasted text, a screenshot, lesson handout.
+// Keeping it lets a card show the sentence the user actually met the word in.
+
+model SourceMaterial {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind     MaterialKind
+  title    String?
+  rawText  String? // extracted text, incl. OCR output
+  imageUrl String?
+  language Lang
+
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  entries Entry[]
+
+  @@index([userId])
+}
+
+enum MaterialKind {
+  TEXT
+  IMAGE
+  GENERATED // AI-generated pack for a category
+}
+
+// ---------------------------------------------------------------- scheduling
+
+// The reviewable unit. One per sense per direction, so recognition and
+// recall are scheduled independently — they are genuinely different skills,
+// and the user's problem is recall lagging behind recognition.
+
+model Card {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  senseId String
+  sense   Sense  @relation(fields: [senseId], references: [id], onDelete: Cascade)
+
+  direction Direction
+
+  // Learning drill state. Both are meaningless once phase is SCHEDULED.
+  phase          Phase     @default(LEARNING)
+  learningStreak Int       @default(0)
+  graduatedAt    DateTime?
+
+  // --- FSRS state. Difficulty/Stability/Retrievability model.
+  due           DateTime  @default(now())
+  stability     Float     @default(0)
+  difficulty    Float     @default(0)
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  // Position within FSRS's own (re)learning steps — ts-fsrs 5 needs it
+  // back on every review, or intervals for relearning cards go wrong.
+  learningSteps Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         CardState @default(NEW)
+  lastReview    DateTime?
+
+  // Set when the translation stops being shown, so a dip in performance
+  // afterwards can be told apart from genuine forgetting.
+  translationHiddenAt DateTime?
+
+  suspended Boolean @default(false)
+
+  logs ReviewLog[]
+
+  @@unique([senseId, direction])
+  @@index([userId, due])
+}
+
+enum Direction {
+  RECOGNITION // see the word, recall the meaning
+  RECALL // see the meaning, produce the word
+  REGISTER // which politeness level is this?
+}
+
+// Learning is a graduation drill run inside a single session and is NOT
+// scheduled by FSRS. A card only enters the scheduler once it graduates,
+// which is why the two are separate phases rather than two card states.
+
+enum Phase {
+  LEARNING
+  SCHEDULED
+}
+
+// How the card is asked. Chosen deterministically from reps, never at
+// random: the rating FSRS receives has to mean the same thing each time.
+
+enum ExerciseType {
+  CHOICE // pick the right answer out of several
+  TYPING // produce the answer from memory
+}
+
+enum CardState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+}
+
+// FSRS trains its parameters on review history, so this table is not a log
+// for debugging — it is an input to the algorithm. Never prune it.
+
+model ReviewLog {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  rating        Rating
+  state         CardState
+  due           DateTime
+  stability     Float
+  difficulty    Float
+  elapsedDays   Int
+  scheduledDays Int
+  reviewedAt    DateTime  @default(now())
+
+  // Whether the translation was visible for this particular review.
+  translationShown Boolean @default(true)
+
+  // Which exercise produced this rating. Needed to tell a dip caused by the
+  // exercise getting harder apart from actual forgetting.
+  exercise ExerciseType @default(TYPING)
+
+  @@index([cardId, reviewedAt])
+}
+
+enum Rating {
+  AGAIN
+  HARD
+  GOOD
+  EASY
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------- ai budget
+
+// One row per model call, with what it actually cost. Balances are summed
+// from here rather than kept as a counter, so they can always be audited.
+model AiUsage {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  // Millionths of a US dollar. Integer, so sums are exact.
+  costMicros   Int
+  // Unlimited users do not count towards the shared daily budget.
+  unlimited    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

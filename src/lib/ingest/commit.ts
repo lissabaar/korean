@@ -1,0 +1,181 @@
+/**
+ * Commit stage: approved candidates in, entries and cards out.
+ *
+ * Categories arriving here were reviewed by the user, so they are taken as
+ * given and `assignedByAi` is false for anything they touched.
+ */
+
+import type { PrismaClient } from "@prisma/client";
+import type { DictEntry } from "../dictionary/krdict";
+
+export interface ApprovedWord {
+  lemma: string;
+  contextNote: string;
+  register: string | null;
+  primaryCategory: string;
+  secondaryCategories: string[];
+  /** False once the user has edited the categories. */
+  categoriesFromAi: boolean;
+  dictionary: DictEntry;
+}
+
+export interface CommitResult {
+  materialId: string;
+  created: number;
+  /** Already in the deck (same word, same dictionary entry); left untouched. */
+  alreadySaved: string[];
+  /** Failed to save; the error is in the server log. */
+  skipped: string[];
+}
+
+const REGISTERS = new Set([
+  "NEUTRAL",
+  "FORMAL",
+  "POLITE",
+  "CASUAL",
+  "HONORIFIC",
+  "HUMBLE",
+  "WRITTEN",
+  "SLANG",
+]);
+
+function normaliseRegister(value: string | null): string | null {
+  if (!value) return null;
+  const upper = value.toUpperCase().trim();
+  return REGISTERS.has(upper) ? upper : null;
+}
+
+export async function commitWords(
+  prisma: PrismaClient,
+  options: {
+    userId: string;
+    /** Where the words came from: pasted text and files are TEXT. */
+    kind?: "TEXT" | "IMAGE";
+    text: string;
+    title?: string;
+    words: ApprovedWord[];
+  },
+): Promise<CommitResult> {
+  const { userId, kind = "TEXT", text, title, words } = options;
+
+  const material = await prisma.sourceMaterial.create({
+    data: {
+      userId,
+      kind,
+      title,
+      rawText: text || null,
+      language: "KO",
+      processedAt: new Date(),
+    },
+  });
+
+  const skipped: string[] = [];
+  const alreadySaved: string[] = [];
+  let created = 0;
+
+  for (const word of words) {
+    try {
+      if (await persistOne(prisma, userId, material.id, word)) created += 1;
+      else alreadySaved.push(word.lemma);
+    } catch (error) {
+      // One bad word must not cost the user the other thirty-nine.
+      console.error(`Failed to save "${word.lemma}":`, error);
+      skipped.push(word.lemma);
+    }
+  }
+
+  return { materialId: material.id, created, alreadySaved, skipped };
+}
+
+async function persistOne(
+  prisma: PrismaClient,
+  userId: string,
+  materialId: string,
+  word: ApprovedWord,
+): Promise<boolean> {
+  // The unique index on (userId, language, lemma, originalForm) does not
+  // stop duplicates of native words: originalForm is null for them and
+  // Postgres treats nulls as distinct. So check by dictionary entry here —
+  // the same word can arrive from two files in one import.
+  const existing = await prisma.entry.findFirst({
+    where: {
+      userId,
+      language: "KO",
+      lemma: word.dictionary.lemma,
+      ...(word.dictionary.targetCode
+        ? { krdictTargetCode: word.dictionary.targetCode }
+        : { originalForm: word.dictionary.originalForm ?? null }),
+    },
+    select: { id: true },
+  });
+  if (existing) return false;
+
+  await prisma.$transaction(async (tx) => {
+    const names = [word.primaryCategory, ...word.secondaryCategories];
+    const categoryIds: string[] = [];
+
+    for (const name of names) {
+      const category = await tx.category.upsert({
+        where: { userId_language_name: { userId, language: "KO", name } },
+        create: { userId, language: "KO", name },
+        update: {},
+      });
+      categoryIds.push(category.id);
+    }
+
+    const entry = await tx.entry.create({
+      data: {
+        userId,
+        materialId,
+        language: "KO",
+        lemma: word.dictionary.lemma,
+        originalForm: word.dictionary.originalForm ?? null,
+        partOfSpeech: word.dictionary.partOfSpeech ?? null,
+        level: word.dictionary.level ?? null,
+        register: normaliseRegister(word.register) as never,
+        krdictTargetCode: word.dictionary.targetCode ?? null,
+        source: word.dictionary.source as never,
+        categories: {
+          create: categoryIds.map((categoryId) => ({
+            categoryId,
+            assignedByAi: word.categoriesFromAi,
+            confirmed: !word.categoriesFromAi,
+          })),
+        },
+        senses: {
+          create: word.dictionary.senses.map((sense, index) => ({
+            order: index,
+            definitionTarget: sense.definition,
+            definitionKnown: sense.translatedDefinition ?? null,
+            translation: sense.translation ?? null,
+            contextNote: index === 0 ? word.contextNote : null,
+            definitionSource: word.dictionary.source as never,
+            examples: {
+              create: sense.examples.slice(0, 3).map((example) => ({
+                text: example,
+                source: word.dictionary.source as never,
+              })),
+            },
+          })),
+        },
+      },
+      include: { senses: true },
+    });
+
+    const primary = entry.senses[0];
+    if (primary) {
+      await tx.card.createMany({
+        data: [
+          { userId, senseId: primary.id, direction: "RECOGNITION" },
+          { userId, senseId: primary.id, direction: "RECALL" },
+        ],
+      });
+    }
+  }, {
+    // Several sequential round trips: generous enough for a database in
+    // another region (the default 5 s was hit with Neon in São Paulo).
+    maxWait: 10_000,
+    timeout: 30_000,
+  });
+  return true;
+}

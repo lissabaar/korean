@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+  Palette: Goryeo celadon — the grey-green of Korean stoneware — against a
+  cool paper. Clay marks anything the dictionary could not confirm.
+*/
+@theme {
+  --color-paper: #f3f5f3;
+  --color-surface: #ffffff;
+  --color-ink: #1e2622;
+  --color-muted: #6b7670;
+  --color-line: #dde2dd;
+  --color-celadon: #7fa695;
+  --color-celadon-soft: #e7eeea;
+  --color-celadon-deep: #3c5f52;
+  --color-clay: #a9643c;
+  --color-clay-soft: #f5ebe4;
+
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-korean: var(--font-gowun), "Apple SD Gothic Neo", "Malgun Gothic", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-paper: #151a17;
+    --color-surface: #1c2320;
+    --color-ink: #e8ece9;
+    --color-muted: #96a29c;
+    --color-line: #2c3630;
+    --color-celadon: #8fb6a4;
+    --color-celadon-soft: #23302a;
+    --color-celadon-deep: #a8c9b9;
+    --color-clay: #c9875f;
+    --color-clay-soft: #30241d;
+  }
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* Comfortable reading size on a phone without zooming. */
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+/* Korean set larger: Hangul at Latin body size is genuinely harder to read,
+   and these are words the reader is still learning to recognise. */
+.korean {
+  font-family: var(--font-korean);
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-celadon-deep);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

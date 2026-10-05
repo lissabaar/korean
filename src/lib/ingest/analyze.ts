@@ -1,0 +1,218 @@
+/**
+ * Analysis stage: text in, candidate words out. Writes nothing.
+ *
+ * Split from persistence so the user can see what the model and dictionary
+ * produced and fix it before anything reaches the deck. Correcting a wrong
+ * category in a preview is trivial; finding it three weeks later among two
+ * hundred entries is not.
+ */
+
+import type Anthropic from "@anthropic-ai/sdk";
+import type { PrismaClient } from "@prisma/client";
+import {
+  lookupMany,
+  type DictEntry,
+  type DictionaryKeys,
+  TRANS_LANG,
+  type TransLang,
+} from "../dictionary/krdict";
+import { recordAiUsage } from "../ai-budget";
+import { extractWords, type ExtractSource } from "./extract";
+import { resolveCategories } from "./categories";
+
+/**
+ * unverified  — a dictionary answered and does not know the lemma
+ * unreachable — no dictionary answered at all; says nothing about the lemma
+ */
+export type CandidateStatus = "new" | "duplicate" | "unverified" | "unreachable";
+
+export interface WordCandidate {
+  /** Stable within one analysis, used as a React key and in the commit call. */
+  id: string;
+  lemma: string;
+  surface: string;
+  sentence: string;
+  contextNote: string;
+  register: string | null;
+
+  primaryCategory: string;
+  secondaryCategories: string[];
+
+  status: CandidateStatus;
+
+  /** Null when no dictionary recognised the lemma. */
+  dictionary: DictEntry | null;
+  /**
+   * Every entry the dictionary has for this spelling, best match first.
+   * More than one means homographs (공원: 公園 park, 工員 worker); the
+   * preview lets the user switch if the automatic pick is wrong.
+   */
+  homographs: DictEntry[];
+
+  /** Pre-ticked for everything the user is likely to want. */
+  selected: boolean;
+
+  /** Set once the user changes a category, so it is not stored as AI-assigned. */
+  edited?: boolean;
+}
+
+export interface AnalysisResult {
+  /** The analysed text; empty for an image. */
+  text: string;
+  candidates: WordCandidate[];
+  stats: {
+    total: number;
+    verified: number;
+    duplicates: number;
+    unverified: number;
+    unreachable: number;
+  };
+}
+
+const EXPLANATION_LANG: Record<string, TransLang> = {
+  EN: TRANS_LANG.EN,
+  RU: TRANS_LANG.RU,
+};
+
+export interface AnalyzeOptions {
+  userId: string;
+  source: ExtractSource;
+  /** Whether this user's AI spend counts towards the shared daily budget. */
+  unlimitedAi: boolean;
+  maxWords?: number;
+  signal?: AbortSignal;
+}
+
+export async function analyzeText(
+  prisma: PrismaClient,
+  anthropic: Anthropic,
+  keys: DictionaryKeys,
+  options: AnalyzeOptions,
+): Promise<AnalysisResult> {
+  const { userId, source, unlimitedAi, maxWords = 40, signal } = options;
+
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { explanationLang: true },
+  });
+
+  const existingCategories = await prisma.category.findMany({
+    where: { language: "KO", OR: [{ userId }, { isBuiltIn: true }] },
+    select: { name: true },
+  });
+
+  const extraction = await extractWords(source, anthropic, {
+    maxWords,
+    existingCategories: existingCategories.map((category) => category.name),
+    signal,
+  });
+  // Recorded straight away: the money is spent even if the dictionary
+  // step below fails.
+  await recordAiUsage(prisma, userId, unlimitedAi, extraction.model, extraction.usage);
+  const extracted = extraction.words;
+
+  const transLang = EXPLANATION_LANG[user.explanationLang] ?? TRANS_LANG.EN;
+  const dictionary = await lookupMany(
+    extracted.map((word) => word.lemma),
+    keys,
+    { transLang, signal },
+  );
+
+  const existing = await prisma.entry.findMany({
+    where: { userId, language: "KO", lemma: { in: extracted.map((w) => w.lemma) } },
+    select: { lemma: true, krdictTargetCode: true },
+  });
+  // A known word is the same lemma *and* the same dictionary entry, so a
+  // second homograph (공원 park after 공원 worker) still counts as new.
+  const isKnown = (lemma: string, targetCode: string | undefined) =>
+    existing.some(
+      (entry) =>
+        entry.lemma === lemma &&
+        (!entry.krdictTargetCode || !targetCode || entry.krdictTargetCode === targetCode),
+    );
+
+  const candidates: WordCandidate[] = extracted.map((word, index) => {
+    const found = dictionary.get(word.lemma);
+    const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote);
+    const dictEntry = homographs[0] ?? null;
+    const { primary, secondary } = resolveCategories(word.categories);
+
+    const status: CandidateStatus = isKnown(word.lemma, dictEntry?.targetCode)
+      ? "duplicate"
+      : found === null
+        ? "unreachable"
+        : dictEntry === null
+          ? "unverified"
+          : "new";
+
+    return {
+      id: `${index}-${word.lemma}`,
+      lemma: word.lemma,
+      surface: word.surface,
+      sentence: word.sentence,
+      contextNote: word.contextNote,
+      register: word.register ?? null,
+      primaryCategory: primary,
+      secondaryCategories: secondary,
+      status,
+      dictionary: dictEntry,
+      homographs,
+      // Unverified words stay off by default — the lemma is probably wrong.
+      // Duplicates stay off because they are already being learned.
+      selected: status === "new",
+    };
+  });
+
+  return {
+    text: source.kind === "text" ? source.text : "",
+    candidates,
+    stats: {
+      total: candidates.length,
+      verified: candidates.filter((c) => c.status === "new").length,
+      duplicates: candidates.filter((c) => c.status === "duplicate").length,
+      unverified: candidates.filter((c) => c.status === "unverified").length,
+      unreachable: candidates.filter((c) => c.status === "unreachable").length,
+    },
+  };
+}
+
+const STOPWORDS = new Set(["a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "be", "is", "it", "this", "that", "here", "used", "meaning", "word", "as", "with", "by"]);
+
+function words(text: string | undefined | null): string[] {
+  return (text ?? "")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((word) => word.length > 1 && !STOPWORDS.has(word));
+}
+
+/**
+ * Order homographs by how well their translations match the model's reading
+ * of the context. The model never supplies the meaning itself — it only
+ * says which of the dictionary's own entries was meant. Ties keep the
+ * dictionary's order.
+ */
+export function rankHomographs(entries: DictEntry[], gloss: string, contextNote: string): DictEntry[] {
+  if (entries.length < 2) return entries;
+
+  const glossWords = new Set(words(gloss));
+  const noteWords = new Set(words(contextNote));
+
+  const score = (entry: DictEntry): number => {
+    let best = 0;
+    for (const sense of entry.senses) {
+      const senseWords = words(`${sense.translation ?? ""} ${sense.translatedDefinition ?? ""}`);
+      let points = 0;
+      for (const word of new Set(senseWords)) {
+        if (glossWords.has(word)) points += 3;
+        else if (noteWords.has(word)) points += 1;
+      }
+      best = Math.max(best, points);
+    }
+    return best;
+  };
+
+  return entries
+    .map((entry, index) => ({ entry, index, points: score(entry) }))
+    .sort((a, b) => b.points - a.points || a.index - b.index)
+    .map(({ entry }) => entry);
+}
