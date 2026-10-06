@@ -39,15 +39,12 @@ async function send(url: string, method: string, body?: unknown) {
 export default function CategoryList({
   initial,
   allCategoryNames,
-  askRecognition: initialAsk,
 }: {
   initial: CategoryView[];
   allCategoryNames: string[];
-  askRecognition: boolean;
 }) {
   const router = useRouter();
   const [categories, setCategories] = useState(initial);
-  const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -69,16 +66,6 @@ export default function CategoryList({
       await run();
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save.");
-    }
-  }
-
-  async function toggleRecognition(value: boolean) {
-    setAskRecognition(value);
-    try {
-      await send("/api/settings", "PATCH", { askRecognition: value });
-    } catch (cause) {
-      setAskRecognition(!value);
       setError(cause instanceof Error ? cause.message : "Could not save.");
     }
   }
@@ -157,20 +144,6 @@ export default function CategoryList({
         </button>
       </form>
 
-      <section className="mt-8 rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-medium">Review direction</h2>
-        <p className="mt-1 text-sm text-muted">
-          Cards show the English meaning and ask for the Korean word.
-        </p>
-        <label className="mt-3 flex items-center gap-3 text-sm">
-          <Switch
-            checked={askRecognition}
-            onChange={toggleRecognition}
-            label="Also ask Korean → English"
-          />
-          Also ask Korean → English
-        </label>
-      </section>
     </main>
   );
 }

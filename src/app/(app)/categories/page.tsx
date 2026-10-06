@@ -15,7 +15,14 @@ export default async function CategoriesPage() {
   // Words saved before every word had a category get "uncategorised" now.
   await repairLooseWords(prisma, user.id);
 
-  const [categories, settings] = await Promise.all([
+  // "uncategorised" always exists, so its words are always findable here.
+  await prisma.category.upsert({
+    where: { userId_language_name: { userId: user.id, language: "KO", name: "uncategorised" } },
+    create: { userId: user.id, language: "KO", name: "uncategorised" },
+    update: {},
+  });
+
+  const [categories] = await Promise.all([
     prisma.category.findMany({
       where: { userId: user.id },
       orderBy: { name: "asc" },
@@ -33,10 +40,6 @@ export default async function CategoriesPage() {
           orderBy: { entry: { lemma: "asc" } },
         },
       },
-    }),
-    prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { askRecognition: true },
     }),
   ]);
 
@@ -59,10 +62,9 @@ export default async function CategoriesPage() {
     <CategoryList
       // Server data changes (a word edited, a category merged) remount the
       // list with fresh state instead of patching it by hand.
-      key={fingerprint(JSON.stringify([view, settings]))}
+      key={fingerprint(JSON.stringify(view))}
       initial={view}
       allCategoryNames={names}
-      askRecognition={settings.askRecognition}
     />
   );
 }

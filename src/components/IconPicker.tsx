@@ -40,9 +40,10 @@ export default function IconPicker({
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search icons — food, heart, book…"
         aria-label="Search icons"
-        className="mb-3 w-full rounded-md border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-celadon"
+        className="mb-3 w-full rounded-md border border-line bg-paper px-3 py-2 text-base outline-none focus:border-celadon"
       />
-      <div className="grid grid-cols-8 gap-1 sm:grid-cols-12">
+      {/* Capped height: on a phone the full grid would fill several screens. */}
+      <div className="grid max-h-52 grid-cols-7 gap-1 overflow-y-auto overscroll-contain sm:max-h-64 sm:grid-cols-12">
         {shown.map((name) => (
           <button
             key={name}

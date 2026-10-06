@@ -28,6 +28,7 @@ import { XMLParser } from "fast-xml-parser";
 type XmlNode = Record<string, any>;
 
 const KRDICT_URL = "https://krdict.korean.go.kr/api/search";
+const KRDICT_VIEW_URL = "https://krdict.korean.go.kr/api/view";
 const STDICT_URL = "https://stdict.korean.go.kr/api/search.do";
 
 /** trans_lang codes as defined by the KRDict API. */
@@ -85,7 +86,8 @@ const parser = new XMLParser({
   // Without this a single <sense> parses as an object and several as an
   // array, so every consumer needs a type check. Forcing the common
   // repeated nodes to arrays keeps the mapping code uniform.
-  isArray: (name) => ["item", "sense", "example", "translation"].includes(name),
+  isArray: (name) =>
+    ["item", "sense", "example", "translation", "sense_info", "example_info"].includes(name),
 });
 
 /** Pull a value out of a parsed node regardless of nesting quirks. */
@@ -215,6 +217,40 @@ export async function lookupStdict(
       examples: [],
     })),
   }));
+}
+
+/**
+ * Example sentences for one KRDict entry, from the view API — the search
+ * API returns none. Full sentences (문장) first, then phrases (구);
+ * dialogues (대화) are skipped as they do not read well on a card.
+ *
+ * Verified against a live response: item > word_info > sense_info[] >
+ * example_info[] > { type, example }.
+ */
+export async function fetchExamples(
+  targetCode: string,
+  apiKey: string,
+  options: { senseIndex?: number; max?: number; signal?: AbortSignal } = {},
+): Promise<string[]> {
+  const { senseIndex = 0, max = 3 } = options;
+  const url = new URL(KRDICT_VIEW_URL);
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("method", "target_code");
+  url.searchParams.set("q", targetCode);
+
+  const parsed = (await fetchXml(url.toString(), options)) as XmlNode;
+  const item = asArray(parsed?.channel?.item)[0] as XmlNode | undefined;
+  const sense = asArray(item?.word_info?.sense_info)[senseIndex] as XmlNode | undefined;
+  const examples = asArray(sense?.example_info) as XmlNode[];
+
+  const byType = (type: string) =>
+    examples
+      .filter((example) => text(example.type) === type)
+      // "example" is parsed as an array everywhere (the search API repeats it).
+      .map((example) => text(asArray(example.example)[0]))
+      .filter((value): value is string => Boolean(value));
+
+  return [...byType("문장"), ...byType("구")].slice(0, max);
 }
 
 export interface DictionaryKeys {

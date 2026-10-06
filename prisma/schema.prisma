@@ -53,6 +53,10 @@ model User {
   // ask for the Korean word, which is the skill that lags behind.
   askRecognition Boolean @default(false)
 
+  // Also show the Korean dictionary definition on the question side of an
+  // English → Korean card. Off by default: the English meaning is the cue.
+  showKoreanDefinition Boolean @default(false)
+
   // Set by Better Auth's anonymous plugin: "try without an account" users.
   // They get no AI; on sign-up their data moves to the real account.
   isAnonymous Boolean? @default(false)

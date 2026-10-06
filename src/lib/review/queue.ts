@@ -36,7 +36,11 @@ type AskedDirection = "RECOGNITION" | "RECALL";
 async function studyScope(prisma: PrismaClient, userId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { askRecognition: true, hideTranslationAfterStability: true },
+    select: {
+      askRecognition: true,
+      showKoreanDefinition: true,
+      hideTranslationAfterStability: true,
+    },
   });
   const directions: AskedDirection[] = user.askRecognition
     ? ["RECALL", "RECOGNITION"]
@@ -138,6 +142,8 @@ export interface ReviewItem {
     definitionTarget: string | null;
     definitionKnown: string | null;
     example: string | null;
+    /** English translation of the example, when it has one (AI-written ones do). */
+    exampleTranslation: string | null;
     contextNote: string | null;
   };
   /** First syllable of the expected answer, offered as a hint when typing. */
@@ -270,7 +276,13 @@ export async function buildSession(
               // Once the word is settled, recall is cued by the Korean
               // definition alone — the translation is the crutch to drop.
               meaning: translationShown ? meaning : null,
-              definitionTarget: sense.definitionTarget,
+              // Otherwise the English meaning is the cue; the Korean
+              // definition joins it only if the user asked for it (or there
+              // is no English at all).
+              definitionTarget:
+                user.showKoreanDefinition || !translationShown || !sense.translation
+                  ? sense.definitionTarget
+                  : null,
             },
       back: {
         lemma: entry.lemma,
@@ -281,6 +293,7 @@ export async function buildSession(
         definitionTarget: sense.definitionTarget,
         definitionKnown: translationShown ? sense.definitionKnown : null,
         example: sense.examples[0]?.text ?? null,
+        exampleTranslation: sense.examples[0]?.translation ?? null,
         contextNote: sense.contextNote,
       },
       hint: exercise === "TYPING" && typedAnswer ? [...typedAnswer][0] : null,

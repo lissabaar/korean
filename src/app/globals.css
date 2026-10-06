@@ -70,3 +70,16 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+  iOS Safari zooms the page into any focused field whose text is smaller
+  than 16px. -webkit-touch-callout exists only there, so other platforms keep
+  the compact sizes; !important beats the Tailwind size utilities.
+*/
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}

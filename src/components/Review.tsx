@@ -437,9 +437,12 @@ function Back({ item }: { item: ReviewItem }) {
         <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>
       )}
       {back.example && (
-        <p className="korean mt-3 border-l-2 border-celadon pl-3 text-lg leading-relaxed sm:text-base">
-          {back.example}
-        </p>
+        <div className="mt-3 border-l-2 border-celadon pl-3">
+          <p className="korean text-lg leading-relaxed sm:text-base">{back.example}</p>
+          {back.exampleTranslation && (
+            <p className="mt-0.5 text-sm text-muted">{back.exampleTranslation}</p>
+          )}
+        </div>
       )}
     </div>
   );

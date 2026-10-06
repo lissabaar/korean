@@ -28,37 +28,23 @@ export default async function Home() {
         <Stat label="Words" value={stats.words} />
       </dl>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        {stats.due > 0 && (
-          <Link
-            href="/review?mode=review"
-            className="rounded-md bg-celadon-deep px-6 py-3 text-center font-medium text-paper"
-          >
-            <i className="bi bi-arrow-repeat mr-2" aria-hidden />
-            Review · {stats.due}
-          </Link>
-        )}
-        {stats.learning > 0 && (
-          <Link
-            href="/review?mode=learn"
-            className={`rounded-md px-6 py-3 text-center font-medium ${
-              stats.due > 0 ? "border border-celadon bg-surface text-celadon-deep" : "bg-celadon-deep text-paper"
-            }`}
-          >
-            <i className="bi bi-stars mr-2" aria-hidden />
-            Learn new words · {stats.learning}
-          </Link>
-        )}
-        <Link
-          href="/add"
-          className={`rounded-md px-6 py-3 text-center font-medium ${
-            hasWork
-              ? "border border-line bg-surface"
-              : "bg-celadon-deep text-paper"
-          }`}
-        >
-          Add words
-        </Link>
+      {/* Three ways in, always visible; counts say whether there is work. */}
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <Action
+          href="/learn"
+          icon="bi-stars"
+          title="Learn"
+          note={stats.learning > 0 ? `${stats.learning} new` : "no new words"}
+          primary={stats.learning > 0 && stats.due === 0}
+        />
+        <Action
+          href="/review"
+          icon="bi-arrow-repeat"
+          title="Review"
+          note={stats.due > 0 ? `${stats.due} due` : "all caught up"}
+          primary={stats.due > 0}
+        />
+        <Action href="/add" icon="bi-plus-lg" title="Add words" note="text, files or by hand" />
       </div>
 
       {stats.words === 0 && (
@@ -110,4 +96,31 @@ function formatWhen(date: Date): string {
   if (hours < 24) return `in ${Math.round(hours)} h`;
   const days = Math.round(hours / 24);
   return days === 1 ? "tomorrow" : `in ${days} days`;
+}
+
+function Action({
+  href,
+  icon,
+  title,
+  note,
+  primary = false,
+}: {
+  href: string;
+  icon: string;
+  title: string;
+  note: string;
+  primary?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-3 rounded-lg px-4 py-3.5 sm:flex-col sm:items-start sm:gap-1 ${
+        primary ? "bg-celadon-deep text-paper" : "border border-line bg-surface"
+      }`}
+    >
+      <i className={`bi ${icon} text-xl`} aria-hidden />
+      <span className="font-medium">{title}</span>
+      <span className={`ml-auto text-sm sm:ml-0 ${primary ? "opacity-80" : "text-muted"}`}>{note}</span>
+    </Link>
+  );
 }

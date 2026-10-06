@@ -41,6 +41,8 @@ src/lib/
     starter-deck.ts         ready-made deck for empty accounts (DRAFT content)
     merge-anonymous.ts      anonymous → real account on sign-up/sign-in
     edit.ts                 rename/merge/delete categories, edit/delete words
+    examples.ts             fill missing examples: KRDict view API first, AI after
+  plans.ts                  plan prices and credits (DRAFT) — pricing page + billing
   ingest/
     extract.ts              model → lemmas + categories (no DB writes)
     categories.ts           fixed taxonomy, alias folding
@@ -56,15 +58,19 @@ src/lib/import/             browser-only: dropped files → analysis jobs
   read.ts                   images (downscaled), CSV/TSV, text, subtitles; chunking
   anki.ts                   .apkg/.colpkg via fflate + fzstd + sql.js (lazy-loaded)
 scripts/copy-sqljs-wasm.mjs postinstall: puts sql.js's wasm in public/
-src/app/(app)/              app pages (home, /review, /add, /categories); layout starts
-                            an anonymous session for first-time visitors
+src/app/(app)/              app pages: home, /learn, /review, /add, /categories,
+                            /settings, /pricing; layout starts an anonymous session
+                            for first-time visitors
 src/app/api/review/         session (GET) and answer (POST) routes
 src/app/api/{words,categories,settings,starter-deck,dictionary}/
                             manual words (+ edit), category flags/rename/delete,
                             dictionary lookup for typed-in words (no AI)
 ```
 
-Docs: `SETUP.md` (Russian, for the owner) — setting up on a new machine.
+Docs for the owner (Russian): `SETUP.md` new machine, `VERCEL.md` deploys,
+`PRICING.md` how plan numbers were derived, `PAYMENTS.md` plan for billing
+(two businesses: RU cards via a Russian acquirer, foreign cards via a
+merchant of record from Uruguay — never help route around sanctions).
 
 ## Key design rules — don't break these
 
@@ -154,6 +160,17 @@ categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
 sessions both go through it. Sessions take a mode — `learn` (new words
 only), `review` (scheduled only), `all` — from `/review?mode=`.
 
+**Examples: dictionary first.**
+`words/examples.ts` fetches from KRDict's view API (`fetchExamples`, free)
+and only asks the model for words the dictionary cannot cover; AI examples
+are stored with source AI and an English translation. In the view API's XML
+`example` is parsed as an array (shared parser) — read `[0]`.
+
+**The English meaning is the cue.**
+English → Korean cards show the English meaning; the Korean definition joins
+it only with `User.showKoreanDefinition` (or when there is no English, or
+once the translation is hidden for a settled word).
+
 **Cards don't repeat themselves.**
 The answer side shows only what the question side did not (an English →
 Korean card's meaning and Korean definition are not shown again). Its
@@ -202,9 +219,11 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 - Starter deck content is a 10-word draft — replace with a real,
   dictionary-checked deck
+- Billing: plans exist only as a placeholder page; see PAYMENTS.md
+- KRDict's 50 000 requests/day are shared by all users — cache lookups
+  before growth
 - Anonymous users that never sign up are never cleaned up
 - Email verification: off (needs a mail provider such as Resend + a domain)
-- Example sentences from KRDict's view API (typed-in words get none yet)
 
 - Example sentences — KRDict's search API has none; needs its view API
   (`/api/view`, by `target_code`)

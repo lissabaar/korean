@@ -59,6 +59,16 @@ export default function ManualWord({ categories }: { categories: string[] }) {
     setLemma(entry.lemma);
     if (entry.translation) setTranslation(entry.translation);
     if (entry.definition) setDefinition(entry.definition);
+    // The search result has no examples; the dictionary's entry page does.
+    if (entry.targetCode && !example.trim()) {
+      fetch(`/api/dictionary/examples?code=${encodeURIComponent(entry.targetCode)}`)
+        .then((response) => response.json())
+        .then((data: { examples?: string[] }) => {
+          const first = data.examples?.[0];
+          if (first) setExample((current) => current || first);
+        })
+        .catch(() => {});
+    }
   }
 
   async function save(event: React.FormEvent) {
