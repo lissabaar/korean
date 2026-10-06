@@ -14,6 +14,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { cachedLookupMany } from "../dictionary/cached";
 import { TRANS_LANG, type DictionaryKeys } from "../dictionary/krdict";
+import { readableMeaning } from "../dictionary/romanize";
 import { rankHomographs } from "../ingest/analyze";
 
 const PER_RUN = 40;
@@ -84,7 +85,8 @@ export async function verifyPending(
               prisma.sense.update({
                 where: { id: sense.id },
                 data: {
-                  translation: first.translation ?? sense.translation,
+                  translation:
+                    readableMeaning(entry.lemma, first.translation, sense.translation) ?? sense.translation,
                   definitionTarget: sense.definitionTarget ?? first.definition ?? null,
                   definitionKnown: first.translatedDefinition ?? undefined,
                   definitionSource: "KRDICT",

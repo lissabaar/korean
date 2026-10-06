@@ -7,6 +7,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 import type { DictEntry } from "../dictionary/krdict";
+import { readableMeaning } from "../dictionary/romanize";
 
 export interface ApprovedWord {
   lemma: string;
@@ -44,7 +45,13 @@ function ownMeaning(word: ApprovedWord): string | null {
 export function resolveEntry(word: ApprovedWord): DictEntry | null {
   // The dictionary's entry as it is — the user's own meaning is stored next
   // to it (Sense.userMeaning), never over it.
-  if (word.dictionary?.senses?.length) return word.dictionary;
+  if (word.dictionary?.senses?.length) {
+    const [first, ...rest] = word.dictionary.senses;
+    const meaning = readableMeaning(word.dictionary.lemma, first.translation, word.aiMeaning);
+    return meaning === first.translation
+      ? word.dictionary
+      : { ...word.dictionary, senses: [{ ...first, translation: meaning ?? undefined }, ...rest] };
+  }
   const english = word.aiMeaning?.trim().slice(0, 300) ?? "";
   const lemma = word.lemma?.normalize("NFC").trim().slice(0, 120);
   if (!lemma || !(english || ownMeaning(word))) return null;
