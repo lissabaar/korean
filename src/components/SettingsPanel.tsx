@@ -16,25 +16,33 @@ export default function SettingsPanel({
   email,
   askRecognition: initialAsk,
   showKoreanDefinition: initialKorean,
+  learningGoal: initialGoal,
   credits,
   missingExamples,
+  planName,
+  lookups,
 }: {
   /** null = no account yet. */
   email: string | null;
   askRecognition: boolean;
   showKoreanDefinition: boolean;
+  learningGoal: number;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
+  planName: string;
+  /** Typed-in dictionary lookups today; limit null = unlimited. */
+  lookups: { used: number; limit: number | null };
 }) {
   const router = useRouter();
   const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [showKorean, setShowKorean] = useState(initialKorean);
+  const [goal, setGoal] = useState(initialGoal);
   const [error, setError] = useState<string | null>(null);
   const [filling, setFilling] = useState(false);
   const [filled, setFilled] = useState<FillResult | null>(null);
 
-  async function save(change: Record<string, boolean>, undo: () => void) {
+  async function save(change: Record<string, boolean | number>, undo: () => void) {
     setError(null);
     try {
       const response = await fetch("/api/settings", {
@@ -104,6 +112,35 @@ export default function SettingsPanel({
       </section>
 
       <section className={section}>
+        <h2 className="font-medium">Learning new words</h2>
+        <p className="mt-1 text-sm text-muted">
+          A new word counts as learned after this many right answers in a row — the last one typed,
+          the rest picked from options. Its first review is the next day; after that the gaps grow
+          (roughly 1, 3, 7–10, 20+ days), shorter whenever you miss it.
+        </p>
+        <div role="radiogroup" aria-label="Right answers in a row" className="mt-3 flex gap-2">
+          {[2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={goal === n}
+              onClick={() => {
+                const before = goal;
+                setGoal(n);
+                save({ learningGoal: n }, () => setGoal(before));
+              }}
+              className={`size-11 rounded-md border text-base ${
+                goal === n ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className={section}>
         <h2 className="font-medium">Examples</h2>
         <p className="mt-1 text-sm text-muted">
           {missingExamples === 0
@@ -156,7 +193,10 @@ export default function SettingsPanel({
           <>
             <p className="mt-1 text-sm">{email}</p>
             <p className="mt-1 text-sm text-muted">
+              Plan: {planName}.{" "}
               {credits === null ? "Unlimited AI." : `${credits} AI credits left.`}{" "}
+              Dictionary lookups today: {lookups.used}
+              {lookups.limit === null ? "" : ` of ${lookups.limit}`}.{" "}
               <Link href="/pricing" className="text-celadon-deep underline underline-offset-4">
                 Plans
               </Link>

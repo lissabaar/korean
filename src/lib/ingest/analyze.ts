@@ -9,8 +9,8 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PrismaClient } from "@prisma/client";
+import { cachedLookupMany } from "../dictionary/cached";
 import {
-  lookupMany,
   type DictEntry,
   type DictionaryKeys,
   TRANS_LANG,
@@ -119,7 +119,8 @@ export async function analyzeText(
   const extracted = extraction.words;
 
   const transLang = EXPLANATION_LANG[user.explanationLang] ?? TRANS_LANG.EN;
-  const dictionary = await lookupMany(
+  const dictionary = await cachedLookupMany(
+    prisma,
     extracted.map((word) => word.lemma),
     keys,
     { transLang, signal },

@@ -57,17 +57,22 @@ model User {
   // English → Korean card. Off by default: the English meaning is the cue.
   showKoreanDefinition Boolean @default(false)
 
+  // Correct answers in a row before a new word counts as learned and moves
+  // to spaced review (2–5). The last step is typed, not picked.
+  learningGoal Int @default(3)
+
   // Set by Better Auth's anonymous plugin: "try without an account" users.
   // They get no AI; on sign-up their data moves to the real account.
   isAnonymous Boolean? @default(false)
 
-  entries    Entry[]
-  categories Category[]
-  cards      Card[]
-  materials  SourceMaterial[]
-  sessions   Session[]
-  accounts   Account[]
-  aiUsage    AiUsage[]
+  entries         Entry[]
+  categories      Category[]
+  cards           Card[]
+  materials       SourceMaterial[]
+  sessions        Session[]
+  accounts        Account[]
+  aiUsage         AiUsage[]
+  dictionaryUsage DictionaryUsage[]
 
   @@map("user")
 }
@@ -476,4 +481,39 @@ model AiUsage {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------- caches
+
+// Dictionary answers, shared by every user: KRDict allows 50 000 requests a
+// day per key for the whole service. Keys: "search:<transLang>:<word>",
+// "examples:<targetCode>". Value is the parsed result as JSON.
+model DictionaryCache {
+  key       String   @id
+  value     Json
+  fetchedAt DateTime @default(now())
+}
+
+// AI-written example sentences, shared by every user: the same word in the
+// same meaning gets its example once, not once per learner.
+model GeneratedExample {
+  id          String   @id @default(cuid())
+  lemma       String
+  // Lowercased English meaning the example was written for.
+  meaning     String
+  text        String
+  translation String?
+  createdAt   DateTime @default(now())
+
+  @@unique([lemma, meaning])
+}
+
+// Typed-in dictionary lookups per user per day, for the plan's daily limit.
+model DictionaryUsage {
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day    DateTime @db.Date
+  count  Int      @default(0)
+
+  @@id([userId, day])
 }

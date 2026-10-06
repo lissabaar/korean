@@ -12,7 +12,8 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { assertCanUseAi, AiQuotaError, recordAiUsage } from "../ai-budget";
-import { fetchExamples, type DictionaryKeys } from "../dictionary/krdict";
+import { cachedExamples } from "../dictionary/cached";
+import type { DictionaryKeys } from "../dictionary/krdict";
 import { EXTRACTION_MODEL } from "../ingest/extract";
 
 /** One request per run is plenty for a personal deck; run again for more. */
@@ -64,7 +65,7 @@ export async function fillMissingExamples(
       let found: string[] = [];
       if (code && /^\d+$/.test(code)) {
         try {
-          found = await fetchExamples(code, keys.krdict, { max: 2 });
+          found = (await cachedExamples(prisma, code, keys)).slice(0, 2);
         } catch {
           // Unreachable dictionary: leave the word for the next run rather
           // than spending AI on something the dictionary probably has.
@@ -83,11 +84,35 @@ export async function fillMissingExamples(
   }
   await Promise.all([worker(), worker(), worker()]);
 
-  // ---- model, for what the dictionary could not cover
+  // ---- shared cache of AI-written examples: another learner's word in the
+  // same meaning already has one, so no model call is needed for it
   let fromAi = 0;
+  const meaningOf = (sense: (typeof senses)[number]) =>
+    (sense.translation ?? "").toLowerCase().trim().slice(0, 200);
+  const cached = needAi.length
+    ? await prisma.generatedExample.findMany({
+        where: { OR: needAi.map((sense) => ({ lemma: sense.entry.lemma, meaning: meaningOf(sense) })) },
+      })
+    : [];
+  const cacheKey = (lemma: string, meaning: string) => `${lemma}|${meaning}`;
+  const byKey = new Map(cached.map((row) => [cacheKey(row.lemma, row.meaning), row]));
+  const uncached: typeof needAi = [];
+  for (const sense of needAi) {
+    const row = byKey.get(cacheKey(sense.entry.lemma, meaningOf(sense)));
+    if (!row) {
+      uncached.push(sense);
+      continue;
+    }
+    await prisma.example.create({
+      data: { senseId: sense.id, text: row.text, translation: row.translation, source: "AI" },
+    });
+    fromAi += 1;
+  }
+
+  // ---- model, for what neither the dictionary nor the cache covered
   let aiBlocked: FillResult["aiBlocked"];
-  for (let i = 0; i < needAi.length; i += AI_BATCH) {
-    const batch = needAi.slice(i, i + AI_BATCH);
+  for (let i = 0; i < uncached.length; i += AI_BATCH) {
+    const batch = uncached.slice(i, i + AI_BATCH);
     let unlimited: boolean;
     try {
       unlimited = (await assertCanUseAi(prisma, userId)).unlimited;
@@ -122,14 +147,18 @@ export async function fillMissingExamples(
     for (const sense of batch) {
       const generated = byLemma.get(sense.entry.lemma);
       if (!generated?.example.trim()) continue;
+      const text = generated.example.normalize("NFC").trim().slice(0, 500);
+      const translation = generated.translation.trim().slice(0, 500) || null;
       await prisma.example.create({
-        data: {
-          senseId: sense.id,
-          text: generated.example.normalize("NFC").trim().slice(0, 500),
-          translation: generated.translation.trim().slice(0, 500) || null,
-          source: "AI",
-        },
+        data: { senseId: sense.id, text, translation, source: "AI" },
       });
+      await prisma.generatedExample
+        .upsert({
+          where: { lemma_meaning: { lemma: sense.entry.lemma, meaning: meaningOf(sense) } },
+          create: { lemma: sense.entry.lemma, meaning: meaningOf(sense), text, translation },
+          update: {},
+        })
+        .catch(() => {}); // the cache is a bonus; never fail the fill over it
       fromAi += 1;
     }
   }

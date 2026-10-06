@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SUGGESTED_ICONS } from "@/lib/category-icons";
 
 /**
@@ -11,11 +11,34 @@ import { SUGGESTED_ICONS } from "@/lib/category-icons";
 export default function IconPicker({
   value,
   onPick,
+  onClose,
 }: {
   value: string;
   onPick: (icon: string) => void;
+  /** Called on a click or tap outside the picker, and on Escape. */
+  onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onPointer(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) onClose();
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    // Deferred one tick so the tap that opened the picker does not close it.
+    const timer = setTimeout(() => {
+      document.addEventListener("pointerdown", onPointer);
+      document.addEventListener("keydown", onKey);
+    });
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
   const [allNames, setAllNames] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -33,7 +56,7 @@ export default function IconPicker({
   }, [query, allNames]);
 
   return (
-    <div>
+    <div ref={rootRef}>
       <input
         autoFocus
         value={query}

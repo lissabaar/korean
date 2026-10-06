@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { AnalysisResult, WordCandidate } from "@/lib/ingest/analyze";
-import { readFile, sourceFromText, type ImportSource } from "@/lib/import/read";
+import {
+  isTopicRequest,
+  readFile,
+  sourceFromText,
+  sourceFromTopic,
+  type ImportSource,
+} from "@/lib/import/read";
 import CandidateRow from "./CandidateRow";
 import FileDrop from "./FileDrop";
 import ManualWord from "./ManualWord";
@@ -86,7 +92,7 @@ export default function AddWords({
     let all: ImportSource[] = files;
     if (pasted) {
       try {
-        all = [sourceFromText(pasted), ...files];
+        all = [isTopicRequest(pasted) ? sourceFromTopic(pasted) : sourceFromText(pasted), ...files];
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No Korean text found.");
         return;
@@ -308,13 +314,13 @@ export default function AddWords({
         <>
           <label className="flex flex-col gap-2">
             <span className="text-sm text-muted">
-              Paste Korean text — a lesson, an article, subtitles, or a word list with your own
-              translations.
+              Paste Korean text, a word list with your translations — or just ask, in any
+              language: <em>“weather words”</em>, <em>“ordering in a cafe, beginner”</em>.
             </span>
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
-              rows={7}
+              rows={4}
               placeholder="오늘은 날씨가 좋아서 친구랑 공원에서 산책했어요."
               className="korean w-full resize-y rounded-md border border-line bg-surface p-4 text-lg leading-relaxed outline-none focus:border-celadon"
             />
@@ -377,7 +383,11 @@ export default function AddWords({
             disabled={reading > 0 || totalParts === 0 || outOfCredits}
             className="mt-5 w-full rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper disabled:opacity-50 sm:w-auto sm:px-8"
           >
-            {totalParts > 1 ? `Find words · ${totalParts} parts` : "Find words"}
+            {totalParts > 1
+              ? `Find words · ${totalParts} parts`
+              : isTopicRequest(pasted) && files.length === 0
+                ? "Find words on this topic"
+                : "Find words"}
           </button>
           {totalParts > 10 && (
             <p className="mt-2 text-xs text-muted">

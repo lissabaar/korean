@@ -19,8 +19,10 @@ export interface Plan {
   /** AI credits: one-off for free, per month for paid plans. */
   credits: number;
   creditsPeriod: "once" | "month";
-  /** Rough capacity, shown to people instead of "credits". */
+  /** One line on who the plan is for. */
   wordsHint: string;
+  /** Typed-in dictionary lookups per day; null = unlimited. */
+  dictionaryLookupsPerDay: number | null;
   features: string[];
 }
 
@@ -34,12 +36,13 @@ export const PLANS: Plan[] = [
     yearlyRub: null,
     credits: 50,
     creditsPeriod: "once",
-    wordsHint: "about 300–500 words found by AI",
+    wordsHint: "Everything you need to learn — for good",
+    dictionaryLookupsPerDay: 100,
     features: [
-      "Unlimited words typed in by hand, with dictionary lookup",
-      "Unlimited reviews and learning",
-      "Categories, starter deck, examples from the dictionary",
-      "50 AI credits to try texts, screenshots and Anki imports",
+      "Learning and reviews, unlimited",
+      "Add words by hand with dictionary lookup (100 a day)",
+      "Categories, starter deck, dictionary examples",
+      "50 AI credits to try texts, screenshots, Anki and topics",
     ],
   },
   {
@@ -51,12 +54,14 @@ export const PLANS: Plan[] = [
     yearlyRub: 3990,
     credits: 200,
     creditsPeriod: "month",
-    wordsHint: "about 1,500–2,500 words a month",
+    wordsHint: "For learning from what you read and watch",
+    dictionaryLookupsPerDay: 1000,
     features: [
       "Everything in Free",
-      "200 AI credits every month",
-      "Texts, screenshots, Anki decks and tables",
-      "AI-written examples where the dictionary has none",
+      "AI turns texts, screenshots, subtitles and Anki decks into cards",
+      "Words on any topic, examples written where the dictionary has none",
+      "1,000 dictionary lookups a day",
+      "Coming: AI exercises and answer checking",
     ],
   },
   {
@@ -68,11 +73,13 @@ export const PLANS: Plan[] = [
     yearlyRub: 7990,
     credits: 500,
     creditsPeriod: "month",
-    wordsHint: "about 4,000–6,000 words a month",
+    wordsHint: "For heavy importing and practice",
+    dictionaryLookupsPerDay: null,
     features: [
-      "Everything in Plus",
-      "500 AI credits every month",
-      "For importing whole Anki decks and textbooks",
+      "Everything in Plus, with 2.5× the AI",
+      "Whole Anki decks and textbooks at once",
+      "Unlimited dictionary lookups",
+      "Coming: more AI practice — writing and conversation checks",
     ],
   },
 ];

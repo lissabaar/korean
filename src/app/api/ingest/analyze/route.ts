@@ -19,6 +19,7 @@ const MAX_IMAGE_BASE64 = 4_000_000;
 export async function POST(request: Request) {
   let body: {
     text?: string;
+    topic?: string;
     image?: { data?: string; mediaType?: string };
     maxWords?: number;
   };
@@ -30,7 +31,9 @@ export async function POST(request: Request) {
   }
 
   let source: ExtractSource;
-  if (body.image) {
+  if (typeof body.topic === "string" && body.topic.trim()) {
+    source = { kind: "topic", topic: body.topic.trim().slice(0, 300) };
+  } else if (body.image) {
     const { data, mediaType } = body.image;
     if (!data || !IMAGE_MEDIA_TYPES.includes(mediaType as ImageMediaType)) {
       return NextResponse.json(

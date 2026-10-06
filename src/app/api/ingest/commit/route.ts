@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
     const result = await commitWords(prisma, {
       userId,
-      kind: body.kind === "IMAGE" ? "IMAGE" : "TEXT",
+      kind: body.kind === "IMAGE" || body.kind === "GENERATED" ? body.kind : "TEXT",
       text: body.text ?? "",
       title: body.title?.slice(0, 200),
       words,

@@ -20,7 +20,16 @@ import {
   type Grade,
 } from "ts-fsrs";
 
-export const LEARNING_STREAK_TO_GRADUATE = 2;
+/**
+ * Correct answers in a row before a new word graduates. A per-user setting
+ * (User.learningGoal, 2–5); this is the default and the fallback.
+ */
+export const DEFAULT_LEARNING_GOAL = 3;
+
+export function clampLearningGoal(value: number | null | undefined): number {
+  const n = Math.round(value ?? DEFAULT_LEARNING_GOAL);
+  return Math.min(5, Math.max(2, Number.isFinite(n) ? n : DEFAULT_LEARNING_GOAL));
+}
 
 /**
  * Number of scheduled reviews answered by multiple choice before switching
@@ -46,11 +55,20 @@ export interface CardLike {
 }
 
 /**
- * Which exercise to show. A pure function of card state — never random,
- * because every rating FSRS receives must mean the same thing.
+ * Which exercise to show. A pure function of card state (plus the user's
+ * stable learning goal) — never random, because every rating FSRS receives
+ * must mean the same thing.
+ *
+ * Learning: pick from options until the last step, which is typed —
+ * recognising a word among four is not yet being able to produce it.
  */
-export function pickExercise(card: CardLike): ExerciseType {
-  if (card.phase === "LEARNING") return "CHOICE";
+export function pickExercise(
+  card: CardLike,
+  learningGoal: number = DEFAULT_LEARNING_GOAL,
+): ExerciseType {
+  if (card.phase === "LEARNING") {
+    return card.learningStreak >= clampLearningGoal(learningGoal) - 1 ? "TYPING" : "CHOICE";
+  }
   if (card.direction === "REGISTER") return "CHOICE"; // finite set of options
   return card.reps < CHOICE_REVIEWS_BEFORE_TYPING ? "CHOICE" : "TYPING";
 }
@@ -83,11 +101,12 @@ export interface LearningOutcome {
 export function advanceLearning(
   card: CardLike,
   wasCorrect: boolean,
+  learningGoal: number = DEFAULT_LEARNING_GOAL,
 ): LearningOutcome {
   const streak = wasCorrect ? card.learningStreak + 1 : 0;
   return {
     learningStreak: streak,
-    graduated: streak >= LEARNING_STREAK_TO_GRADUATE,
+    graduated: streak >= clampLearningGoal(learningGoal),
   };
 }
 

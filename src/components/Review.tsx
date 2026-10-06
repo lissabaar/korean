@@ -44,7 +44,16 @@ export default function Review({ mode }: { mode: StudyMode }) {
     if (result.correct) setCorrectCount((n) => n + 1);
     setQueue(([head, ...rest]) => {
       if (!result.requeue) return rest;
-      const again = { ...head, learningStreak: result.learningStreak };
+      // Mirror pickExercise(): the last learning step is typed.
+      const typed = result.learningStreak >= head.learningGoal - 1;
+      const answer = head.direction === "RECALL" ? head.back.lemma : (head.back.translation ?? "");
+      const again: ReviewItem = {
+        ...head,
+        learningStreak: result.learningStreak,
+        exercise: typed ? "TYPING" : "CHOICE",
+        hint: typed && answer ? [...answer][0] : null,
+        selfGraded: typed ? head.direction === "RECOGNITION" && !head.back.translation : head.choices === null,
+      };
       const at = Math.min(REQUEUE_GAP, rest.length);
       return [...rest.slice(0, at), again, ...rest.slice(at)];
     });
@@ -124,7 +133,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         <div className="mb-1.5 flex justify-between text-xs text-muted">
           <span>
             {current.phase === "LEARNING"
-              ? `New word · ${current.learningStreak} of 2 in a row`
+              ? `New word · ${current.learningStreak} of ${current.learningGoal} in a row`
               : "Review"}
           </span>
           <span className="tabular-nums">{queue.length} left</span>
@@ -157,6 +166,7 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
 
@@ -171,6 +181,12 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
           body: JSON.stringify({ cardId: item.cardId, usedHint, ...body }),
         });
         const data = await response.json();
+        // 401/404: the card belongs to a different session than the one now
+        // in the browser — signed in or out in another tab since loading.
+        if (response.status === 401 || response.status === 404) {
+          setStale(true);
+          return;
+        }
         if (!response.ok) throw new Error(data.error ?? "Could not save that answer.");
         setResult(data);
       } catch (cause) {
@@ -219,6 +235,20 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
         <p role="alert" className="mt-4 rounded-md bg-clay-soft px-3 py-2 text-sm text-clay">
           {error}
         </p>
+      )}
+
+      {stale && (
+        <div role="alert" className="mt-4 rounded-md bg-clay-soft px-3 py-3 text-sm text-clay">
+          You signed in or out since this page opened, so these cards belong to another
+          account.
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="ml-2 font-medium underline underline-offset-4"
+          >
+            Reload
+          </button>
+        </div>
       )}
 
       {/* ---- answering ---- */}
@@ -377,7 +407,11 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
 function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | null): string {
   if (result.graduated) return "Learned — this word now moves to spaced review.";
   if (result.verdict === "almost") return `${result.note ?? "Close."} Expected: ${result.expected}`;
-  if (result.correct) return item.phase === "LEARNING" ? "Right — once more to lock it in." : "Right.";
+  if (result.correct) {
+    if (item.phase !== "LEARNING") return "Right.";
+    const left = item.learningGoal - result.learningStreak;
+    return left === 1 ? "Right — one more, and this time type it." : `Right — ${left} more to go.`;
+  }
   // The options are hidden on phones after answering, so say what was picked.
   return picked
     ? `Not quite — you picked ${picked}. The answer: ${result.expected}`

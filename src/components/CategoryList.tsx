@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import IconPicker from "./IconPicker";
 import WordEditor from "./WordEditor";
 
@@ -168,6 +168,7 @@ function CategoryRow({
   const [editing, setEditing] = useState<string | null>(null);
   const off = !category.learnActive && !category.reviewActive;
   const toggle = (value: typeof panel) => setPanel(panel === value ? "none" : value);
+  const closePanel = useCallback(() => setPanel("none"), []);
 
   return (
     <li className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -176,6 +177,11 @@ function CategoryRow({
         <button
           type="button"
           onClick={() => toggle("icon")}
+          // While open, this button closes the picker itself; keep its press
+          // from also counting as an "outside" tap (which would reopen it).
+          onPointerDown={(event) => {
+            if (panel === "icon") event.stopPropagation();
+          }}
           aria-label={`Change icon for ${category.name}`}
           className={`grid size-10 shrink-0 place-items-center rounded-md bg-celadon-soft text-xl text-celadon-deep ${off ? "opacity-50" : ""}`}
         >
@@ -233,6 +239,7 @@ function CategoryRow({
               onPatch({ icon });
               setPanel("none");
             }}
+            onClose={closePanel}
           />
         </div>
       )}

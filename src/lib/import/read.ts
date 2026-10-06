@@ -12,6 +12,7 @@ import type { ImageMediaType } from "@/lib/ingest/extract";
 
 export type JobPayload =
   | { text: string }
+  | { topic: string }
   | { image: { data: string; mediaType: ImageMediaType } };
 
 export interface ImportJob {
@@ -23,7 +24,8 @@ export interface ImportJob {
 export interface ImportSource {
   id: string;
   name: string;
-  kind: "TEXT" | "IMAGE";
+  /** Stored as the material kind; GENERATED = words suggested for a topic. */
+  kind: "TEXT" | "IMAGE" | "GENERATED";
   /** Stored with the saved words as the material they came from. */
   text: string;
   /** Human summary, e.g. "Anki deck · 312 notes". */
@@ -78,6 +80,25 @@ export async function readFile(file: File): Promise<ImportSource> {
 
 export function sourceFromText(text: string, name = "Pasted text"): ImportSource {
   return textSource(name, proseLines(text), "Text");
+}
+
+/** True when the input has no Korean at all — then it is read as a topic. */
+export function isTopicRequest(text: string): boolean {
+  return text.trim().length > 0 && !HANGUL.test(text);
+}
+
+/** "weather words", "ordering in a cafe, beginner" → one suggestion request. */
+export function sourceFromTopic(topic: string): ImportSource {
+  const id = nextId("s");
+  const clean = topic.trim().slice(0, 300);
+  return {
+    id,
+    name: `Topic: ${clean}`,
+    kind: "GENERATED",
+    text: clean,
+    summary: "Words suggested by AI, checked against the dictionary",
+    jobs: [{ id: nextId("j"), sourceId: id, payload: { topic: clean } }],
+  };
 }
 
 // ---------------------------------------------------------------- text

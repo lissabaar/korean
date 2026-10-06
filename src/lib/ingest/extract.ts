@@ -97,7 +97,29 @@ Rules:
 /** What the words come from: pasted or file text, or one image. */
 export type ExtractSource =
   | { kind: "text"; text: string }
-  | { kind: "image"; data: string; mediaType: ImageMediaType };
+  | { kind: "image"; data: string; mediaType: ImageMediaType }
+  /** A request in plain words: "weather words", "food for beginners". */
+  | { kind: "topic"; topic: string };
+
+/**
+ * Topic requests: the model proposes words, the dictionary decides whether
+ * they are real — an invented word fails lookup and never becomes a card,
+ * exactly as with extraction.
+ */
+const TOPIC_PROMPT = `You suggest Korean vocabulary for a learning app.
+
+The learner describes what they want in their own words, in any language — a topic, a situation, a level ("weather", "words for ordering in a cafe, beginner"). Suggest the most useful words for it: common, current, standard-dictionary words; respect a level if one is given, otherwise mix beginner and intermediate.
+
+For each word return:
+- lemma: the dictionary form (기본형); verbs and adjectives end in 다
+- surface: same as lemma
+- sentence: one short, natural example sentence using the word (polite 해요체)
+- category: exactly one, copied verbatim from the category list supplied below — the closest fit. Never invent a category.
+- contextNote: one sentence in English on the meaning
+- gloss: the meaning as a plain English word or two
+- register: the politeness level, or null if the word carries no particular level
+
+Do not invent definitions or translations. Those come from a dictionary.`;
 
 export const IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
@@ -131,6 +153,9 @@ function buildContent(source: ExtractSource, options: ExtractOptions): Anthropic
   const instructions = buildInstructions(options);
   if (source.kind === "text") {
     return [{ type: "text", text: `${instructions}\n\nText:\n${source.text}` }];
+  }
+  if (source.kind === "topic") {
+    return [{ type: "text", text: `${instructions}\n\nRequest:\n${source.topic}` }];
   }
   return [
     {
@@ -180,7 +205,7 @@ export async function extractWords(
 ): Promise<Extraction> {
   const { words, ...meta } = await requestWords(
     client,
-    SYSTEM_PROMPT,
+    source.kind === "topic" ? TOPIC_PROMPT : SYSTEM_PROMPT,
     buildContent(source, options),
     options.signal,
   );
@@ -195,49 +220,5 @@ export async function extractWords(
         surface: word.surface.normalize("NFC").trim(),
         category: word.category.toLowerCase().trim(),
       })),
-  };
-}
-
-/**
- * Generate a word pack for a category from scratch.
- *
- * Same contract as extraction: the model proposes lemmas, the dictionary
- * decides whether they are real. A model-invented word simply fails lookup
- * and never becomes a card.
- */
-export async function generatePack(
-  category: string,
-  level: "beginner" | "intermediate" | "advanced",
-  count: number,
-  client: Anthropic,
-  options: { signal?: AbortSignal } = {},
-): Promise<Extraction> {
-  const { words, ...meta } = await requestWords(
-    client,
-    `You generate Korean vocabulary lists for a learning app.
-
-Return ${count} Korean words for the topic given, at ${level} level.
-For each word give:
-- lemma: dictionary form
-- surface: same as lemma
-- sentence: a natural example sentence using the word
-- category: just the topic, lowercase
-- contextNote: one sentence in English on the core meaning
-- gloss: the core meaning as a plain English word or two
-- register: the politeness level, or null if none applies
-
-Use only real, current Korean words that appear in standard dictionaries.`,
-    `Topic: ${category}`,
-    options.signal,
-  );
-
-  return {
-    ...meta,
-    words: words.map((word) => ({
-      ...word,
-      lemma: word.lemma.normalize("NFC").trim(),
-      surface: word.lemma.normalize("NFC").trim(),
-      category: category.toLowerCase().trim(),
-    })),
   };
 }

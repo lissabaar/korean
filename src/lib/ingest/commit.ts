@@ -52,7 +52,7 @@ export async function commitWords(
   options: {
     userId: string;
     /** Where the words came from: pasted text and files are TEXT. */
-    kind?: "TEXT" | "IMAGE";
+    kind?: "TEXT" | "IMAGE" | "GENERATED";
     text: string;
     title?: string;
     words: ApprovedWord[];

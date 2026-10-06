@@ -8,7 +8,10 @@ export async function PATCH(request: Request) {
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const data: { askRecognition?: boolean; showKoreanDefinition?: boolean } = {};
+  const data: { askRecognition?: boolean; showKoreanDefinition?: boolean; learningGoal?: number } = {};
+  if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 5) {
+    data.learningGoal = body.learningGoal;
+  }
   if (typeof body.askRecognition === "boolean") data.askRecognition = body.askRecognition;
   if (typeof body.showKoreanDefinition === "boolean") {
     data.showKoreanDefinition = body.showKoreanDefinition;

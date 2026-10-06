@@ -8,7 +8,13 @@
 
 import type { PrismaClient } from "@prisma/client";
 import { buildChoices, buildDistractors, type DistractorCandidate } from "./distractors";
-import { pickExercise, showsTranslation, type ExerciseType, type Phase } from "./session";
+import {
+  clampLearningGoal,
+  pickExercise,
+  showsTranslation,
+  type ExerciseType,
+  type Phase,
+} from "./session";
 
 /**
  * New words introduced per session. Learning is a drill that repeats each
@@ -39,6 +45,7 @@ async function studyScope(prisma: PrismaClient, userId: string) {
     select: {
       askRecognition: true,
       showKoreanDefinition: true,
+      learningGoal: true,
       hideTranslationAfterStability: true,
     },
   });
@@ -119,6 +126,8 @@ export interface ReviewItem {
   direction: AskedDirection;
   exercise: ExerciseType;
   learningStreak: number;
+  /** Correct answers in a row this user needs to learn a word. */
+  learningGoal: number;
 
   /** Options for CHOICE. Null means the deck is too small: self-graded. */
   choices: string[] | null;
@@ -226,7 +235,7 @@ export async function buildSession(
     const { sense } = card;
     const { entry } = sense;
     const direction = card.direction as AskedDirection;
-    const exercise = pickExercise(card);
+    const exercise = pickExercise(card, user.learningGoal);
     const translationShown = showsTranslation(card, user.hideTranslationAfterStability);
 
     const meaning = meaningText(sense);
@@ -264,6 +273,7 @@ export async function buildSession(
       direction,
       exercise,
       learningStreak: card.learningStreak,
+      learningGoal: clampLearningGoal(user.learningGoal),
       choices,
       selfGraded:
         (exercise === "CHOICE" && choices === null) ||

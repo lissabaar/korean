@@ -31,6 +31,8 @@ src/lib/
   category-icons.ts         Bootstrap Icons defaults + picker suggestions (client-safe)
   guess-icon.ts             icon for a user-named category (server: full icon list)
   dictionary/labels.ts      KRDict level / part-of-speech labels → English
+  dictionary/cached.ts      shared DB cache for KRDict + per-plan daily lookup limit
+  plan-limits.ts            userPlan(): Free for everyone, Pro for UNLIMITED_AI_EMAILS
   auth-client.ts            client-side auth helpers ("use client")
   session.ts                server-side session helpers
   db.ts                     Prisma singleton
@@ -160,6 +162,23 @@ categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
 sessions both go through it. Sessions take a mode — `learn` (new words
 only), `review` (scheduled only), `all` — from `/review?mode=`.
 
+**Every KRDict call goes through the shared cache.**
+Use `cachedLookup` / `cachedLookupMany` / `cachedExamples` from
+`dictionary/cached.ts`, never `lookup()` directly: the 50 000/day key quota
+is shared by the whole service. Found entries are kept 90 days, misses 7,
+unreachable never. Typed-in lookups also count against the plan's
+`dictionaryLookupsPerDay` (`consumeLookup`). AI-written examples are cached
+across users in `GeneratedExample` (by lemma + English meaning).
+
+**Topic requests.** Input with no Hangul is a request ("weather words for
+beginners"): `ExtractSource` kind `topic`, TOPIC_PROMPT; the dictionary still
+rejects any word it does not know. Saved as material kind GENERATED.
+
+**Learning goal.** `User.learningGoal` (2–5, default 3) right answers in a
+row graduate a word; every step is picked from options except the last,
+which is typed. `pickExercise(card, goal)` and `advanceLearning(card, ok, goal)`
+take it; the client mirrors the switch when it requeues a card.
+
 **Examples: dictionary first.**
 `words/examples.ts` fetches from KRDict's view API (`fetchExamples`, free)
 and only asks the model for words the dictionary cannot cover; AI examples
@@ -232,6 +251,11 @@ Run Node through `npm run …`: the project `.npmrc` sets
 - Spanish support (schema supports it, UI doesn't)
 
 ## Decisions already made
+
+- **Prompt caching: not used.** The stable prompt is ~526 tokens; Sonnet 4.6
+  caches only from 1024, and most of the cost is output anyway. Revisit on
+  a model switch (Sonnet 5.5 is ~33% cheaper and caches from a lower
+  minimum, but its thinking cannot be turned off — re-tune and re-test).
 
 - **Database: PostgreSQL (Neon), not YDB.** Prisma has no YDB connector and
   YDB removed its PostgreSQL compatibility layer. The Neon project is in

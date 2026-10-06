@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { dictionaryKeys } from "@/lib/clients";
-import { DictionaryError, lookup, TRANS_LANG } from "@/lib/dictionary/krdict";
+import { dictionaryKeys, prisma } from "@/lib/clients";
+import { cachedLookup, consumeLookup, LookupLimitError } from "@/lib/dictionary/cached";
+import { DictionaryError, TRANS_LANG } from "@/lib/dictionary/krdict";
+import { userPlan } from "@/lib/plan-limits";
 import { getUserId } from "@/lib/session";
 
 /**
  * Dictionary lookup for typed-in words. No AI involved, so it is open to
- * every user, anonymous ones included.
+ * every user, anonymous ones included — within the plan's daily limit.
  */
 export async function GET(request: Request) {
   const userId = await getUserId();
@@ -17,7 +19,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const entries = await lookup(q, dictionaryKeys, { transLang: TRANS_LANG.EN });
+    const plan = await userPlan(prisma, userId);
+    await consumeLookup(prisma, userId, plan.dictionaryLookupsPerDay);
+    const entries = await cachedLookup(prisma, q, dictionaryKeys, { transLang: TRANS_LANG.EN });
     return NextResponse.json({
       entries: entries.slice(0, 8).map((entry) => ({
         targetCode: entry.targetCode ?? null,
@@ -30,6 +34,12 @@ export async function GET(request: Request) {
       })),
     });
   } catch (error) {
+    if (error instanceof LookupLimitError) {
+      return NextResponse.json(
+        { error: `That's today's ${error.limit} dictionary lookups. Fill the fields in yourself, or come back tomorrow.` },
+        { status: 429 },
+      );
+    }
     if (error instanceof DictionaryError && error.code === "010") {
       return NextResponse.json({ error: "The dictionary's daily limit is used up." }, { status: 429 });
     }

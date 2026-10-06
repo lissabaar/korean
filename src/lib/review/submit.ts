@@ -77,7 +77,9 @@ export async function submitAnswer(
           },
         },
       },
-      user: { select: { desiredRetention: true, hideTranslationAfterStability: true } },
+      user: {
+        select: { desiredRetention: true, hideTranslationAfterStability: true, learningGoal: true },
+      },
     },
   });
   if (!card || (card.direction !== "RECOGNITION" && card.direction !== "RECALL")) {
@@ -86,7 +88,7 @@ export async function submitAnswer(
 
   const { sense } = card;
   const { entry } = sense;
-  const exercise = pickExercise(card);
+  const exercise = pickExercise(card, card.user.learningGoal);
   const now = new Date();
 
   // ---------------------------------------------------------------- grade
@@ -126,7 +128,7 @@ export async function submitAnswer(
   // ---------------------------------------------------------------- learning
 
   if (card.phase === "LEARNING") {
-    const outcome = advanceLearning(card, correct);
+    const outcome = advanceLearning(card, correct, card.user.learningGoal);
     await prisma.card.update({
       where: { id: card.id },
       data: outcome.graduated

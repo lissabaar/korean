@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { dictionaryKeys } from "@/lib/clients";
-import { fetchExamples } from "@/lib/dictionary/krdict";
+import { dictionaryKeys, prisma } from "@/lib/clients";
+import { cachedExamples } from "@/lib/dictionary/cached";
 import { getUserId } from "@/lib/session";
 
 /** Example sentences for one dictionary entry, to prefill a typed-in word. */
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const code = new URL(request.url).searchParams.get("code") ?? "";
   if (!/^\d{1,10}$/.test(code)) return NextResponse.json({ examples: [] });
   try {
-    return NextResponse.json({ examples: await fetchExamples(code, dictionaryKeys.krdict, { max: 3 }) });
+    return NextResponse.json({ examples: await cachedExamples(prisma, code, dictionaryKeys) });
   } catch {
     // Examples are a nice-to-have here; the form works without them.
     return NextResponse.json({ examples: [] });
