@@ -34,7 +34,7 @@ export default async function Home() {
   const hasWork = stats.due + stats.learning > 0;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-4xl px-4 pb-16 pt-8 sm:px-6">
       <BackgroundVerify pending={pendingCheck} />
       <header className="mb-8">
         <p className="korean text-4xl text-celadon-deep">안녕하세요</p>

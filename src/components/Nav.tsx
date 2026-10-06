@@ -27,7 +27,7 @@ export default function Nav({ email }: { email: string | null }) {
   const pathname = usePathname();
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-10 border-b border-line bg-paper/90 backdrop-blur">
-      <nav className="mx-auto flex max-w-3xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
+      <nav className="mx-auto flex max-w-5xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
         <Link href="/" className="korean mr-2 text-xl text-celadon-deep" aria-label="Home">
           단어
         </Link>

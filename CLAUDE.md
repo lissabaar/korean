@@ -43,6 +43,7 @@ src/lib/
     starter-deck.ts         ready-made deck for empty accounts (DRAFT content)
     merge-anonymous.ts      anonymous → real account on sign-up/sign-in
     edit.ts                 rename/merge/delete categories, edit/delete words
+    resort.ts               "Re-sort with AI": plan + cost, then batches
     examples.ts             fill missing examples: KRDict view API first, AI after
     example-translations.ts English for example sentences (shared cache for dictionary ones)
     meanings.ts             fill missing English meanings
@@ -240,6 +241,24 @@ ReviewItem): "Start learning" sets introducedAt for every card of the sense;
 snoozed cards) and the session gets a replacement word. Answering a card
 also sets introducedAt.
 
+**Categories: AI by default, the user can pin them.**
+- Add screen "Categories": AI sorts (default) / All into one (locked) / I
+  pick for each word (forces review-first).
+- Lines without Hangul above pasted Korean text are the learner's note
+  (`sourceFromText`), sent with every part; the model returns
+  `requestedCategory` when the note asks for one category, every word goes
+  there and the category is saved `locked` (`ApprovedWord.lockCategory`).
+- `Category.locked`: "Re-sort with AI" (`words/resort.ts`) never touches a
+  word that is in any locked category. Re-sort targets only the user's
+  existing categories ("uncategorised" as fallback), one category per word,
+  shows the estimated cost first (`resortPlan`), runs in batches of 120,
+  writes links with assignedByAi false (see the comment there).
+
+**New words are picked at random.** `pickLearningCards()` in queue.ts:
+words already started first, the rest a random pick from the whole pool
+(oldest-first made an imported list come up in its own order). In the
+session a repeated card goes back to a random later position (Review.tsx).
+
 **Example translations.** KRDict examples are Korean only; the example a
 card shows gets English from the model (`words/example-translations.ts`,
 metered). Translations of dictionary sentences are shared in
@@ -306,10 +325,6 @@ Run Node through `npm run …`: the project `.npmrc` sets
 `npm.cmd …` rather than changing the execution policy.
 
 ## What's not built yet
-
-- **Re-sort into categories** (owner's request): after the user reshapes
-  their categories, the model re-assigns every word to the current set.
-  Must show the expected AI cost first and go through `ai-budget.ts`.
 
 - Starter deck content is a 10-word draft — replace with a real,
   dictionary-checked deck

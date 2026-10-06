@@ -35,6 +35,7 @@ import {
   type ImportSource,
 } from "@/lib/import/read";
 import CandidateRow from "./CandidateRow";
+import CategorySelect from "./CategorySelect";
 import FileDrop from "./FileDrop";
 import ManualWord from "./ManualWord";
 
@@ -44,7 +45,24 @@ type Stage = "input" | "preview" | "done";
  * originalCategory: the model's pick, restored when "Put every word in" is unticked.
  * saved: already added (automatic mode) — shown as added, not saved again.
  */
-type Candidate = WordCandidate & { sourceId: string; originalCategory: string; saved?: boolean };
+/**
+ * lockCategory: the word goes into a category the user asked for (in the
+ * text, "All into one category", or a file's own category) — saved locked.
+ */
+type Candidate = WordCandidate & {
+  sourceId: string;
+  originalCategory: string;
+  saved?: boolean;
+  lockCategory?: boolean;
+};
+
+/**
+ * How words get their category:
+ *   ai   — the model picks one per word (default)
+ *   one  — every word goes into one category the user names; it gets locked
+ *   each — the user picks per word in the preview (forces "Let me review first")
+ */
+type CategoryMode = "ai" | "one" | "each";
 
 /** Parts read at the same time. */
 const PARALLEL_PARTS = 3;
@@ -153,7 +171,12 @@ export default function AddWords({
   /** Running totals of automatic adding. */
   const [added, setAdded] = useState({ created: 0, pending: 0, alreadySaved: 0 });
   /** Add each part's words as soon as it is read (default), or review first. */
-  const autoAdd = useSyncExternalStore(subscribeAutoAdd, loadAutoAdd, () => true);
+  const autoAddSetting = useSyncExternalStore(subscribeAutoAdd, loadAutoAdd, () => true);
+  const [categoryMode, setCategoryMode] = useState<CategoryMode>("ai");
+  /** The category for categoryMode "one" (an existing name or a new one). */
+  const [oneCategory, setOneCategory] = useState("");
+  /** Picking categories per word needs the preview, so it turns automatic adding off. */
+  const autoAdd = autoAddSetting && categoryMode !== "each";
   /** Sources whose words all go into the file's own category (read inside the async loop). */
   const forcedRef = useRef<Record<string, string>>({});
   const [forced, setForced] = useState<Record<string, string>>({});
@@ -210,6 +233,17 @@ export default function AddWords({
       }
     }
     if (all.length === 0) return;
+
+    // "All into one category": every source's words go there, locked.
+    const oneName = oneCategory.replace(/\s+/g, " ").trim().toLowerCase();
+    if (categoryMode === "one" && !oneName) {
+      setError("Choose the category to put the words in.");
+      return;
+    }
+    const forcedStart: Record<string, string> = {};
+    if (categoryMode === "one") for (const s of all) forcedStart[s.id] = oneName;
+    forcedRef.current = forcedStart;
+    setForced(forcedStart);
 
     const initial: SourceState[] = all.map((s) => {
       const doneBefore = autoAdd ? loadDoneParts(s) : new Set<number>();
@@ -282,6 +316,12 @@ export default function AddWords({
               continue;
             }
             seenRef.current.add(key);
+            // A category asked for in the text itself ("put these in drama")
+            // applies to this whole source from now on.
+            if (!forcedRef.current[source.id] && result.requestedCategory) {
+              forcedRef.current = { ...forcedRef.current, [source.id]: result.requestedCategory };
+              setForced(forcedRef.current);
+            }
             const forcedName = forcedRef.current[source.id];
             const id = `${job.id}:${candidate.id}`;
             fresh.push({
@@ -289,7 +329,7 @@ export default function AddWords({
               id,
               sourceId: source.id,
               originalCategory: candidate.primaryCategory,
-              ...(forcedName && { primaryCategory: forcedName, edited: true }),
+              ...(forcedName && { primaryCategory: forcedName, edited: true, lockCategory: true }),
             });
             if (candidate.status === "unreachable") unreachable.push({ ...candidate, id });
           }
@@ -374,6 +414,7 @@ export default function AddWords({
       primaryCategory: c.primaryCategory,
       secondaryCategories: c.secondaryCategories,
       categoriesFromAi: !c.edited,
+      lockCategory: Boolean(c.lockCategory),
       dictionary: c.dictionary,
       aiMeaning: c.aiMeaning,
       userMeaning: c.userMeaning,
@@ -491,7 +532,18 @@ export default function AddWords({
    * meaning choice) to the list.
    */
   function update(next: WordCandidate) {
-    setCandidates((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+    setCandidates((list) =>
+      list.map((c) =>
+        c.id !== next.id
+          ? c
+          : {
+              ...c,
+              ...next,
+              // Moved by hand to another category: no longer the requested one.
+              lockCategory: c.lockCategory && next.primaryCategory === c.primaryCategory,
+            },
+      ),
+    );
   }
 
   /** Tick: all of the file's words go into its own category. Untick: back to the model's picks. */
@@ -506,8 +558,8 @@ export default function AddWords({
         c.sourceId !== sourceId
           ? c
           : on
-            ? { ...c, primaryCategory: name, edited: true }
-            : { ...c, primaryCategory: c.originalCategory, edited: false },
+            ? { ...c, primaryCategory: name, edited: true, lockCategory: true }
+            : { ...c, primaryCategory: c.originalCategory, edited: false, lockCategory: false },
       ),
     );
   }
@@ -644,7 +696,7 @@ export default function AddWords({
   const unreachableCount = candidates.filter((c) => c.status === "unreachable").length;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-28 pt-8 sm:px-6">
+    <main className="mx-auto max-w-4xl px-4 pb-28 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">새 단어</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Add words</h1>
@@ -752,6 +804,46 @@ export default function AddWords({
             </span>
           </div>
 
+          <div role="radiogroup" aria-label="Categories" className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Categories</span>
+            {(
+              [
+                ["ai", "AI sorts"],
+                ["one", "All into one"],
+                ["each", "I pick for each word"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={categoryMode === value}
+                onClick={() => setCategoryMode(value)}
+                className={`rounded-full border px-3 py-1 ${
+                  categoryMode === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            {categoryMode === "one" && (
+              <CategorySelect
+                value={oneCategory}
+                options={categories}
+                onChange={setOneCategory}
+                placeholder="Choose a category…"
+                className="min-w-48"
+              />
+            )}
+            <span className="w-full text-xs text-muted">
+              {categoryMode === "ai"
+                ? "The AI puts each word in the category that fits it best. Tip: write “put these in …” above your text to choose one category for all of them."
+                : categoryMode === "one"
+                  ? "Every word goes into this category, and the category is locked — “Re-sort with AI” will not move them out."
+                  : "You see the words first and choose each one's category (the AI's pick is filled in to start from)."}
+            </span>
+          </div>
+
           <div role="radiogroup" aria-label="When to add" className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted">Then</span>
             {(
@@ -766,7 +858,9 @@ export default function AddWords({
                 role="radio"
                 aria-checked={autoAdd === value}
                 onClick={() => setAutoAdd(value)}
-                className={`rounded-full border px-3 py-1 ${
+                // Picking categories per word needs the preview.
+                disabled={categoryMode === "each" && value}
+                className={`rounded-full border px-3 py-1 disabled:opacity-40 ${
                   autoAdd === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
                 }`}
               >
@@ -1006,7 +1100,7 @@ export default function AddWords({
           <div className="flex flex-col gap-5">
             {sources.map((source) => {
               const rows = candidates.filter((c) => c.sourceId === source.id);
-              const showHeader = grouped || source.error || source.suggestedCategory;
+              const showHeader = grouped || source.error || source.suggestedCategory || forced[source.id];
               if (!showHeader && rows.length === 0) return null;
               return (
                 <section key={source.id}>
@@ -1029,6 +1123,12 @@ export default function AddWords({
                           />
                           Put every word in “{source.suggestedCategory}”
                         </label>
+                      )}
+                      {forced[source.id] && !source.suggestedCategory && (
+                        <span className="ml-auto flex items-center gap-1.5 text-xs text-celadon-deep">
+                          <i className="bi bi-lock" aria-hidden />
+                          All words go into “{forced[source.id]}” (locked)
+                        </span>
                       )}
                       {source.error && <span className="w-full text-xs text-clay">{source.error}</span>}
                     </h2>
@@ -1053,7 +1153,7 @@ export default function AddWords({
           {/* Fixed on mobile so the action stays reachable in a long list. */}
           <div className="fixed inset-x-0 bottom-0 border-t border-line bg-paper px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
             {!autoAdd && (
-              <div className="mx-auto mb-2 flex max-w-2xl gap-4 text-sm">
+              <div className="mx-auto mb-2 flex max-w-4xl gap-4 text-sm">
                 <button type="button" onClick={() => setAll(true)} className="text-celadon-deep underline underline-offset-4">
                   Select all
                 </button>
@@ -1062,7 +1162,7 @@ export default function AddWords({
                 </button>
               </div>
             )}
-            <div className="mx-auto flex max-w-2xl gap-3">
+            <div className="mx-auto flex max-w-4xl gap-3">
               <button
                 type="button"
                 onClick={() => {

@@ -14,7 +14,7 @@
  *   - Question: pick the right option (CHOICE) or type the answer (TYPING);
  *     the answer goes to /api/review/answer, which grades it.
  *   - Feedback: right/wrong, then the back of the card (Back).
- * A learning card that has not graduated comes back 2–5 cards later
+ * A learning card that has not graduated comes back at a random later place
  * (advance). Below: the pieces of a card — Intro, Question, Front, Back.
  */
 
@@ -27,13 +27,18 @@ import SpeakButton, { speakKorean } from "./SpeakButton";
 
 type Load = "loading" | "ready" | "error";
 
-/** A learning card answered but not graduated comes back this many cards later. */
+/**
+ * A learning card answered but not graduated goes back to a random place in
+ * the rest of the session, at least this many cards later (never straight
+ * back). A small fixed gap (it used to be 2-5) made ten words cycle in
+ * almost the same order every round.
+ */
 const REQUEUE_MIN = 2;
-const REQUEUE_MAX = 5;
 
-/** How many cards later a repeated learning card comes back: random 2–5. */
-function requeueGap(): number {
-  return REQUEUE_MIN + Math.floor(Math.random() * (REQUEUE_MAX - REQUEUE_MIN + 1));
+/** Where a repeated card goes back: a random position from REQUEUE_MIN to the end. */
+function requeueGap(restLength: number): number {
+  if (restLength <= REQUEUE_MIN) return restLength;
+  return REQUEUE_MIN + Math.floor(Math.random() * (restLength - REQUEUE_MIN + 1));
 }
 
 /**
@@ -96,7 +101,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
     if (!response.ok) throw new Error((await response.json()).error ?? "Could not save that.");
     setIntroduced((set) => new Set(set).add(item.senseId));
     setQueue(([head, ...rest]) => {
-      const at = Math.min(requeueGap(), rest.length);
+      const at = requeueGap(rest.length);
       return [...rest.slice(0, at), head, ...rest.slice(at)];
     });
   }
@@ -143,7 +148,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         selfGraded: typed ? head.direction === "RECOGNITION" && !head.back.translation : head.choices === null,
       };
       // Comes back a few cards later — how many varies, so the gap cannot be learned either.
-      const at = Math.min(requeueGap(), rest.length);
+      const at = requeueGap(rest.length);
       return [...rest.slice(0, at), again, ...rest.slice(at)];
     });
   }
@@ -260,7 +265,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
 
 /** Page frame (width and padding) shared by every state of the screen. */
 function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
+  return <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
 }
 
 // ---------------------------------------------------------------- question

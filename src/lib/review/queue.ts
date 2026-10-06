@@ -6,7 +6,7 @@
  * comes from `pickExercise()` — never chosen here, never random.
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { buildChoices, buildDistractors, type DistractorCandidate } from "./distractors";
 import {
   clampLearningGoal,
@@ -274,15 +274,15 @@ export async function buildSession(
       orderBy: { due: "asc" },
       take: REVIEWS_PER_SESSION,
     }),
-    mode === "review" ? [] : prisma.card.findMany({
-      where: options.excludeSenseIds?.length
-        ? { AND: [learn, { senseId: { notIn: options.excludeSenseIds } }] }
-        : learn,
-      include: cardInclude,
-      // Oldest words first, and both directions of a word together.
-      orderBy: [{ sense: { entry: { createdAt: "asc" } } }, { direction: "asc" }],
-      take: options.newLimit ?? clampNewPerSession(user.newPerSession),
-    }),
+    mode === "review"
+      ? []
+      : pickLearningCards(
+          prisma,
+          options.excludeSenseIds?.length
+            ? { AND: [learn, { senseId: { notIn: options.excludeSenseIds } }] }
+            : learn,
+          options.newLimit ?? clampNewPerSession(user.newPerSession),
+        ),
   ]);
 
   const cards = [...scheduled, ...learning];
@@ -375,6 +375,45 @@ export async function buildSession(
       hint: exercise === "TYPING" && typedAnswer ? [...typedAnswer][0] : null,
     };
   });
+}
+
+/**
+ * Which new words a session drills. Words already started (met on an intro
+ * card, or with right answers) come first, so they get finished; the rest
+ * are picked at random from the whole pool — taking the oldest first meant
+ * an imported list came up in its own order, ten by ten. Both directions of
+ * a word stay together. `limit` counts cards, like the user's setting.
+ */
+async function pickLearningCards(
+  prisma: PrismaClient,
+  where: Prisma.CardWhereInput,
+  limit: number,
+) {
+  const rows = await prisma.card.findMany({
+    where,
+    select: { id: true, senseId: true, introducedAt: true, learningStreak: true },
+  });
+  const bySense = new Map<string, { ids: string[]; started: boolean }>();
+  for (const row of rows) {
+    const group = bySense.get(row.senseId) ?? { ids: [], started: false };
+    group.ids.push(row.id);
+    group.started ||= Boolean(row.introducedAt) || row.learningStreak > 0;
+    bySense.set(row.senseId, group);
+  }
+  const groups = [...bySense.values()];
+  // Fisher–Yates: every order of the pool equally likely.
+  for (let i = groups.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [groups[i], groups[j]] = [groups[j], groups[i]];
+  }
+  const ordered = [...groups.filter((g) => g.started), ...groups.filter((g) => !g.started)];
+  const ids: string[] = [];
+  for (const group of ordered) {
+    if (ids.length >= limit) break;
+    ids.push(...group.ids);
+  }
+  if (ids.length === 0) return [];
+  return prisma.card.findMany({ where: { id: { in: ids } }, include: cardInclude });
 }
 
 /**

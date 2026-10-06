@@ -9,7 +9,8 @@
  * "abc123" (a Promise in this Next.js version, hence `await params`).
  *
  *   PATCH   rename (renaming onto an existing name merges the two), switch
- *           Learn/Review, change the icon
+ *           Learn/Review, lock/unlock (locked = re-sort leaves its words),
+ *           change the icon
  *   DELETE  delete; words left without a category go to "uncategorised"
  *
  * The rules live in lib/words/edit.ts; this file checks input and maps
@@ -50,9 +51,10 @@ export async function PATCH(request: Request, { params }: Params) {
       ({ id: targetId, merged } = await renameCategory(prisma, userId, id, body.name));
     }
 
-    const data: { learnActive?: boolean; reviewActive?: boolean; icon?: string | null } = {};
+    const data: { learnActive?: boolean; reviewActive?: boolean; locked?: boolean; icon?: string | null } = {};
     if (typeof body.learnActive === "boolean") data.learnActive = body.learnActive;
     if (typeof body.reviewActive === "boolean") data.reviewActive = body.reviewActive;
+    if (typeof body.locked === "boolean") data.locked = body.locked;
     if (body.icon === null || (typeof body.icon === "string" && isIconName(body.icon))) {
       data.icon = body.icon;
     }

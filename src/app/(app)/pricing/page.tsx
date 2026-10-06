@@ -13,7 +13,7 @@ export const metadata = { title: "Plans · Korean vocabulary" };
 /** Placeholder: plans are shown, nothing can be bought yet. */
 export default function PricingPage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6">
       <header className="mb-6">
         <p className="korean text-4xl text-celadon-deep">요금제</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Plans</h1>

@@ -40,6 +40,8 @@ const MAX_IMAGE_BASE64 = 4_000_000;
 export async function POST(request: Request) {
   let body: {
     text?: string;
+    /** The learner's instructions written above the text (see sourceFromText). */
+    note?: string;
     topic?: string;
     phrases?: boolean;
     image?: { data?: string; mediaType?: string };
@@ -78,7 +80,11 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    source = { kind: "text", text };
+    source = {
+      kind: "text",
+      text,
+      note: typeof body.note === "string" ? body.note.slice(0, 500) : undefined,
+    };
   }
 
   try {

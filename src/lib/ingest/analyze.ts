@@ -79,6 +79,12 @@ export interface WordCandidate {
 export interface AnalysisResult {
   /** The analysed text; empty for an image. */
   text: string;
+  /**
+   * The category the learner asked for in their note or request ("put
+   * these in drama"); empty when none. Every candidate is already in it,
+   * and the category gets locked when the words are saved.
+   */
+  requestedCategory: string;
   candidates: WordCandidate[];
   stats: {
     total: number;
@@ -173,9 +179,12 @@ export async function analyzeText(
     const found = dictionary.get(word.lemma);
     const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote);
     const dictEntry = homographs[0] ?? null;
-    const { primary, secondary } = allowedOwn.has(word.category)
-      ? { primary: word.category, secondary: [] }
-      : resolveCategories([word.category], { maxSecondary: 0 });
+    // A category the learner asked for wins over the model's per-word pick.
+    const { primary, secondary } = extraction.requestedCategory
+      ? { primary: extraction.requestedCategory, secondary: [] }
+      : allowedOwn.has(word.category)
+        ? { primary: word.category, secondary: [] }
+        : resolveCategories([word.category], { maxSecondary: 0 });
 
     const status: CandidateStatus = isKnown(word.lemma, dictEntry?.targetCode)
       ? "duplicate"
@@ -222,6 +231,7 @@ export async function analyzeText(
 
   return {
     text: source.kind === "text" ? source.text : "",
+    requestedCategory: extraction.requestedCategory,
     candidates,
     stats: {
       total: candidates.length,

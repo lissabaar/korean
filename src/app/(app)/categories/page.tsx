@@ -70,6 +70,7 @@ export default async function CategoriesPage() {
     icon: category.icon ?? (categoryIcon(category.name, null) === "tag" ? guessIcon(category.name) : categoryIcon(category.name, null)),
     learnActive: category.learnActive,
     reviewActive: category.reviewActive,
+    locked: category.locked,
     words: category.entries.map(({ entry }) => ({
       id: entry.id,
       lemma: entry.lemma,

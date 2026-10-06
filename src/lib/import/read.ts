@@ -11,7 +11,8 @@ import Papa from "papaparse";
 import type { ImageMediaType } from "@/lib/ingest/extract";
 
 export type JobPayload =
-  | { text: string }
+  /** `note`: the learner's instructions written around the text, sent with every part. */
+  | { text: string; note?: string }
   | { topic: string }
   | { image: { data: string; mediaType: ImageMediaType } };
 
@@ -96,9 +97,27 @@ export async function readFile(file: File): Promise<ImportSource> {
   throw new UnsupportedFileError(`${name}: this file type is not supported`);
 }
 
-/** Pasted text as an ImportSource, split into parts like a file. */
+/**
+ * Pasted text as an ImportSource, split into parts like a file. Lines with no
+ * Korean before the first Korean line are the learner's note ("put all of
+ * these in my drama category"): they go to the model with every part as
+ * instructions, instead of being dropped like other lines without Hangul.
+ */
 export function sourceFromText(text: string, name = "Pasted text"): ImportSource {
-  return textSource(name, proseLines(text), "Text");
+  const lines = text.split(/\r?\n/);
+  const firstKorean = lines.findIndex((line) => HANGUL.test(line));
+  const note = lines
+    .slice(0, Math.max(0, firstKorean))
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, 500);
+  const source = textSource(name, proseLines(text), "Text");
+  if (!note) return source;
+  return {
+    ...source,
+    jobs: source.jobs.map((job) => ({ ...job, payload: { ...job.payload, note } as JobPayload })),
+  };
 }
 
 /** True when the input has no Korean at all — then it is read as a topic. */

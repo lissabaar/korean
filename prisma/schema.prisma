@@ -269,6 +269,11 @@ model Category {
   // src/lib/category-icons.ts.
   icon String?
 
+  // Locked: the words in it stay put. "Re-sort with AI" never moves a word
+  // out of a locked category. Set by the user on /categories, or
+  // automatically when an import was told to put its words here.
+  locked Boolean @default(false)
+
   entries EntryCategory[]
 
   @@unique([userId, language, name])

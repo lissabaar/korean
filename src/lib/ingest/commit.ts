@@ -18,6 +18,12 @@ export interface ApprovedWord {
   secondaryCategories: string[];
   /** False once the user has edited the categories. */
   categoriesFromAi: boolean;
+  /**
+   * The user put every word of this import into one category on purpose
+   * (asked for it in the text, or chose "All into one category"): that
+   * category gets locked, so "Re-sort with AI" leaves these words alone.
+   */
+  lockCategory?: boolean;
   /** The dictionary did not answer for it: verify in the background later. */
   needsCheck?: boolean;
   /** The dictionary's entry; absent when the dictionary does not have it. */
@@ -169,10 +175,11 @@ async function persistOne(
     const categoryIds: string[] = [];
 
     for (const name of names) {
+      const lock = Boolean(word.lockCategory) && name === word.primaryCategory;
       const category = await tx.category.upsert({
         where: { userId_language_name: { userId, language: "KO", name } },
-        create: { userId, language: "KO", name },
-        update: {},
+        create: { userId, language: "KO", name, ...(lock && { locked: true }) },
+        update: lock ? { locked: true } : {},
       });
       categoryIds.push(category.id);
     }

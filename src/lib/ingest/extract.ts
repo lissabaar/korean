@@ -31,6 +31,11 @@ export const EXTRACTION_MODEL = "claude-sonnet-4-6";
 /** Words plus what the call cost, so the caller can meter it. */
 export interface Extraction {
   words: ExtractedWord[];
+  /**
+   * A category the learner asked to put all the words into ("add these to
+   * my drama category"), lowercase; empty when they asked for none.
+   */
+  requestedCategory: string;
   model: string;
   usage: TokenUsage;
 }
@@ -96,7 +101,14 @@ const ExtractedWordSchema = z.object({
   userMeaningFits: z.boolean(),
 });
 
-const ExtractionSchema = z.object({ words: z.array(ExtractedWordSchema) });
+const ExtractionSchema = z.object({
+  words: z.array(ExtractedWordSchema),
+  /**
+   * Set only when the learner explicitly asks for one category for all the
+   * words. Then every word goes there and the category is locked.
+   */
+  requestedCategory: z.string(),
+});
 
 export type ExtractedWord = z.infer<typeof ExtractedWordSchema>;
 
@@ -126,9 +138,13 @@ Rules:
 - Phrases (only when wanted): set expressions, collocations and sentences worth learning whole. The lemma is the phrase in its natural, complete form — fill a template's blanks with a typical word or drop them, keep a sentence's natural polite ending; surface is the phrase as it appears. Single words inside a phrase may also be returned as words.
 - Getting the lemma right matters most. If unsure of the dictionary form, give your best analysis anyway.`;
 
-/** What the words come from: pasted or file text, or one image. */
+/**
+ * What the words come from: pasted or file text, or one image. `note` is
+ * what the learner wrote around the Korean text in their own language
+ * ("put these in my drama category") — instructions, not material.
+ */
 export type ExtractSource =
-  | { kind: "text"; text: string }
+  | { kind: "text"; text: string; note?: string }
   | { kind: "image"; data: string; mediaType: ImageMediaType }
   /** A request in plain words: "weather words", "food for beginners". */
   | { kind: "topic"; topic: string };
@@ -189,6 +205,10 @@ function buildInstructions(options: ExtractOptions): string {
       : `Return single words only (kind "word"), no phrases.`,
   );
 
+  parts.push(
+    `requestedCategory: if the learner explicitly asks to put the words into a particular category (in any language, e.g. "add all of these to the category drama", "в категорию работа"), return that category's name: when it means the same as an entry of the category list, that entry verbatim; otherwise the learner's own name for it, lowercase. Then also use it as every word's "category". If they ask for nothing like that, return an empty string and pick categories as usual.`,
+  );
+
   if (options.maxWords) {
     parts.push(
       `Return at most ${options.maxWords} entries. If the text has more, pick the ones most worth learning.`,
@@ -205,7 +225,10 @@ function buildContent(
 ): Anthropic.ContentBlockParam[] {
   const instructions = buildInstructions(options);
   if (source.kind === "text") {
-    return [{ type: "text", text: `${instructions}\n\nText:\n${source.text}` }];
+    const note = source.note?.trim()
+      ? `\n\nThe learner's note (instructions, not text to analyse):\n${source.note.trim()}`
+      : "";
+    return [{ type: "text", text: `${instructions}${note}\n\nText:\n${source.text}` }];
   }
   if (source.kind === "topic") {
     return [{ type: "text", text: `${instructions}\n\nRequest:\n${source.topic}` }];
@@ -250,6 +273,11 @@ async function requestWords(
   }
   return {
     words: response.parsed_output.words,
+    requestedCategory: response.parsed_output.requestedCategory
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60),
     // The model that actually answered — the fallback one if it ran.
     model: response.model,
     usage: response.usage,
