@@ -40,7 +40,19 @@ const trustedOrigins = [
   .filter((value): value is string => Boolean(value))
   .map((value) => (value.startsWith("http") ? value : `https://${value}`).replace(/\/+$/, ""));
 
+/**
+ * The site's own address — used for OAuth redirect URIs, so it must be the
+ * public one. On Vercel production it comes from Vercel itself, so a
+ * BETTER_AUTH_URL copied from a local .env (localhost) cannot send Google
+ * sign-ins back to someone's laptop.
+ */
+const baseURL =
+  process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.BETTER_AUTH_URL;
+
 export const auth = betterAuth({
+  baseURL,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   trustedOrigins,
 
