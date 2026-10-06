@@ -19,8 +19,24 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "./db";
 
+/**
+ * Origins allowed to call the auth endpoints. Better Auth rejects any other
+ * with "Invalid origin". BETTER_AUTH_URL covers the main address; the Vercel
+ * variables cover the production domain and per-deployment preview URLs, so
+ * a wrong or stale BETTER_AUTH_URL cannot lock everyone out.
+ */
+const trustedOrigins = [
+  process.env.BETTER_AUTH_URL,
+  process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  process.env.VERCEL_BRANCH_URL,
+  process.env.VERCEL_URL,
+]
+  .filter((value): value is string => Boolean(value))
+  .map((value) => (value.startsWith("http") ? value : `https://${value}`).replace(/\/+$/, ""));
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  trustedOrigins,
 
   emailAndPassword: {
     enabled: true,
