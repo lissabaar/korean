@@ -49,7 +49,8 @@ export const TRANS_LANG = {
 
 export type TransLang = (typeof TRANS_LANG)[keyof typeof TRANS_LANG];
 
-export type DictSource = "KRDICT" | "STDICT" | "OPENDICT";
+/** AI = no dictionary had it; built from the model's meaning (see commit.ts). */
+export type DictSource = "KRDICT" | "STDICT" | "OPENDICT" | "AI";
 
 export interface DictSense {
   definition: string;

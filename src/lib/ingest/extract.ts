@@ -77,6 +77,26 @@ const ExtractedWordSchema = z.object({
   gloss: z.string(),
   /** Politeness level, where the word carries one. */
   register: z.enum(REGISTERS).nullable(),
+  /** A single word, or a phrase / sentence learned as a whole. */
+  kind: z.enum(["word", "phrase"]),
+  /**
+   * A short English meaning. A fallback only: used when no dictionary knows
+   * the lemma (phrases, compounds), and then stored marked as source AI.
+   */
+  meaning: z.string(),
+  /**
+   * The meaning the learner wrote next to the word in the input, verbatim
+   * and in whatever language; empty when they wrote none. It wins over the
+   * dictionary's translation unless the user chooses otherwise.
+   */
+  userMeaning: z.string(),
+  /** The learner's spelling was wrong and the lemma corrects it. */
+  misspelled: z.boolean(),
+  /**
+   * Whether the learner's meaning is a real meaning of this word. false
+   * flags a likely mistake (배 — "car"); the user then decides.
+   */
+  userMeaningFits: z.boolean(),
 });
 
 const ExtractionSchema = z.object({ words: z.array(ExtractedWordSchema) });
@@ -87,7 +107,7 @@ const SYSTEM_PROMPT = `You analyse Korean text for a vocabulary learning app.
 
 The input is running text (an article, a lesson, subtitles), a screenshot or photo of any of those, or a word list a learner wrote down, often with a translation or meaning next to each word in any language ("공원 — парк", "먹다 to eat"). For a word list, the learner's own meaning tells you which homograph they mean: base the gloss on it, and leave sentence empty unless the list includes one.
 
-For each distinct content word in the text, return:
+For each distinct content word — and, when phrases are wanted (see the instructions below), each phrase or sentence worth learning as a whole — return:
 - lemma: the dictionary form (기본형). For verbs and adjectives this ends in 다.
 - surface: the form exactly as it appears in the text
 - sentence: the full sentence it appeared in, unmodified; empty for a bare word list
@@ -95,12 +115,18 @@ For each distinct content word in the text, return:
 - contextNote: one sentence in English on which meaning is used here
 - gloss: the meaning used here as a plain English word or two ("park", "to eat") — this picks between dictionary homographs, so name the meaning, not the form
 - register: the politeness level, or null if the word carries no particular level
+- kind: "word" for a single word, "phrase" for a set expression, collocation or sentence kept whole
+- meaning: a short, accurate English meaning of the lemma as used here (for a phrase, its natural English equivalent). It is only used when no dictionary has the entry.
+- userMeaning: the meaning the learner wrote next to this entry in the input, copied verbatim in its own language ("парк", "to eat"); an empty string if they wrote none
+- misspelled: true only if the learner's written form was a misspelling you corrected in the lemma (not merely an inflected, bracketed or abbreviated form)
+- userMeaningFits: false if the learner's meaning is not a real meaning of this Korean word in any of its senses (a likely mistake); true if it fits, or if there is no learner meaning. Judge the learner's meaning as written — do not reinterpret it to make it fit.
 
 Rules:
 - Skip particles (조사), common auxiliary verbs, and pure grammar.
 - Skip proper nouns unless they are culturally significant vocabulary.
 - One entry per distinct lemma. If a word appears several times, pick the clearest occurrence.
-- Do not invent definitions or translations. Those come from a dictionary.
+- Definitions, examples and translations come from a dictionary whenever it has the entry; "meaning" is only the fallback for what it lacks.
+- Phrases (only when wanted): set expressions, collocations and sentences worth learning whole. The lemma is the phrase in its natural, complete form — fill a template's blanks with a typical word or drop them, keep a sentence's natural polite ending; surface is the phrase as it appears. Single words inside a phrase may also be returned as words.
 - Getting the lemma right matters most. If unsure of the dictionary form, give your best analysis anyway.`;
 
 /** What the words come from: pasted or file text, or one image. */
@@ -127,8 +153,13 @@ For each word return:
 - contextNote: one sentence in English on the meaning
 - gloss: the meaning as a plain English word or two
 - register: the politeness level, or null if the word carries no particular level
+- kind: "word", or "phrase" for a useful expression or sentence (only when phrases are wanted)
+- meaning: a short, accurate English meaning — only used if no dictionary has the entry
+- userMeaning: an empty string
+- misspelled: false
+- userMeaningFits: true
 
-Do not invent definitions or translations. Those come from a dictionary.`;
+Definitions, examples and translations come from a dictionary whenever it has the entry.`;
 
 export const IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
@@ -138,6 +169,8 @@ export interface ExtractOptions {
   maxWords?: number;
   /** The user's own categories, offered alongside the built-in ones. */
   existingCategories?: string[];
+  /** Also return phrases and sentences to learn whole (default: words only). */
+  phrases?: boolean;
   signal?: AbortSignal;
 }
 
@@ -149,9 +182,15 @@ function buildInstructions(options: ExtractOptions): string {
     `Category list — "category" MUST be one of these, verbatim. The learner's own categories come first; prefer one of them when it fits:\n${allowed.join(", ")}`,
   );
 
+  parts.push(
+    options.phrases
+      ? `Phrases are wanted: besides words, return useful phrases and sentences as kind "phrase". If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
+      : `Return single words only (kind "word"), no phrases.`,
+  );
+
   if (options.maxWords) {
     parts.push(
-      `Return at most ${options.maxWords} words. If the text has more, pick the ones most worth learning.`,
+      `Return at most ${options.maxWords} entries. If the text has more, pick the ones most worth learning.`,
     );
   }
 

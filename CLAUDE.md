@@ -76,10 +76,20 @@ merchant of record from Uruguay — never help route around sanctions).
 
 ## Key design rules — don't break these
 
-**AI supplements, dictionaries decide.**
-The model produces lemmas, context notes and category guesses.
-Definitions, translations, examples, levels and hanja come from KRDict/STDICT.
-A lemma with no dictionary entry is rejected, not saved.
+**Order of trust: the user's meaning, then the dictionary, then the AI.**
+- A meaning the user wrote in the input (`userMeaning`) becomes the card's
+  translation. The dictionary is still consulted; when the model judges the
+  user's meaning wrong for the word (`userMeaningFits: false`) or corrects
+  their spelling, the candidate gets a `conflict` and the user decides
+  (`useDictionaryMeaning`, "Use dictionary for all").
+- Definitions, examples, levels and hanja come from KRDict/STDICT whenever
+  it has the entry.
+- What the dictionary lacks — phrases, compounds, rare words — is kept with
+  the model's `meaning` (status `ai`, stored with source AI, shown as "AI
+  meaning"), not rejected. `commit.ts` `resolveEntry()` builds that entry.
+- Phrases: with "Words & phrases" on, extraction returns `kind: "phrase"`
+  for expressions and sentences, learned as one card. Typed answers ignore
+  punctuation and spacing and allow about one typo per 7 characters.
 
 **One card tests one thing.**
 Cards hang off `Sense`, not `Entry`. A word with three senses → three sense
@@ -216,6 +226,10 @@ UNLIMITED_AI_EMAILS   # comma-separated; the owner's account
 GOOGLE_CLIENT_ID      # optional; with the secret, shows "Continue with Google"
 GOOGLE_CLIENT_SECRET
 ```
+
+**Pronunciation** uses the browser's speech synthesis (`SpeakButton`,
+`speakKorean`) — free and offline; `User.autoPlayAudio` speaks the word
+after each answer. Cloud TTS would be the upgrade if quality is not enough.
 
 ## Common commands
 

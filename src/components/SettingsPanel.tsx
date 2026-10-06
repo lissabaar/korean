@@ -17,6 +17,7 @@ export default function SettingsPanel({
   askRecognition: initialAsk,
   showKoreanDefinition: initialKorean,
   learningGoal: initialGoal,
+  autoPlayAudio: initialAutoPlay,
   credits,
   missingExamples,
   planName,
@@ -27,6 +28,7 @@ export default function SettingsPanel({
   askRecognition: boolean;
   showKoreanDefinition: boolean;
   learningGoal: number;
+  autoPlayAudio: boolean;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
@@ -38,6 +40,7 @@ export default function SettingsPanel({
   const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [showKorean, setShowKorean] = useState(initialKorean);
   const [goal, setGoal] = useState(initialGoal);
+  const [autoPlay, setAutoPlay] = useState(initialAutoPlay);
   const [error, setError] = useState<string | null>(null);
   const [filling, setFilling] = useState(false);
   const [filled, setFilled] = useState<FillResult | null>(null);
@@ -108,6 +111,14 @@ export default function SettingsPanel({
             save({ askRecognition: value }, () => setAskRecognition(!value));
           }}
           label="Also ask the other way: Korean word → English meaning"
+        />
+        <Toggle
+          checked={autoPlay}
+          onChange={(value) => {
+            setAutoPlay(value);
+            save({ autoPlayAudio: value }, () => setAutoPlay(!value));
+          }}
+          label="Say the Korean word out loud after each answer (🔊 buttons work either way)"
         />
       </section>
 

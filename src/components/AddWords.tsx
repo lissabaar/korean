@@ -44,6 +44,8 @@ export default function AddWords({
   categories: string[];
 }) {
   const [mode, setMode] = useState<"ai" | "manual">(anonymous ? "manual" : "ai");
+  /** Keep phrases and sentences whole, not only single words. */
+  const [phrases, setPhrases] = useState(true);
   const [credits, setCredits] = useState(initialCredits);
   const outOfCredits = credits !== null && credits <= 0;
   const [stage, setStage] = useState<Stage>("input");
@@ -128,7 +130,7 @@ export default function AddWords({
           const response = await fetch("/api/ingest/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(job.payload),
+            body: JSON.stringify({ ...job.payload, phrases }),
             signal: controller.signal,
           });
           const data = await response.json();
@@ -186,7 +188,9 @@ export default function AddWords({
     try {
       for (const source of sources) {
         const words = candidates
-          .filter((c) => c.sourceId === source.id && c.selected && c.dictionary)
+          .filter(
+            (c) => c.sourceId === source.id && c.selected && (c.dictionary || c.aiMeaning || c.userMeaning),
+          )
           .map((c) => ({
             lemma: c.lemma,
             sentence: c.sentence,
@@ -196,6 +200,9 @@ export default function AddWords({
             secondaryCategories: c.secondaryCategories,
             categoriesFromAi: !c.edited,
             dictionary: c.dictionary,
+            aiMeaning: c.aiMeaning,
+            userMeaning: c.userMeaning,
+            useDictionaryMeaning: c.useDictionaryMeaning,
           }));
         if (words.length === 0) continue;
 
@@ -229,7 +236,9 @@ export default function AddWords({
   }
 
   function setAll(selected: boolean) {
-    setCandidates((list) => list.map((c) => (c.status === "new" ? { ...c, selected } : c)));
+    setCandidates((list) =>
+      list.map((c) => (c.status === "new" || c.status === "ai" ? { ...c, selected } : c)),
+    );
   }
 
   function reset() {
@@ -247,6 +256,7 @@ export default function AddWords({
   const partsTotal = sources.reduce((sum, s) => sum + s.jobs.length, 0);
   const partsDone = sources.reduce((sum, s) => sum + s.partsDone, 0);
   const grouped = sources.length > 1;
+  const conflicts = candidates.filter((c) => c.conflict === "meaning" && c.selected).length;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-8 sm:px-6">
@@ -328,6 +338,33 @@ export default function AddWords({
 
           <div className="mt-4">
             <FileDrop onFiles={addFiles} />
+          </div>
+
+          <div role="radiogroup" aria-label="What to keep" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Keep</span>
+            {(
+              [
+                [false, "Words only"],
+                [true, "Words & phrases"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={phrases === value}
+                onClick={() => setPhrases(value)}
+                className={`rounded-full border px-3 py-1 ${
+                  phrases === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="w-full text-xs text-muted">
+              With phrases, set expressions and sentences (from a phrase list or a screenshot) are kept
+              whole and learned as one card.
+            </span>
           </div>
 
           {(files.length > 0 || reading > 0 || fileErrors.length > 0) && (
@@ -423,11 +460,31 @@ export default function AddWords({
             </div>
           )}
 
+          {conflicts > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-clay-soft px-4 py-3 text-sm">
+              <span className="flex-1 text-clay">
+                {conflicts} {conflicts === 1 ? "word disagrees" : "words disagree"} with the dictionary —
+                your meanings are kept unless you tick “Use the dictionary meaning”.
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCandidates((list) =>
+                    list.map((c) => (c.conflict === "meaning" ? { ...c, useDictionaryMeaning: true } : c)),
+                  )
+                }
+                className="rounded-md border border-clay px-3 py-1 text-clay"
+              >
+                Use dictionary for all
+              </button>
+            </div>
+          )}
+
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted">
               {count("new")} found
               {count("duplicate") > 0 && `, ${count("duplicate")} already yours`}
-              {count("unverified") > 0 && `, ${count("unverified")} unconfirmed`}
+              {count("ai") > 0 && `, ${count("ai")} with AI meaning`}
               {count("unreachable") > 0 &&
                 `, ${count("unreachable")} not checked — dictionary did not respond`}
               {merged > 0 && `, ${merged} repeats merged`}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { WordCandidate } from "@/lib/ingest/analyze";
 import CategorySelect from "./CategorySelect";
+import SpeakButton from "./SpeakButton";
 import type { DictEntry } from "@/lib/dictionary/krdict";
 
 interface Props {
@@ -16,10 +17,16 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
   const [open, setOpen] = useState(false);
 
   const sense = candidate.dictionary?.senses[0];
-  const unverified = candidate.status === "unverified";
+  const aiOnly = candidate.status === "ai";
   const unreachable = candidate.status === "unreachable";
   const duplicate = candidate.status === "duplicate";
-  const disabled = unverified || unreachable || duplicate;
+  const disabled = duplicate;
+  // Phrases and long compounds do not fit the square word cell.
+  const long = candidate.kind === "phrase" || candidate.lemma.length > 5;
+  // The user's own meaning first, unless they chose the dictionary's.
+  const own = candidate.userMeaning && !candidate.useDictionaryMeaning ? candidate.userMeaning : null;
+  const meaning =
+    own ?? sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
 
   return (
     <li
@@ -40,28 +47,66 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
 
         {/* The word is the hero: a Hangul-block-shaped cell, set large. */}
         <div
-          className={`grid size-16 shrink-0 place-items-center rounded-sm sm:size-20 ${
-            unverified || unreachable ? "bg-clay-soft" : "bg-celadon-soft"
-          }`}
+          className={`grid shrink-0 place-items-center rounded-sm ${
+            long ? "max-w-[45%] min-h-16 px-3 py-2" : "size-16 sm:size-20"
+          } ${aiOnly || unreachable ? "bg-clay-soft" : "bg-celadon-soft"}`}
         >
-          <span className="korean text-2xl leading-none sm:text-3xl">
+          <span
+            className={`korean leading-snug ${long ? "text-lg sm:text-xl" : "text-2xl leading-none sm:text-3xl"}`}
+          >
             {candidate.lemma}
           </span>
         </div>
 
         <div className="min-w-0 flex-1">
-          {sense?.translation && (
-            <p className="font-medium">{sense.translation}</p>
-          )}
+          <div className="flex items-start gap-1">
+            {meaning && <p className="flex-1 font-medium">{meaning}</p>}
+            <SpeakButton text={candidate.lemma} className="ml-auto -mt-1" />
+          </div>
 
-          {unverified && (
-            <p className="text-sm text-clay">
-              No dictionary entry — the dictionary form is probably wrong.
+          {(aiOnly || candidate.kind === "phrase") && (
+            <p className="mt-0.5 flex flex-wrap gap-1.5 text-xs">
+              {candidate.kind === "phrase" && (
+                <span className="rounded-full bg-celadon-soft px-2 py-0.5 text-celadon-deep">phrase</span>
+              )}
+              {aiOnly && (
+                <span className="rounded-full bg-clay-soft px-2 py-0.5 text-clay">
+                  AI meaning — not in the dictionary
+                </span>
+              )}
             </p>
           )}
           {unreachable && (
             <p className="text-sm text-clay">
-              The dictionary did not respond. Run the text again to check this word.
+              The dictionary did not respond, so this is not checked. Run it again for dictionary data
+              — or keep it with {candidate.userMeaning ? "your meaning" : "the AI meaning"}.
+            </p>
+          )}
+          {candidate.conflict === "meaning" && (sense?.translation || candidate.aiMeaning) && (
+            <div className="mt-1.5 rounded-md bg-clay-soft px-2.5 py-2 text-sm">
+              <p className="text-clay">
+                Your meaning looks wrong for this word.{" "}
+                {sense?.translation ? "The dictionary says" : "Suggested"}:{" "}
+                <strong>{sense?.translation ?? candidate.aiMeaning}</strong>
+              </p>
+              <label className="mt-1 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={candidate.useDictionaryMeaning}
+                  onChange={(event) =>
+                    onChange({ ...candidate, useDictionaryMeaning: event.target.checked })
+                  }
+                  className="size-4 accent-celadon-deep"
+                />
+                Use {sense?.translation ? "the dictionary" : "the suggested"} meaning instead of “
+                {candidate.userMeaning}”
+              </label>
+            </div>
+          )}
+          {candidate.conflict === "spelling" && (
+            <p className="mt-1 text-sm text-clay">
+              Written as <span className="korean">{candidate.surface}</span> — corrected to the dictionary
+              spelling.
             </p>
           )}
           {duplicate && (

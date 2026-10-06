@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { commitWords, type ApprovedWord } from "@/lib/ingest/commit";
+import { commitWords, resolveEntry, type ApprovedWord } from "@/lib/ingest/commit";
 import { prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 
@@ -19,10 +19,10 @@ export async function POST(request: Request) {
 
   // The dictionary entry travels through the client, so it cannot be
   // trusted blindly — a missing lemma would create a broken card.
-  const invalid = words.find((word) => !word.lemma || !word.dictionary?.senses?.length);
+  const invalid = words.find((word) => !resolveEntry(word));
   if (invalid) {
     return NextResponse.json(
-      { error: `"${invalid.lemma ?? "A word"}" has no dictionary data.` },
+      { error: `"${invalid.lemma ?? "A word"}" has no dictionary data and no meaning.` },
       { status: 400 },
     );
   }

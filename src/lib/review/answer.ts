@@ -23,6 +23,8 @@ export interface GradedAnswer {
 export function normalise(input: string): string {
   return input
     .normalize("NFC")
+    // Punctuation is not part of knowing a phrase: "감사합니다." = "감사합니다"
+    .replace(/[.,!?~…·'"“”‘’()\[\]-]/g, " ")
     .trim()
     .replace(/\s+/g, " ")
     .toLocaleLowerCase();
@@ -77,15 +79,20 @@ export function gradeTypedAnswer(
   const candidates = [expected, ...alternatives].map(normalise).filter(Boolean);
 
   for (const candidate of candidates) {
-    if (given === candidate) return { verdict: "correct", matched: candidate };
+    // Spacing (띄어쓰기) is famously hard and not what is being tested.
+    if (given === candidate || given.replace(/ /g, "") === candidate.replace(/ /g, "")) {
+      return { verdict: "correct", matched: candidate };
+    }
   }
 
   if (!allowNearMiss) return { verdict: "wrong" };
 
-  // One edit for short words, two for longer ones. Korean words are short,
-  // so a fixed threshold would be far too forgiving on 2-syllable words.
+  // One edit for short words, two for longer ones, then about one per seven
+  // characters for phrases. Korean words are short, so a fixed threshold
+  // would be far too forgiving on 2-syllable words and far too strict on
+  // whole sentences.
   for (const candidate of candidates) {
-    const budget = candidate.length <= 3 ? 1 : 2;
+    const budget = candidate.length <= 3 ? 1 : Math.max(2, Math.round(candidate.length / 7));
     if (editDistance(given, candidate) <= budget) {
       return {
         verdict: "almost",

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
 import type { AnswerResult } from "@/lib/review/submit";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
+import SpeakButton, { speakKorean } from "./SpeakButton";
 
 type Load = "loading" | "ready" | "error";
 
@@ -18,6 +19,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [done, setDone] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [stats, setStats] = useState<DeckStats | null>(null);
+  const [autoPlay, setAutoPlay] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,6 +30,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         setQueue(data.items);
         setTotal(data.items.length);
         setStats(data.stats);
+        setAutoPlay(Boolean(data.autoPlay));
         setLoad("ready");
       })
       .catch((cause) => {
@@ -147,7 +150,12 @@ export default function Review({ mode }: { mode: StudyMode }) {
       </div>
 
       {/* Keyed on the card and attempt, so state resets for every question. */}
-      <Question key={`${current.cardId}-${done}`} item={current} onDone={advance} />
+      <Question
+        key={`${current.cardId}-${done}`}
+        item={current}
+        onDone={advance}
+        autoPlay={autoPlay}
+      />
     </Shell>
   );
 }
@@ -158,7 +166,15 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 // ---------------------------------------------------------------- question
 
-function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult) => void }) {
+function Question({
+  item,
+  onDone,
+  autoPlay,
+}: {
+  item: ReviewItem;
+  onDone: (r: AnswerResult) => void;
+  autoPlay: boolean;
+}) {
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
@@ -189,13 +205,15 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
         }
         if (!response.ok) throw new Error(data.error ?? "Could not save that answer.");
         setResult(data);
+        // Hear the word right after answering, while it is on screen.
+        if (autoPlay) speakKorean(item.back.lemma);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Could not save that answer.");
       } finally {
         setBusy(false);
       }
     },
-    [item.cardId, usedHint],
+    [item.cardId, usedHint, autoPlay, item.back.lemma],
   );
 
   const choose = useCallback(
@@ -424,7 +442,10 @@ function Front({ item }: { item: ReviewItem }) {
   if (item.front.lemma) {
     return (
       <div className="grid min-h-40 place-items-center rounded-lg bg-celadon-soft px-6 py-10">
-        <p className="korean text-center text-5xl leading-tight">{item.front.lemma}</p>
+        <div className="flex flex-col items-center gap-2">
+          <p className="korean text-center text-5xl leading-tight">{item.front.lemma}</p>
+          <SpeakButton text={item.front.lemma} />
+        </div>
       </div>
     );
   }
@@ -453,6 +474,7 @@ function Back({ item }: { item: ReviewItem }) {
     <div className="mt-4 rounded-lg border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="korean text-3xl">{back.lemma}</span>
+        <SpeakButton text={back.lemma} className="self-center" />
         {back.originalForm && (
           <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
             {back.originalForm}

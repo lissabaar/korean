@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   let body: {
     text?: string;
     topic?: string;
+    phrases?: boolean;
     image?: { data?: string; mediaType?: string };
     maxWords?: number;
   };
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
       userId,
       source,
       unlimitedAi: budget.unlimited,
+      phrases: body.phrases === true,
       maxWords: body.maxWords,
     });
     const after = await getAiBalance(prisma, userId);

@@ -18,7 +18,44 @@ export interface ApprovedWord {
   secondaryCategories: string[];
   /** False once the user has edited the categories. */
   categoriesFromAi: boolean;
-  dictionary: DictEntry;
+  /** The dictionary's entry; absent when the dictionary does not have it. */
+  dictionary?: DictEntry | null;
+  /** The model's English meaning, used when there is no dictionary entry. */
+  aiMeaning?: string;
+  /** The meaning the user wrote; it becomes the card's translation... */
+  userMeaning?: string;
+  /** ...unless the user chose the dictionary's meaning instead. */
+  useDictionaryMeaning?: boolean;
+}
+
+/** The user's own meaning, when it is the one to store. */
+function ownMeaning(word: ApprovedWord): string | null {
+  const meaning = word.userMeaning?.trim().slice(0, 300);
+  return meaning && !word.useDictionaryMeaning ? meaning : null;
+}
+
+/**
+ * The entry to store: the dictionary's when it has one, otherwise a minimal
+ * one built from the model's meaning and marked source AI (phrases,
+ * compounds, words the dictionary lacks). Null if there is neither.
+ */
+export function resolveEntry(word: ApprovedWord): DictEntry | null {
+  if (word.dictionary?.senses?.length) {
+    // The user's meaning comes first; the dictionary keeps everything else
+    // (definition, level, hanja, examples) and its other senses.
+    const own = ownMeaning(word);
+    if (!own) return word.dictionary;
+    const [first, ...rest] = word.dictionary.senses;
+    return { ...word.dictionary, senses: [{ ...first, translation: own }, ...rest] };
+  }
+  const meaning = (ownMeaning(word) ?? word.aiMeaning?.trim() ?? "").slice(0, 300);
+  const lemma = word.lemma?.normalize("NFC").trim().slice(0, 120);
+  if (!meaning || !lemma) return null;
+  return {
+    lemma,
+    source: "AI",
+    senses: [{ definition: "", translation: meaning, examples: [] }],
+  };
 }
 
 export interface CommitResult {
@@ -95,6 +132,9 @@ async function persistOne(
   materialId: string,
   word: ApprovedWord,
 ): Promise<boolean> {
+  const dict = resolveEntry(word);
+  if (!dict) throw new Error(`"${word.lemma}" has neither dictionary data nor a meaning`);
+
   // The unique index on (userId, language, lemma, originalForm) does not
   // stop duplicates of native words: originalForm is null for them and
   // Postgres treats nulls as distinct. So check by dictionary entry here —
@@ -103,10 +143,10 @@ async function persistOne(
     where: {
       userId,
       language: "KO",
-      lemma: word.dictionary.lemma,
-      ...(word.dictionary.targetCode
-        ? { krdictTargetCode: word.dictionary.targetCode }
-        : { originalForm: word.dictionary.originalForm ?? null }),
+      lemma: dict.lemma,
+      ...(dict.targetCode
+        ? { krdictTargetCode: dict.targetCode }
+        : { originalForm: dict.originalForm ?? null }),
     },
     select: { id: true },
   });
@@ -130,13 +170,13 @@ async function persistOne(
         userId,
         materialId,
         language: "KO",
-        lemma: word.dictionary.lemma,
-        originalForm: word.dictionary.originalForm ?? null,
-        partOfSpeech: word.dictionary.partOfSpeech ?? null,
-        level: word.dictionary.level ?? null,
+        lemma: dict.lemma,
+        originalForm: dict.originalForm ?? null,
+        partOfSpeech: dict.partOfSpeech ?? null,
+        level: dict.level ?? null,
         register: normaliseRegister(word.register) as never,
-        krdictTargetCode: word.dictionary.targetCode ?? null,
-        source: word.dictionary.source as never,
+        krdictTargetCode: dict.targetCode ?? null,
+        source: dict.source as never,
         categories: {
           create: categoryIds.map((categoryId) => ({
             categoryId,
@@ -145,13 +185,13 @@ async function persistOne(
           })),
         },
         senses: {
-          create: word.dictionary.senses.map((sense, index) => ({
+          create: dict.senses.map((sense, index) => ({
             order: index,
-            definitionTarget: sense.definition,
+            definitionTarget: sense.definition || null,
             definitionKnown: sense.translatedDefinition ?? null,
             translation: sense.translation ?? null,
             contextNote: index === 0 ? word.contextNote : null,
-            definitionSource: word.dictionary.source as never,
+            definitionSource: dict.source as never,
             examples: {
               create: [
                 // The learner's own sentence first: it is the context they met
@@ -161,7 +201,7 @@ async function persistOne(
                   : []),
                 ...sense.examples.slice(0, 3).map((example) => ({
                   text: example,
-                  source: word.dictionary.source as never,
+                  source: dict.source as never,
                 })),
               ],
             },

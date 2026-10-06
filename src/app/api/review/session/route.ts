@@ -15,7 +15,11 @@ export async function GET(request: Request) {
       buildSession(prisma, userId, mode),
       getDeckStats(prisma, userId),
     ]);
-    return NextResponse.json({ items, stats });
+    const settings = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { autoPlayAudio: true },
+    });
+    return NextResponse.json({ items, stats, autoPlay: settings?.autoPlayAudio ?? false });
   } catch (error) {
     console.error("Building review session failed:", error);
     return NextResponse.json({ error: "Could not load your reviews." }, { status: 500 });

@@ -14,7 +14,12 @@ export default async function SettingsPage() {
   const [settings, ai, missingExamples, plan, lookups] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { askRecognition: true, showKoreanDefinition: true, learningGoal: true },
+      select: {
+        askRecognition: true,
+        showKoreanDefinition: true,
+        learningGoal: true,
+        autoPlayAudio: true,
+      },
     }),
     getAiBalance(prisma, user.id),
     prisma.sense.count({ where: { order: 0, examples: { none: {} }, entry: { userId: user.id } } }),
@@ -28,6 +33,7 @@ export default async function SettingsPage() {
       askRecognition={settings.askRecognition}
       showKoreanDefinition={settings.showKoreanDefinition}
       learningGoal={settings.learningGoal}
+      autoPlayAudio={settings.autoPlayAudio}
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
       planName={plan.name}

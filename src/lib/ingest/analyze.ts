@@ -21,10 +21,14 @@ import { extractWords, type ExtractSource } from "./extract";
 import { resolveCategories } from "./categories";
 
 /**
- * unverified  — a dictionary answered and does not know the lemma
- * unreachable — no dictionary answered at all; says nothing about the lemma
+ * new         — the dictionary knows it; its data is used
+ * ai          — the dictionary answered and does not know it (a phrase, a
+ *               compound, a rare word): the model's meaning is used, marked AI
+ * unreachable — no dictionary answered at all; the AI meaning is on offer,
+ *               but trying again is usually better
+ * duplicate   — already in the user's words
  */
-export type CandidateStatus = "new" | "duplicate" | "unverified" | "unreachable";
+export type CandidateStatus = "new" | "duplicate" | "ai" | "unreachable";
 
 export interface WordCandidate {
   /** Stable within one analysis, used as a React key and in the commit call. */
@@ -48,6 +52,20 @@ export interface WordCandidate {
    * preview lets the user switch if the automatic pick is wrong.
    */
   homographs: DictEntry[];
+  /** Single word or a phrase/sentence learned whole. */
+  kind: "word" | "phrase";
+  /** The model's English meaning — used only when there is no dictionary entry. */
+  aiMeaning: string;
+  /** The meaning the user wrote in the input; it wins unless they choose otherwise. */
+  userMeaning: string;
+  /**
+   * Where the user's input and the dictionary disagree:
+   *   meaning  — their meaning matches none of the dictionary entry's senses
+   *   spelling — their spelling was wrong; the lemma is the corrected form
+   */
+  conflict: "meaning" | "spelling" | null;
+  /** Set by the user on a meaning conflict: replace their meaning with the dictionary's. */
+  useDictionaryMeaning: boolean;
 
   /** Pre-ticked for everything the user is likely to want. */
   selected: boolean;
@@ -64,7 +82,8 @@ export interface AnalysisResult {
     total: number;
     verified: number;
     duplicates: number;
-    unverified: number;
+    /** Kept with an AI meaning: the dictionary does not have them. */
+    aiOnly: number;
     unreachable: number;
   };
 }
@@ -79,6 +98,8 @@ export interface AnalyzeOptions {
   source: ExtractSource;
   /** Whether this user's AI spend counts towards the shared daily budget. */
   unlimitedAi: boolean;
+  /** Also keep phrases and sentences, not just words. */
+  phrases?: boolean;
   maxWords?: number;
   signal?: AbortSignal;
 }
@@ -89,7 +110,7 @@ export async function analyzeText(
   keys: DictionaryKeys,
   options: AnalyzeOptions,
 ): Promise<AnalysisResult> {
-  const { userId, source, unlimitedAi, maxWords = 40, signal } = options;
+  const { userId, source, unlimitedAi, phrases = false, maxWords = 40, signal } = options;
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -110,6 +131,7 @@ export async function analyzeText(
 
   const extraction = await extractWords(source, anthropic, {
     maxWords,
+    phrases,
     existingCategories: existingCategories.map((category) => category.name),
     signal,
   });
@@ -152,7 +174,7 @@ export async function analyzeText(
       : found === null
         ? "unreachable"
         : dictEntry === null
-          ? "unverified"
+          ? "ai"
           : "new";
 
     return {
@@ -167,9 +189,25 @@ export async function analyzeText(
       status,
       dictionary: dictEntry,
       homographs,
-      // Unverified words stay off by default — the lemma is probably wrong.
-      // Duplicates stay off because they are already being learned.
-      selected: status === "new",
+      kind: word.kind,
+      aiMeaning: word.meaning.trim(),
+      userMeaning: word.userMeaning.trim(),
+      // The model judges whether the user's meaning fits the word — word
+      // overlap cannot, as it reads the user's meaning charitably.
+      conflict:
+        word.userMeaning.trim() && !word.userMeaningFits
+          ? "meaning"
+          : word.misspelled && word.surface !== word.lemma
+            ? "spelling"
+            : null,
+      useDictionaryMeaning: false,
+      // Duplicates stay off: already being learned. Unreachable words stay
+      // off unless the user gave a meaning or it is a phrase (the dictionary
+      // rarely has phrases) — otherwise a retry gets better data.
+      selected:
+        status === "new" ||
+        (status === "ai" && Boolean(word.meaning.trim() || word.userMeaning.trim())) ||
+        (status === "unreachable" && (Boolean(word.userMeaning.trim()) || word.kind === "phrase")),
     };
   });
 
@@ -180,7 +218,7 @@ export async function analyzeText(
       total: candidates.length,
       verified: candidates.filter((c) => c.status === "new").length,
       duplicates: candidates.filter((c) => c.status === "duplicate").length,
-      unverified: candidates.filter((c) => c.status === "unverified").length,
+      aiOnly: candidates.filter((c) => c.status === "ai").length,
       unreachable: candidates.filter((c) => c.status === "unreachable").length,
     },
   };
