@@ -28,15 +28,27 @@ export default async function Home() {
         <Stat label="Words" value={stats.words} />
       </dl>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        {hasWork ? (
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        {stats.due > 0 && (
           <Link
-            href="/review"
+            href="/review?mode=review"
             className="rounded-md bg-celadon-deep px-6 py-3 text-center font-medium text-paper"
           >
-            Start review
+            <i className="bi bi-arrow-repeat mr-2" aria-hidden />
+            Review · {stats.due}
           </Link>
-        ) : null}
+        )}
+        {stats.learning > 0 && (
+          <Link
+            href="/review?mode=learn"
+            className={`rounded-md px-6 py-3 text-center font-medium ${
+              stats.due > 0 ? "border border-celadon bg-surface text-celadon-deep" : "bg-celadon-deep text-paper"
+            }`}
+          >
+            <i className="bi bi-stars mr-2" aria-hidden />
+            Learn new words · {stats.learning}
+          </Link>
+        )}
         <Link
           href="/add"
           className={`rounded-md px-6 py-3 text-center font-medium ${

@@ -183,6 +183,7 @@ export default function AddWords({
           .filter((c) => c.sourceId === source.id && c.selected && c.dictionary)
           .map((c) => ({
             lemma: c.lemma,
+            sentence: c.sentence,
             contextNote: c.contextNote,
             register: c.register,
             primaryCategory: c.primaryCategory,

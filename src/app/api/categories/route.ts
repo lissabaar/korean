@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { guessIcon } from "@/lib/guess-icon";
 import { getUserId } from "@/lib/session";
 
 /** Create a category. Names are lowercase, like the built-in taxonomy. */
@@ -16,8 +17,8 @@ export async function POST(request: Request) {
 
   const category = await prisma.category.upsert({
     where: { userId_language_name: { userId, language: "KO", name } },
-    create: { userId, language: "KO", name },
+    create: { userId, language: "KO", name, icon: guessIcon(name) },
     update: {},
   });
-  return NextResponse.json({ id: category.id, name: category.name });
+  return NextResponse.json({ id: category.id, name: category.name, icon: category.icon ?? "tag" });
 }

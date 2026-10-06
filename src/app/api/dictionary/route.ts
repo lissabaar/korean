@@ -1,0 +1,41 @@
+import { NextResponse } from "next/server";
+import { dictionaryKeys } from "@/lib/clients";
+import { DictionaryError, lookup, TRANS_LANG } from "@/lib/dictionary/krdict";
+import { getUserId } from "@/lib/session";
+
+/**
+ * Dictionary lookup for typed-in words. No AI involved, so it is open to
+ * every user, anonymous ones included.
+ */
+export async function GET(request: Request) {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const q = new URL(request.url).searchParams.get("q")?.normalize("NFC").trim() ?? "";
+  if (!/[가-힣]/.test(q) || q.length > 40) {
+    return NextResponse.json({ error: "Type a Korean word first." }, { status: 400 });
+  }
+
+  try {
+    const entries = await lookup(q, dictionaryKeys, { transLang: TRANS_LANG.EN });
+    return NextResponse.json({
+      entries: entries.slice(0, 8).map((entry) => ({
+        targetCode: entry.targetCode ?? null,
+        lemma: entry.lemma,
+        originalForm: entry.originalForm ?? null,
+        partOfSpeech: entry.partOfSpeech ?? null,
+        level: entry.level ?? null,
+        translation: entry.senses[0]?.translation ?? null,
+        definition: entry.senses[0]?.definition ?? null,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof DictionaryError && error.code === "010") {
+      return NextResponse.json({ error: "The dictionary's daily limit is used up." }, { status: 429 });
+    }
+    return NextResponse.json(
+      { error: "The dictionary did not respond. Try again, or fill the fields in yourself." },
+      { status: 503 },
+    );
+  }
+}

@@ -14,17 +14,21 @@ export default function CategorySelect({
   onChange,
   disabled = false,
   className = "",
+  placeholder,
 }: {
   value: string;
   options: string[];
   onChange: (name: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Shown while value is empty, e.g. "Add to category…". */
+  placeholder?: string;
 }) {
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState("");
 
   const all = options.includes(value) || !value ? options : [value, ...options];
+  const label = placeholder ?? "Category";
 
   function commit() {
     const name = draft.replace(/\s+/g, " ").trim().toLowerCase();
@@ -79,9 +83,14 @@ export default function CategorySelect({
         if (event.target.value === NEW) setCreating(true);
         else onChange(event.target.value);
       }}
-      aria-label="Category"
+      aria-label={label}
       className={`max-w-[14rem] rounded-full border border-celadon bg-surface px-2.5 py-1 text-xs text-celadon-deep disabled:opacity-50 ${className}`}
     >
+      {placeholder && (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      )}
       {all.map((name) => (
         <option key={name} value={name}>
           {name}

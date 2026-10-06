@@ -7,7 +7,7 @@ import { signOut } from "@/lib/auth-client";
 
 const LINKS = [
   { href: "/", label: "Home", icon: "bi-house" },
-  { href: "/review", label: "Review", icon: "bi-arrow-repeat" },
+  { href: "/review", label: "Study", icon: "bi-mortarboard" },
   { href: "/add", label: "Add", icon: "bi-plus-lg" },
   { href: "/categories", label: "Categories", icon: "bi-grid" },
 ];
@@ -50,11 +50,14 @@ export default function Nav({ email }: { email: string | null }) {
           );
         })}
         {email === null ? (
+          // No account yet. Sign-in links to sign-up, and either way the words
+          // added so far come along.
           <Link
-            href="/sign-up"
-            className="ml-auto rounded-md px-2 py-1.5 text-sm text-celadon-deep underline underline-offset-4"
+            href="/sign-in"
+            className="ml-auto rounded-md px-2 py-1.5 text-sm font-medium text-celadon-deep"
           >
-            Save progress
+            <i className="bi bi-person-circle mr-1.5" aria-hidden />
+            Sign in
           </Link>
         ) : (
           <button

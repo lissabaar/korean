@@ -28,6 +28,10 @@ export async function POST(request: Request) {
       definition: text(body.definition),
       example: text(body.example),
       category: text(body.category),
+      dictionary:
+        body.dictionary && typeof body.dictionary === "object"
+          ? (body.dictionary as ManualWordInput["dictionary"])
+          : undefined,
     });
     return NextResponse.json(result);
   } catch (error) {

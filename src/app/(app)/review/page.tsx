@@ -1,7 +1,13 @@
 import Review from "@/components/Review";
+import { parseStudyMode } from "@/lib/review/queue";
 
-export const metadata = { title: "Review · Korean vocabulary" };
+export const metadata = { title: "Study · Korean vocabulary" };
 
-export default function ReviewPage() {
-  return <Review />;
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const { mode } = await searchParams;
+  return <Review mode={parseStudyMode(mode)} />;
 }

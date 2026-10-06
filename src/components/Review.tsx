@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DeckStats, ReviewItem } from "@/lib/review/queue";
+import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
 import type { AnswerResult } from "@/lib/review/submit";
+import { levelLabel, posLabel } from "@/lib/dictionary/labels";
 
 type Load = "loading" | "ready" | "error";
 
 /** A learning card answered but not graduated comes back this many cards later. */
 const REQUEUE_GAP = 3;
 
-export default function Review() {
+export default function Review({ mode }: { mode: StudyMode }) {
   const [load, setLoad] = useState<Load>("loading");
   const [queue, setQueue] = useState<ReviewItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -20,7 +21,7 @@ export default function Review() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/review/session")
+    fetch(`/api/review/session?mode=${mode}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load reviews.");
@@ -33,7 +34,7 @@ export default function Review() {
         setError(cause instanceof Error ? cause.message : "Could not load reviews.");
         setLoad("error");
       });
-  }, []);
+  }, [mode]);
 
   const current = queue[0];
 
@@ -68,11 +69,15 @@ export default function Review() {
       <Shell>
         <div className="rounded-lg border border-line bg-surface p-6">
           <p className="korean text-3xl text-celadon-deep">쉬는 시간</p>
-          <p className="mt-2 font-medium">Nothing to review right now.</p>
+          <p className="mt-2 font-medium">
+            {mode === "learn" ? "No new words to learn." : "Nothing to review right now."}
+          </p>
           <p className="mt-1 text-sm text-muted">
             {stats && stats.words === 0
               ? "Add some words first — they show up here to learn."
-              : "Everything is scheduled for later. Come back then, or add new words."}
+              : mode === "learn"
+                ? "Add words, or switch Learn on for more categories."
+                : "Everything is scheduled for later. Come back then, or learn new words."}
           </p>
           <Link
             href="/add"
@@ -255,7 +260,9 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
       )}
 
       {!item.selfGraded && item.exercise === "CHOICE" && item.choices && (
-        <ul className="mt-6 flex flex-col gap-2.5">
+        // On phones the options make way for the answer card once answered,
+        // so it appears where the eye already is instead of below the fold.
+        <ul className={`mt-6 flex-col gap-2.5 ${result ? "hidden sm:flex" : "flex"}`}>
           {item.choices.map((option, index) => {
             const isPicked = picked === option;
             const isAnswer = result && option === result.expected;
@@ -350,7 +357,7 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
               result.correct ? "bg-celadon-soft text-celadon-deep" : "bg-clay-soft text-clay"
             }`}
           >
-            {feedbackLine(result, item)}
+            {feedbackLine(result, item, picked)}
           </p>
           {!item.selfGraded && <Back item={item} />}
           <button
@@ -367,11 +374,14 @@ function Question({ item, onDone }: { item: ReviewItem; onDone: (r: AnswerResult
   );
 }
 
-function feedbackLine(result: AnswerResult, item: ReviewItem): string {
+function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | null): string {
   if (result.graduated) return "Learned — this word now moves to spaced review.";
   if (result.verdict === "almost") return `${result.note ?? "Close."} Expected: ${result.expected}`;
   if (result.correct) return item.phase === "LEARNING" ? "Right — once more to lock it in." : "Right.";
-  return `Not quite. The answer: ${result.expected}`;
+  // The options are hidden on phones after answering, so say what was picked.
+  return picked
+    ? `Not quite — you picked ${picked}. The answer: ${result.expected}`
+    : `Not quite. The answer: ${result.expected}`;
 }
 
 // ---------------------------------------------------------------- card faces
@@ -396,31 +406,41 @@ function Front({ item }: { item: ReviewItem }) {
   );
 }
 
+/**
+ * The answer side. Shows only what the front did not: on an English →
+ * Korean card the meaning and Korean definition were the question, so they
+ * are not repeated here.
+ */
 function Back({ item }: { item: ReviewItem }) {
-  const { back } = item;
+  const { back, front } = item;
+  const level = levelLabel(back.level);
+  const pos = posLabel(back.partOfSpeech);
   return (
     <div className="mt-4 rounded-lg border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="korean text-3xl">{back.lemma}</span>
-        {back.originalForm && <span className="korean text-lg text-muted">{back.originalForm}</span>}
-        {back.level && (
-          <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">
-            {back.level}
+        {back.originalForm && (
+          <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
+            {back.originalForm}
           </span>
         )}
-        {back.partOfSpeech && <span className="korean text-xs text-muted">{back.partOfSpeech}</span>}
+        {level && (
+          <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">{level}</span>
+        )}
+        {pos && <span className="text-xs text-muted">{pos}</span>}
       </div>
-      {back.translation && <p className="mt-2 font-medium">{back.translation}</p>}
-      {back.definitionTarget && (
+      {back.translation && !front.meaning && <p className="mt-2 font-medium">{back.translation}</p>}
+      {back.definitionTarget && !front.definitionTarget && (
         <p className="korean mt-2 text-base sm:text-sm">{back.definitionTarget}</p>
       )}
-      {back.definitionKnown && <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>}
+      {back.definitionKnown && !front.meaning && (
+        <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>
+      )}
       {back.example && (
-        <p className="korean mt-3 border-l-2 border-celadon pl-3 text-lg leading-relaxed text-muted sm:text-base">
+        <p className="korean mt-3 border-l-2 border-celadon pl-3 text-lg leading-relaxed sm:text-base">
           {back.example}
         </p>
       )}
-      {back.contextNote && <p className="mt-2 text-xs text-muted">From your text: {back.contextNote}</p>}
     </div>
   );
 }

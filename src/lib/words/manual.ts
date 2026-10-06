@@ -19,6 +19,16 @@ export interface ManualWordInput {
   example?: string;
   /** Category name; created if new. Defaults to "uncategorised". */
   category?: string;
+  /**
+   * Set when the user filled the form from a dictionary lookup: the entry's
+   * dictionary facts, kept so the word can be refetched and shows its level.
+   */
+  dictionary?: {
+    targetCode?: string | null;
+    level?: string | null;
+    partOfSpeech?: string | null;
+    originalForm?: string | null;
+  };
 }
 
 export class DuplicateWordError extends Error {}
@@ -65,6 +75,12 @@ export async function createManualWord(
           language: "KO",
           lemma,
           source,
+          ...(input.dictionary && {
+            krdictTargetCode: clean(String(input.dictionary.targetCode ?? ""), 40) || null,
+            level: clean(String(input.dictionary.level ?? ""), 20) || null,
+            partOfSpeech: clean(String(input.dictionary.partOfSpeech ?? ""), 20) || null,
+            originalForm: clean(String(input.dictionary.originalForm ?? ""), 40) || null,
+          }),
           categories: { create: { categoryId: cat.id, assignedByAi: false, confirmed: true } },
           senses: {
             create: {

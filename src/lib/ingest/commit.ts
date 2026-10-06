@@ -10,6 +10,8 @@ import type { DictEntry } from "../dictionary/krdict";
 
 export interface ApprovedWord {
   lemma: string;
+  /** The sentence the word was found in; becomes its first example. */
+  sentence?: string;
   contextNote: string;
   register: string | null;
   primaryCategory: string;
@@ -151,10 +153,17 @@ async function persistOne(
             contextNote: index === 0 ? word.contextNote : null,
             definitionSource: word.dictionary.source as never,
             examples: {
-              create: sense.examples.slice(0, 3).map((example) => ({
-                text: example,
-                source: word.dictionary.source as never,
-              })),
+              create: [
+                // The learner's own sentence first: it is the context they met
+                // the word in. Dictionary examples follow.
+                ...(index === 0 && word.sentence?.trim()
+                  ? [{ text: word.sentence.trim().slice(0, 500), source: "USER" as const }]
+                  : []),
+                ...sense.examples.slice(0, 3).map((example) => ({
+                  text: example,
+                  source: word.dictionary.source as never,
+                })),
+              ],
             },
           })),
         },

@@ -1,8 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { categoryIcon } from "@/lib/category-icons";
 import IconPicker from "./IconPicker";
+import WordEditor from "./WordEditor";
 
 export interface WordView {
   id: string;
@@ -30,21 +31,26 @@ async function send(url: string, method: string, body?: unknown) {
   return data;
 }
 
+/**
+ * Toggles and icons update in place (optimistically). Anything that moves
+ * words around — rename/merge, delete, editing a word — refreshes the page,
+ * and the server component remounts this list with fresh data.
+ */
 export default function CategoryList({
   initial,
-  looseWords,
+  allCategoryNames,
   askRecognition: initialAsk,
 }: {
   initial: CategoryView[];
-  looseWords: WordView[];
+  allCategoryNames: string[];
   askRecognition: boolean;
 }) {
+  const router = useRouter();
   const [categories, setCategories] = useState(initial);
   const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  /** Optimistic: flip locally, roll back if the server refuses. */
   async function patch(id: string, change: Partial<CategoryView>) {
     const before = categories;
     setCategories((list) => list.map((c) => (c.id === id ? { ...c, ...change } : c)));
@@ -57,37 +63,13 @@ export default function CategoryList({
     }
   }
 
-  async function remove(id: string) {
+  async function structural(run: () => Promise<unknown>) {
     setError(null);
     try {
-      await send(`/api/categories/${id}`, "DELETE");
-      setCategories((list) => list.filter((c) => c.id !== id));
+      await run();
+      router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not delete.");
-    }
-  }
-
-  async function create(event: React.FormEvent) {
-    event.preventDefault();
-    if (!newName.trim()) return;
-    setError(null);
-    try {
-      const created: { id: string; name: string } = await send("/api/categories", "POST", {
-        name: newName,
-      });
-      setNewName("");
-      if (!categories.some((c) => c.id === created.id)) {
-        const view: CategoryView = {
-          ...created,
-          icon: categoryIcon(created.name, null),
-          learnActive: true,
-          reviewActive: true,
-          words: [],
-        };
-        setCategories((list) => [...list, view].sort((a, b) => a.name.localeCompare(b.name)));
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not create.");
+      setError(cause instanceof Error ? cause.message : "Could not save.");
     }
   }
 
@@ -110,9 +92,10 @@ export default function CategoryList({
         <p className="korean text-4xl text-celadon-deep">분류</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Categories</h1>
         <p className="mt-2 text-sm text-muted">
-          Choose what you study. <strong className="font-medium text-ink">Learn</strong> decides
-          where new words come from, <strong className="font-medium text-ink">Review</strong>{" "}
-          which learned words come back. A word takes part if any of its categories is on.
+          <strong className="font-medium text-ink">Learn</strong> — new words for{" "}
+          <em>Learn new words</em> come from these.{" "}
+          <strong className="font-medium text-ink">Review</strong> — learned words from these come
+          back in <em>Review</em>. A word counts if any of its categories is on. Tap a word to edit it.
         </p>
       </header>
 
@@ -121,17 +104,6 @@ export default function CategoryList({
           {error}
         </p>
       )}
-
-      <section className="mb-6 rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-medium">Review direction</h2>
-        <p className="mt-1 text-sm text-muted">
-          Cards show the English meaning and ask for the Korean word.
-        </p>
-        <label className="mt-3 flex items-center gap-3 text-sm">
-          <Switch checked={askRecognition} onChange={toggleRecognition} label="Also ask Korean → English" />
-          Also ask Korean → English
-        </label>
-      </section>
 
       {categories.length > 0 && (
         <p className="mb-2 text-xs text-muted">
@@ -145,24 +117,28 @@ export default function CategoryList({
           <CategoryRow
             key={category.id}
             category={category}
+            allCategoryNames={allCategoryNames}
             onPatch={(change) => patch(category.id, change)}
-            onDelete={() => remove(category.id)}
+            onRename={(name) =>
+              structural(() => send(`/api/categories/${category.id}`, "PATCH", { name }))
+            }
+            onDelete={() => structural(() => send(`/api/categories/${category.id}`, "DELETE"))}
+            onWordChanged={() => router.refresh()}
           />
         ))}
-        {looseWords.length > 0 && (
-          <li className="rounded-lg border border-dashed border-line bg-surface">
-            <details>
-              <summary className="cursor-pointer px-4 py-3 text-sm">
-                <i className="bi bi-inbox mr-2 text-muted" aria-hidden />
-                No category · {looseWords.length} — always studied
-              </summary>
-              <WordList words={looseWords} />
-            </details>
-          </li>
-        )}
       </ul>
 
-      <form onSubmit={create} className="mt-5 flex gap-2">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!newName.trim()) return;
+          structural(async () => {
+            await send("/api/categories", "POST", { name: newName });
+            setNewName("");
+          });
+        }}
+        className="mt-4 flex gap-2"
+      >
         <input
           value={newName}
           onChange={(event) => setNewName(event.target.value)}
@@ -180,101 +156,187 @@ export default function CategoryList({
           <span className="hidden sm:inline">Create</span>
         </button>
       </form>
+
+      <section className="mt-8 rounded-lg border border-line bg-surface p-4">
+        <h2 className="text-sm font-medium">Review direction</h2>
+        <p className="mt-1 text-sm text-muted">
+          Cards show the English meaning and ask for the Korean word.
+        </p>
+        <label className="mt-3 flex items-center gap-3 text-sm">
+          <Switch
+            checked={askRecognition}
+            onChange={toggleRecognition}
+            label="Also ask Korean → English"
+          />
+          Also ask Korean → English
+        </label>
+      </section>
     </main>
   );
 }
 
 function CategoryRow({
   category,
+  allCategoryNames,
   onPatch,
+  onRename,
   onDelete,
+  onWordChanged,
 }: {
   category: CategoryView;
+  allCategoryNames: string[];
   onPatch: (change: Partial<CategoryView>) => void;
+  onRename: (name: string) => void;
   onDelete: () => void;
+  onWordChanged: () => void;
 }) {
-  const [picking, setPicking] = useState(false);
+  const [panel, setPanel] = useState<"none" | "icon" | "rename" | "delete">("none");
+  const [draft, setDraft] = useState(category.name);
+  const [editing, setEditing] = useState<string | null>(null);
   const off = !category.learnActive && !category.reviewActive;
+  const toggle = (value: typeof panel) => setPanel(panel === value ? "none" : value);
 
   return (
-    <li className={`rounded-lg border border-line bg-surface ${off ? "opacity-60" : ""}`}>
+    <li className="overflow-hidden rounded-lg border border-line bg-surface">
+      {/* Row 1: icon, full name, actions. Row 2 on phones: the switches. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <button
           type="button"
-          onClick={() => setPicking(!picking)}
+          onClick={() => toggle("icon")}
           aria-label={`Change icon for ${category.name}`}
-          className="grid size-10 shrink-0 place-items-center rounded-md bg-celadon-soft text-xl text-celadon-deep"
+          className={`grid size-10 shrink-0 place-items-center rounded-md bg-celadon-soft text-xl text-celadon-deep ${off ? "opacity-50" : ""}`}
         >
           <i className={`bi bi-${category.icon}`} aria-hidden />
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{category.name}</p>
+        <div className={`min-w-0 flex-1 basis-40 ${off ? "opacity-60" : ""}`}>
+          <p className="font-medium break-words">{category.name}</p>
           <p className="text-xs text-muted">
             {category.words.length} {category.words.length === 1 ? "word" : "words"}
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <label className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 text-muted">
+          <button
+            type="button"
+            onClick={() => toggle("rename")}
+            aria-label={`Rename ${category.name}`}
+            className="rounded p-1.5 hover:text-ink"
+          >
+            <i className="bi bi-pencil" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => toggle("delete")}
+            aria-label={`Delete ${category.name}`}
+            className="rounded p-1.5 hover:text-clay"
+          >
+            <i className="bi bi-trash" aria-hidden />
+          </button>
+        </div>
+        <div className="flex w-full items-center gap-5 pl-[3.25rem] text-sm sm:w-auto sm:pl-0">
+          <label className="flex items-center gap-2">
             <Switch
               checked={category.learnActive}
-                  onChange={(learnActive) => onPatch({ learnActive })}
+              onChange={(learnActive) => onPatch({ learnActive })}
               label={`Learn new words from ${category.name}`}
             />
             Learn
           </label>
-          <label className="flex items-center gap-1.5">
+          <label className="flex items-center gap-2">
             <Switch
               checked={category.reviewActive}
-                  onChange={(reviewActive) => onPatch({ reviewActive })}
+              onChange={(reviewActive) => onPatch({ reviewActive })}
               label={`Review ${category.name}`}
             />
             Review
           </label>
-          {category.words.length === 0 && (
-            <button
-              type="button"
-              onClick={onDelete}
-              aria-label={`Delete ${category.name}`}
-              className="text-muted hover:text-clay"
-            >
-              <i className="bi bi-trash" aria-hidden />
-            </button>
-          )}
         </div>
       </div>
 
-      {picking && (
+      {panel === "icon" && (
         <div className="border-t border-line px-4 py-3">
           <IconPicker
             value={category.icon}
             onPick={(icon) => {
               onPatch({ icon });
-              setPicking(false);
+              setPanel("none");
             }}
           />
+        </div>
+      )}
+
+      {panel === "rename" && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (draft.trim()) onRename(draft);
+          }}
+          className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3"
+        >
+          <input
+            autoFocus
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            maxLength={60}
+            aria-label="Category name"
+            className="min-w-0 flex-1 rounded-md border border-line bg-paper px-3 py-2 text-base outline-none focus:border-celadon"
+          />
+          <button type="submit" className="rounded-md bg-celadon-deep px-4 py-2 text-sm text-paper">
+            Rename
+          </button>
+          <p className="w-full text-xs text-muted">
+            Using the name of another category merges the two.
+          </p>
+        </form>
+      )}
+
+      {panel === "delete" && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-line bg-clay-soft px-4 py-3 text-sm">
+          <span className="flex-1">
+            {category.words.length === 0
+              ? "Delete this empty category?"
+              : "Delete the category? Its words stay — any without another category move to “uncategorised”."}
+          </span>
+          <button type="button" onClick={onDelete} className="rounded-md bg-clay px-3 py-1.5 text-paper">
+            Delete
+          </button>
+          <button type="button" onClick={() => setPanel("none")} className="text-muted">
+            Cancel
+          </button>
         </div>
       )}
 
       {category.words.length > 0 && (
         <details className="border-t border-line">
           <summary className="cursor-pointer px-4 py-2 text-xs text-muted">Show words</summary>
-          <WordList words={category.words} />
+          <ul className="pb-2">
+            {category.words.map((word) => (
+              <li key={word.id} className="border-t border-line/60 first:border-t-0">
+                {editing === word.id ? (
+                  <WordEditor
+                    wordId={word.id}
+                    allCategoryNames={allCategoryNames}
+                    onDone={(changed) => {
+                      setEditing(null);
+                      if (changed) onWordChanged();
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(word.id)}
+                    className="flex w-full items-baseline gap-2 px-4 py-1.5 text-left text-sm hover:bg-celadon-soft/50"
+                  >
+                    <span className="korean text-base">{word.lemma}</span>
+                    {word.translation && <span className="truncate text-muted">{word.translation}</span>}
+                    <i className="bi bi-pencil ml-auto text-xs text-muted" aria-hidden />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         </details>
       )}
     </li>
-  );
-}
-
-function WordList({ words }: { words: WordView[] }) {
-  return (
-    <ul className="grid gap-x-4 gap-y-1 px-4 pb-3 sm:grid-cols-2">
-      {words.map((word) => (
-        <li key={word.id} className="flex items-baseline gap-2 text-sm">
-          <span className="korean text-base">{word.lemma}</span>
-          {word.translation && <span className="truncate text-muted">{word.translation}</span>}
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -282,12 +344,10 @@ function Switch({
   checked,
   onChange,
   label,
-  disabled = false,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   label: string;
-  disabled?: boolean;
 }) {
   return (
     <button
@@ -295,9 +355,8 @@ function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
         checked ? "bg-celadon-deep" : "bg-line"
       }`}
     >

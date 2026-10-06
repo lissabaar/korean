@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn, signUp } from "@/lib/auth-client";
 
-export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export default function AuthForm({
+  mode,
+  googleEnabled,
+}: {
+  mode: "sign-in" | "sign-up";
+  googleEnabled: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,9 +49,23 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       </h1>
       <p className="mb-8 text-sm text-muted">
         {isSignUp
-          ? "Your words and schedule stay in your own database."
-          : "Pick up where your reviews left off."}
+          ? "Free AI credits, and the words you already added come along."
+          : "Pick up where your reviews left off. Words added without an account come along."}
       </p>
+
+      {googleEnabled && (
+        <>
+          <button
+            type="button"
+            onClick={() => signIn.social({ provider: "google", callbackURL: "/" })}
+            className="flex items-center justify-center gap-2 rounded-md border border-line bg-surface px-4 py-3 font-medium"
+          >
+            <i className="bi bi-google" aria-hidden />
+            Continue with Google
+          </button>
+          <p className="my-4 text-center text-xs text-muted">or with email</p>
+        </>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {isSignUp && (

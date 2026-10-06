@@ -96,10 +96,17 @@ export async function analyzeText(
     select: { explanationLang: true },
   });
 
+  // Only categories the user made or uses by choice: ones the model created
+  // itself in the past (every link AI-assigned) are not offered again.
   const existingCategories = await prisma.category.findMany({
-    where: { language: "KO", OR: [{ userId }, { isBuiltIn: true }] },
+    where: {
+      userId,
+      language: "KO",
+      OR: [{ entries: { none: {} } }, { entries: { some: { assignedByAi: false } } }],
+    },
     select: { name: true },
   });
+  const allowedOwn = new Set(existingCategories.map((category) => category.name));
 
   const extraction = await extractWords(source, anthropic, {
     maxWords,
@@ -135,7 +142,9 @@ export async function analyzeText(
     const found = dictionary.get(word.lemma);
     const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote);
     const dictEntry = homographs[0] ?? null;
-    const { primary, secondary } = resolveCategories(word.categories);
+    const { primary, secondary } = allowedOwn.has(word.category)
+      ? { primary: word.category, secondary: [] }
+      : resolveCategories([word.category], { maxSecondary: 0 });
 
     const status: CandidateStatus = isKnown(word.lemma, dictEntry?.targetCode)
       ? "duplicate"

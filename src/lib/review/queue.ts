@@ -154,7 +154,9 @@ export interface DeckStats {
 const cardInclude = {
   sense: {
     include: {
-      examples: { take: 1 },
+      // cuid ids grow with creation order, so this is the first one saved —
+      // the learner's own sentence when there is one.
+      examples: { take: 1, orderBy: { id: "asc" as const } },
       entry: { include: { categories: { select: { categoryId: true } } } },
     },
   },
@@ -178,21 +180,29 @@ export async function getDeckStats(prisma: PrismaClient, userId: string): Promis
   return { due, learning, words, nextDue: next?.due ?? null };
 }
 
+/** learn = new words only, review = scheduled reviews only, all = both. */
+export type StudyMode = "learn" | "review" | "all";
+
+export function parseStudyMode(value: string | null | undefined): StudyMode {
+  return value === "learn" || value === "review" ? value : "all";
+}
+
 export async function buildSession(
   prisma: PrismaClient,
   userId: string,
+  mode: StudyMode = "all",
 ): Promise<ReviewItem[]> {
   const now = new Date();
   const { user, learn, review } = await studyScope(prisma, userId);
 
   const [scheduled, learning] = await Promise.all([
-    prisma.card.findMany({
+    mode === "learn" ? [] : prisma.card.findMany({
       where: { ...review, due: { lte: now } },
       include: cardInclude,
       orderBy: { due: "asc" },
       take: REVIEWS_PER_SESSION,
     }),
-    prisma.card.findMany({
+    mode === "review" ? [] : prisma.card.findMany({
       where: learn,
       include: cardInclude,
       // Oldest words first, and both directions of a word together.

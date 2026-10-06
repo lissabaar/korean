@@ -53,7 +53,7 @@ npm install
 | `BETTER_AUTH_SECRET` | любая случайная строка от 32 символов: `npx auth secret` |
 | `BETTER_AUTH_URL` | `http://localhost:3000` |
 | `UNLIMITED_AI_EMAILS` | твоя почта — для неё ИИ без лимита |
-| `FREE_AI_CREDITS` | необязательно: бесплатные кредиты новым пользователям, по умолчанию 100 (= $1) |
+| `FREE_AI_CREDITS` | необязательно: бесплатные кредиты новым пользователям, по умолчанию 50 (= $0.50) |
 | `AI_DAILY_BUDGET_CREDITS` | необязательно: общий дневной потолок на всех бесплатных, по умолчанию 300 (= $3) |
 
 Важно: `BETTER_AUTH_SECRET` должен быть **тем же**, что раньше, иначе все
@@ -83,6 +83,19 @@ npm run dev
 Например, учить только еду, а повторять всё. Там же иконки категорий и
 направление повторения (по умолчанию: показывается английский, отвечаешь
 по-корейски).
+
+## Вход через Google (необязательно)
+
+1. console.cloud.google.com → создай проект → APIs & Services → OAuth
+   consent screen: тип External, название приложения, своя почта.
+2. Credentials → Create credentials → OAuth client ID → Web application.
+3. Authorized redirect URIs — оба адреса:
+   - `https://korean-drab.vercel.app/api/auth/callback/google`
+   - `http://localhost:3000/api/auth/callback/google`
+4. Скопируй Client ID и Client secret в `GOOGLE_CLIENT_ID` и
+   `GOOGLE_CLIENT_SECRET` — в `.env` и в Vercel (потом Redeploy).
+
+Пока ключей нет, кнопки Google просто не видно.
 
 ## Что можно загружать
 

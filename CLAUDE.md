@@ -28,7 +28,9 @@ src/components/             React client components
 src/lib/
   ai-budget.ts              free AI credits, usage log, daily cap
   auth.ts                   Better Auth config (+ anonymous plugin)
-  category-icons.ts         Bootstrap Icons defaults per category
+  category-icons.ts         Bootstrap Icons defaults + picker suggestions (client-safe)
+  guess-icon.ts             icon for a user-named category (server: full icon list)
+  dictionary/labels.ts      KRDict level / part-of-speech labels → English
   auth-client.ts            client-side auth helpers ("use client")
   session.ts                server-side session helpers
   db.ts                     Prisma singleton
@@ -38,6 +40,7 @@ src/lib/
     manual.ts               word typed in by hand (source USER), no AI
     starter-deck.ts         ready-made deck for empty accounts (DRAFT content)
     merge-anonymous.ts      anonymous → real account on sign-up/sign-in
+    edit.ts                 rename/merge/delete categories, edit/delete words
   ingest/
     extract.ts              model → lemmas + categories (no DB writes)
     categories.ts           fixed taxonomy, alias folding
@@ -56,7 +59,9 @@ scripts/copy-sqljs-wasm.mjs postinstall: puts sql.js's wasm in public/
 src/app/(app)/              app pages (home, /review, /add, /categories); layout starts
                             an anonymous session for first-time visitors
 src/app/api/review/         session (GET) and answer (POST) routes
-src/app/api/{words,categories,settings,starter-deck}/   manual words, category flags
+src/app/api/{words,categories,settings,starter-deck,dictionary}/
+                            manual words (+ edit), category flags/rename/delete,
+                            dictionary lookup for typed-in words (no AI)
 ```
 
 Docs: `SETUP.md` (Russian, for the owner) — setting up on a new machine.
@@ -130,11 +135,30 @@ The one exception to "dictionaries decide": `words/manual.ts` stores what
 the user wrote with source USER (starter deck: source AI, since its draft
 content was written by the assistant).
 
+**One category per extracted word, never invented.**
+The model picks exactly one from the built-in taxonomy plus the user's own
+categories (only ones the user made or chose — categories the model created
+in the past are not offered back). Free-form "secondary" categories produced
+noise like "cutting" and are gone.
+
+**Every word has a category.**
+`words/edit.ts` keeps it so: deleting a category or clearing a word's
+categories puts it in "uncategorised" — an ordinary category with its own
+Learn/Review switches; it can only be deleted when empty. Renaming onto an
+existing name merges the two.
+
 **Study scope = direction × categories.**
 `studyScope()` in `review/queue.ts`: RECALL (English → Korean) always,
 RECOGNITION only if `User.askRecognition`. A word is learned if any of its
-categories has `learnActive`, reviewed if any has `reviewActive`; a word
-with no category always takes part. Stats and sessions both go through it.
+categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
+sessions both go through it. Sessions take a mode — `learn` (new words
+only), `review` (scheduled only), `all` — from `/review?mode=`.
+
+**Cards don't repeat themselves.**
+The answer side shows only what the question side did not (an English →
+Korean card's meaning and Korean definition are not shown again). Its
+example is the first one saved — the sentence from the user's own text when
+the word came from one.
 
 **Auth owns nothing in `clients.ts`.**
 Prisma lives in `db.ts`; auth in `auth.ts`. Both import from `db.ts`.
@@ -150,9 +174,11 @@ KRDICT_API_KEY
 STDICT_API_KEY        # optional fallback
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL       # the site's own URL (http://localhost:3000 locally)
-FREE_AI_CREDITS       # optional, default 100 per user
+FREE_AI_CREDITS       # optional, default 50 per user
 AI_DAILY_BUDGET_CREDITS # optional, default 300 across all free users
 UNLIMITED_AI_EMAILS   # comma-separated; the owner's account
+GOOGLE_CLIENT_ID      # optional; with the secret, shows "Continue with Google"
+GOOGLE_CLIENT_SECRET
 ```
 
 ## Common commands
@@ -177,7 +203,8 @@ Run Node through `npm run …`: the project `.npmrc` sets
 - Starter deck content is a 10-word draft — replace with a real,
   dictionary-checked deck
 - Anonymous users that never sign up are never cleaned up
-- Typed-in words could be auto-filled from KRDict (free, no AI)
+- Email verification: off (needs a mail provider such as Resend + a domain)
+- Example sentences from KRDict's view API (typed-in words get none yet)
 
 - Example sentences — KRDict's search API has none; needs its view API
   (`/api/view`, by `target_code`)

@@ -53,12 +53,11 @@ const ExtractedWordSchema = z.object({
   /** The sentence it appeared in, for the card's context note. */
   sentence: z.string(),
   /**
-   * Categories this word belongs to, most apt first. A word genuinely can
-   * sit in several (김치 is both food and culture), so this is a list —
-   * but a capped one, since a word tagged with everything is tagged with
-   * nothing.
+   * One category, picked from a closed list (the built-in taxonomy plus the
+   * user's own). Free-form extras used to be allowed and produced oddly
+   * narrow categories ("cutting"), so the model no longer invents any.
    */
-  categories: z.array(z.string()),
+  category: z.string(),
   /** Model's reading of which sense was meant here. */
   contextNote: z.string(),
   /**
@@ -83,7 +82,7 @@ For each distinct content word in the text, return:
 - lemma: the dictionary form (기본형). For verbs and adjectives this ends in 다.
 - surface: the form exactly as it appears in the text
 - sentence: the full sentence it appeared in, unmodified; empty for a bare word list
-- categories: a list, most apt first. The FIRST entry must be chosen from the fixed list supplied below — pick the closest fit, never invent one. After it you may add at most two of your own, lowercase, only where they say something the fixed category does not.
+- category: exactly one, copied verbatim from the category list supplied below — the closest fit. Never invent a category.
 - contextNote: one sentence in English on which meaning is used here
 - gloss: the meaning used here as a plain English word or two ("park", "to eat") — this picks between dictionary homographs, so name the meaning, not the form
 - register: the politeness level, or null if the word carries no particular level
@@ -106,7 +105,7 @@ export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 export interface ExtractOptions {
   /** Cap on words returned, so one long text cannot create 300 cards. */
   maxWords?: number;
-  /** Categories that already exist, so the model reuses them. */
+  /** The user's own categories, offered alongside the built-in ones. */
   existingCategories?: string[];
   signal?: AbortSignal;
 }
@@ -114,15 +113,10 @@ export interface ExtractOptions {
 function buildInstructions(options: ExtractOptions): string {
   const parts: string[] = [];
 
+  const allowed = [...new Set([...(options.existingCategories ?? []), ...BASE_CATEGORIES])];
   parts.push(
-    `Fixed category list — the first entry of "categories" MUST be one of these, verbatim:\n${BASE_CATEGORIES.join(", ")}`,
+    `Category list — "category" MUST be one of these, verbatim. The learner's own categories come first; prefer one of them when it fits:\n${allowed.join(", ")}`,
   );
-
-  if (options.existingCategories?.length) {
-    parts.push(
-      `Secondary categories already in use — prefer these over inventing new ones:\n${options.existingCategories.join(", ")}`,
-    );
-  }
 
   if (options.maxWords) {
     parts.push(
@@ -199,7 +193,7 @@ export async function extractWords(
         ...word,
         lemma: word.lemma.normalize("NFC").trim(),
         surface: word.surface.normalize("NFC").trim(),
-        categories: word.categories.map((name) => name.toLowerCase().trim()),
+        category: word.category.toLowerCase().trim(),
       })),
   };
 }
@@ -227,7 +221,7 @@ For each word give:
 - lemma: dictionary form
 - surface: same as lemma
 - sentence: a natural example sentence using the word
-- categories: just the topic, lowercase
+- category: just the topic, lowercase
 - contextNote: one sentence in English on the core meaning
 - gloss: the core meaning as a plain English word or two
 - register: the politeness level, or null if none applies
@@ -243,7 +237,7 @@ Use only real, current Korean words that appear in standard dictionaries.`,
       ...word,
       lemma: word.lemma.normalize("NFC").trim(),
       surface: word.lemma.normalize("NFC").trim(),
-      categories: [category.toLowerCase().trim()],
+      category: category.toLowerCase().trim(),
     })),
   };
 }

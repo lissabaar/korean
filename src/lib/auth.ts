@@ -27,6 +27,10 @@ import { moveAnonymousData } from "./words/merge-anonymous";
  * variables cover the production domain and per-deployment preview URLs, so
  * a wrong or stale BETTER_AUTH_URL cannot lock everyone out.
  */
+export const googleEnabled = Boolean(
+  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+);
+
 const trustedOrigins = [
   process.env.BETTER_AUTH_URL,
   process.env.VERCEL_PROJECT_PRODUCTION_URL,
@@ -39,6 +43,24 @@ const trustedOrigins = [
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   trustedOrigins,
+
+  // Google sign-in, switched on only when its keys are configured. The
+  // redirect URI to register in Google Cloud is
+  //   <site>/api/auth/callback/google
+  socialProviders: googleEnabled
+    ? {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID!,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        },
+      }
+    : {},
+
+  // Signing in with Google using the email of an existing password account
+  // joins the two instead of failing. Google has verified the address.
+  account: {
+    accountLinking: { enabled: true, trustedProviders: ["google"] },
+  },
 
   emailAndPassword: {
     enabled: true,
