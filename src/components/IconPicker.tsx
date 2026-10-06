@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * Popup grid of Bootstrap Icons for choosing a category's icon, with a few
+ * suggestions for the category's name (lib/category-icons.ts).
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SUGGESTED_ICONS } from "@/lib/category-icons";
 

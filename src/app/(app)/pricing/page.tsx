@@ -1,3 +1,11 @@
+/**
+ * "/pricing" — the plans page. A placeholder: nothing can be bought yet
+ * (see PAYMENTS.md). Prices and features come from lib/plans.ts.
+ *
+ * Next.js page (server component): runs on the server for every request, may
+ * read the database directly, and returns HTML. The folder path is the URL.
+ */
+
 import { PLANS } from "@/lib/plans";
 
 export const metadata = { title: "Plans · Korean vocabulary" };

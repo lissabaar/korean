@@ -38,6 +38,7 @@ export class InvalidWordError extends Error {}
 
 const LIMITS = { lemma: 60, translation: 200, definition: 500, example: 500, category: 60 };
 
+/** Trimmed, NFC-normalised, single-spaced text cut to `max` characters. */
 function clean(value: string | undefined, max: number): string {
   return (value ?? "").normalize("NFC").replace(/\s+/g, " ").trim().slice(0, max);
 }
@@ -56,6 +57,10 @@ function meanings(typed: string, dictionary: string | null | undefined) {
   };
 }
 
+/**
+ * Save a word typed in by hand, with its card(s). Throws InvalidWordError (bad
+ * input) or DuplicateWordError (already saved).
+ */
 export async function createManualWord(
   prisma: PrismaClient,
   userId: string,

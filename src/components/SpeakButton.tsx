@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * Pronunciation: a speaker button, plus speakKorean() for playing a word from
+ * code (auto-play after answering).
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Uses the browser's built-in speech synthesis (Web Speech API) with a Korean
+ * voice — free and offline; the voice quality depends on the device. The
+ * button hides itself where the browser cannot speak.
+ */
+
 import { useSyncExternalStore } from "react";
 
 /**
@@ -12,6 +25,10 @@ function koreanVoice(): SpeechSynthesisVoice | undefined {
   return window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ko"));
 }
 
+/**
+ * Say a Korean word aloud with the browser's voice (cancels whatever is still
+ * speaking). Does nothing where speech is not supported.
+ */
 export function speakKorean(text: string): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
   const utterance = new SpeechSynthesisUtterance(text);
@@ -26,6 +43,10 @@ export function speakKorean(text: string): void {
 const subscribe = () => () => {};
 const supported = () => "speechSynthesis" in window;
 
+/**
+ * Speaker icon button that says `text`. Hidden where the browser has no speech
+ * synthesis.
+ */
 export default function SpeakButton({ text, className = "" }: { text: string; className?: string }) {
   const canSpeak = useSyncExternalStore(subscribe, supported, () => false);
   if (!canSpeak) return null;

@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * Form for adding one word by hand on /add: the word, its meaning, optional
+ * definition, example and category. The "Dictionary" button looks the word
+ * up (/api/dictionary) and prefills the fields from the chosen entry, plus an
+ * example (/api/dictionary/examples). Saving goes to /api/words. No AI.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useState } from "react";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
 import CategorySelect from "./CategorySelect";
@@ -53,6 +64,7 @@ export default function ManualWord({ categories }: { categories: string[] }) {
     }
   }
 
+  /** Fill the form from the chosen dictionary entry and fetch an example for it. */
   function pick(entry: Found) {
     setPicked(entry);
     setFound(null);
@@ -71,6 +83,10 @@ export default function ManualWord({ categories }: { categories: string[] }) {
     }
   }
 
+  /**
+   * Save the typed-in word (POST /api/words); on success clear the form for the
+   * next one.
+   */
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);

@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * The interactive list on /categories: each category with its words, the
+ * total word count, Learn/Review switches, rename/merge, icon picker, delete,
+ * and the word editor for a single word.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Changes are sent to /api/categories/:id and /api/words/:id; after a change
+ * that moves words around the page re-reads its data (router.refresh()).
+ */
+
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import IconPicker from "./IconPicker";
@@ -20,6 +33,10 @@ export interface CategoryView {
   words: WordView[];
 }
 
+/**
+ * Small fetch() wrapper: JSON in, JSON out, throws with the server's error
+ * message on failure.
+ */
 async function send(url: string, method: string, body?: unknown) {
   const response = await fetch(url, {
     method,
@@ -48,6 +65,10 @@ export default function CategoryList({
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Change a field of one category (switches, icon) — shown at once, saved in
+   * the background, undone if the server refuses.
+   */
   async function patch(id: string, change: Partial<CategoryView>) {
     const before = categories;
     setCategories((list) => list.map((c) => (c.id === id ? { ...c, ...change } : c)));
@@ -60,6 +81,10 @@ export default function CategoryList({
     }
   }
 
+  /**
+   * For changes that move words around (rename/merge, delete): run it, then
+   * reload the page's data from the server.
+   */
   async function structural(run: () => Promise<unknown>) {
     setError(null);
     try {
@@ -154,6 +179,10 @@ export default function CategoryList({
   );
 }
 
+/**
+ * One category: icon, name (click to rename), word count, Learn/Review switches,
+ * delete, and its words (click one to edit).
+ */
 function CategoryRow({
   category,
   allCategoryNames,
@@ -326,6 +355,7 @@ function CategoryRow({
   );
 }
 
+/** An on/off switch (role="switch" for screen readers). */
 function Switch({
   checked,
   onChange,

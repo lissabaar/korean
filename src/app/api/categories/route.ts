@@ -1,3 +1,14 @@
+/**
+ * POST /api/categories — create a category (from the category picker).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * An icon is guessed from the name (lib/guess-icon.ts). Creating a name that
+ * already exists returns the existing one (upsert).
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { guessIcon } from "@/lib/guess-icon";

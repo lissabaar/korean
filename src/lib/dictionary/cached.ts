@@ -25,6 +25,10 @@ const DAY = 24 * 60 * 60 * 1000;
 const FOUND_TTL = 90 * DAY;
 const EMPTY_TTL = 7 * DAY;
 
+/**
+ * A cached dictionary answer, if it is still fresh (found: 90 days, "no such
+ * word": 7 days).
+ */
 async function readCache<T>(prisma: PrismaClient, key: string): Promise<T | undefined> {
   const row = await prisma.dictionaryCache.findUnique({ where: { key } });
   if (!row) return undefined;
@@ -34,6 +38,10 @@ async function readCache<T>(prisma: PrismaClient, key: string): Promise<T | unde
   return age < (empty ? EMPTY_TTL : FOUND_TTL) ? value : undefined;
 }
 
+/**
+ * Store a dictionary answer. A failed write is only logged — it never breaks the
+ * lookup.
+ */
 async function writeCache(prisma: PrismaClient, key: string, value: unknown): Promise<void> {
   const json = value as Prisma.InputJsonValue;
   await prisma.dictionaryCache
@@ -46,6 +54,11 @@ async function writeCache(prisma: PrismaClient, key: string, value: unknown): Pr
     .catch((error) => console.warn("Dictionary cache write failed:", error));
 }
 
+/**
+ * Look one word up: cache first, else KRDict (and store the answer). Throws
+ * DictionaryUnavailableError when the dictionary does not answer — that is never
+ * cached.
+ */
 export async function cachedLookup(
   prisma: PrismaClient,
   word: string,
@@ -80,6 +93,10 @@ export async function cachedLookupMany(
   const BREAK_AFTER = 6;
   let failuresInARow = 0;
 
+  /**
+   * One of the parallel workers: takes words from the shared queue until it is
+   * empty.
+   */
   async function worker(): Promise<void> {
     for (let word = queue.shift(); word !== undefined; word = queue.shift()) {
       if (failuresInARow >= BREAK_AFTER) {
@@ -101,6 +118,10 @@ export async function cachedLookupMany(
   return results;
 }
 
+/**
+ * Example sentences for a KRDict entry (by target code), from the cache or the
+ * view API.
+ */
 export async function cachedExamples(
   prisma: PrismaClient,
   targetCode: string,
@@ -122,11 +143,16 @@ export class LookupLimitError extends Error {
   }
 }
 
+/** Midnight UTC of the current day — the key of the daily lookup counter. */
 function today(): Date {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+/**
+ * How many typed-in dictionary lookups this user made today (imports do not
+ * count).
+ */
 export async function lookupsToday(prisma: PrismaClient, userId: string): Promise<number> {
   const row = await prisma.dictionaryUsage.findUnique({
     where: { userId_day: { userId, day: today() } },

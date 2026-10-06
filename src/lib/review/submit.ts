@@ -62,6 +62,10 @@ export interface AnswerResult {
 
 export class CardNotFoundError extends Error {}
 
+/**
+ * Grade one answer and move the card on (learning streak, or FSRS schedule +
+ * ReviewLog). Throws CardNotFoundError if the card is not this user's.
+ */
 export async function submitAnswer(
   prisma: PrismaClient,
   userId: string,

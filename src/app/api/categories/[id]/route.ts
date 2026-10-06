@@ -1,3 +1,21 @@
+/**
+ * /api/categories/:id — change or delete one category.
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * "[id]" is a dynamic segment: /api/categories/abc123 gives params.id =
+ * "abc123" (a Promise in this Next.js version, hence `await params`).
+ *
+ *   PATCH   rename (renaming onto an existing name merges the two), switch
+ *           Learn/Review, change the icon
+ *   DELETE  delete; words left without a category go to "uncategorised"
+ *
+ * The rules live in lib/words/edit.ts; this file checks input and maps
+ * errors to HTTP status codes.
+ */
+
 import { NextResponse } from "next/server";
 import { isIconName } from "@/lib/category-icons";
 import { prisma } from "@/lib/db";
@@ -6,6 +24,10 @@ import { deleteCategory, EditError, renameCategory } from "@/lib/words/edit";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * Turns an error into an HTTP response: EditError carries its own status
+ * (400/404/409); anything else is logged and answered 500.
+ */
 function failure(error: unknown) {
   if (error instanceof EditError) {
     return NextResponse.json({ error: error.message }, { status: error.status });

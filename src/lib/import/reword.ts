@@ -32,6 +32,10 @@ export interface RewordDeck {
 const HANGUL = /[가-힣]/;
 const text = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
 
+/**
+ * Read a ReWord .reword export (a zip with JSON inside) into text lines "word —
+ * translation", skipping duplicates and lines without Hangul.
+ */
 export function readRewordPackage(buffer: ArrayBuffer): RewordDeck {
   let files: Record<string, Uint8Array>;
   try {

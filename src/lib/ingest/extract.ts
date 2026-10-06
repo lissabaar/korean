@@ -171,6 +171,10 @@ export interface ExtractOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * The system prompt for this call: the base rules plus options (phrases mode,
+ * word limit, the user's own categories).
+ */
 function buildInstructions(options: ExtractOptions): string {
   const parts: string[] = [];
 
@@ -194,6 +198,7 @@ function buildInstructions(options: ExtractOptions): string {
   return parts.join("\n\n");
 }
 
+/** The user message: the text, the image, or the topic request. */
 function buildContent(
   source: ExtractSource,
   options: ExtractOptions,
@@ -251,6 +256,10 @@ async function requestWords(
   };
 }
 
+/**
+ * Ask the model for the words in a text/image/topic. Returns the lemmas with
+ * categories, notes and glosses, plus token usage for metering.
+ */
 export async function extractWords(
   source: ExtractSource,
   client: Anthropic,

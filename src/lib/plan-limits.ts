@@ -8,6 +8,10 @@ import type { PrismaClient } from "@prisma/client";
 import { isUnlimited } from "./ai-budget";
 import { PLANS, type Plan } from "./plans";
 
+/**
+ * The plan this user is on (Free, or Pro for the owner's emails), with its
+ * limits.
+ */
 export async function userPlan(prisma: PrismaClient, userId: string): Promise<Plan> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },

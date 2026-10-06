@@ -39,6 +39,10 @@ export interface FillResult {
   aiBlocked?: "anonymous" | "user" | "daily";
 }
 
+/**
+ * One run for up to 60 words without an example: dictionary examples first, then
+ * the shared AI cache, then the model. Returns counts and what remains.
+ */
 export async function fillMissingExamples(
   prisma: PrismaClient,
   anthropic: Anthropic,
@@ -64,6 +68,7 @@ export async function fillMissingExamples(
   let fromDictionary = 0;
   const needAi: typeof senses = [];
   const queue = [...senses];
+  /** One of three parallel workers asking the dictionary for examples. */
   async function worker() {
     for (let sense = queue.shift(); sense; sense = queue.shift()) {
       const code = sense.entry.krdictTargetCode;

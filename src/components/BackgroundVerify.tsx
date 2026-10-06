@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * Invisible helper on the home page: if some words are waiting for the
+ * dictionary (needsCheck), it calls /api/verify in the background — up to 5
+ * rounds, stopping when nothing is left or the dictionary still is not
+ * answering. The counters update on the next visit.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys. Renders nothing.
+ */
+
 import { useEffect } from "react";
 
 /**

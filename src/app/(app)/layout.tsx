@@ -1,3 +1,15 @@
+/**
+ * Layout for the app itself: home, Learn, Review, Add, Categories, Settings,
+ * Plans.
+ *
+ * "(app)" in parentheses is a Next.js route group: it groups pages under one
+ * layout without adding "/app" to the URL (so (app)/add/page.tsx is /add).
+ *
+ * Server component. Reads the session; with none (a first-time visitor) it
+ * renders <StartAnonymous/>, which creates an anonymous account in the
+ * browser and reloads. Otherwise it shows the top navigation and the page.
+ */
+
 import Nav from "@/components/Nav";
 import StartAnonymous from "@/components/StartAnonymous";
 import { currentUser } from "@/lib/session";

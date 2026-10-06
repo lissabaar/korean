@@ -15,6 +15,10 @@ export type IntroAction = "start" | "skip";
 
 export class IntroCardNotFoundError extends Error {}
 
+/**
+ * "start": mark the word's cards as met. "skip": snooze them for SKIP_DAYS and
+ * return replacement cards for the session.
+ */
 export async function introduceWord(
   prisma: PrismaClient,
   userId: string,

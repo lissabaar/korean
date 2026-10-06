@@ -1,3 +1,15 @@
+/**
+ * POST /api/translations — English translations for example sentences that
+ * have none (KRDict examples are Korean only).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Called in rounds like /api/examples. Logic in lib/words/example-
+ * translations.ts.
+ */
+
 import { NextResponse } from "next/server";
 import { anthropic, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";

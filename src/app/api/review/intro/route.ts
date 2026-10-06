@@ -1,8 +1,24 @@
+/**
+ * POST /api/review/intro — the first meeting with a new word:
+ * { cardId, action: "start" } starts learning it, "skip" puts it away for
+ * 3 days and returns a replacement word for the session.
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Logic in lib/review/intro.ts.
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { IntroCardNotFoundError, introduceWord } from "@/lib/review/intro";
 
+/**
+ * Body: { cardId, action: "start" | "skip", sessionSenseIds? }. Returns {
+ * replacement } — new cards to put in the session after a skip.
+ */
 export async function POST(request: Request) {
   let body: { cardId?: unknown; action?: unknown; sessionSenseIds?: unknown };
   try {

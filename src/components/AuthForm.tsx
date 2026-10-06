@@ -1,10 +1,26 @@
 "use client";
 
+/**
+ * Sign-in / sign-up form: email + password, and "Continue with Google" when
+ * Google keys are configured.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Uses the Better Auth browser client (lib/auth-client.ts). After success it
+ * goes to the home page.
+ */
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn, signUp } from "@/lib/auth-client";
 
+/**
+ * `mode` picks sign-in or sign-up (sign-up also asks for an optional name).
+ * `googleEnabled` shows "Continue with Google".
+ */
 export default function AuthForm({
   mode,
   googleEnabled,
@@ -21,6 +37,10 @@ export default function AuthForm({
 
   const isSignUp = mode === "sign-up";
 
+  /**
+   * Send the form to Better Auth; on success go home and re-read the session, on
+   * failure show its message.
+   */
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -125,6 +145,7 @@ export default function AuthForm({
   );
 }
 
+/** A labelled input field used by the form. */
 function Field({
   label,
   value,

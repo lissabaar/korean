@@ -1,3 +1,14 @@
+/**
+ * GET /api/dictionary/examples?code=12345 — example sentences for one KRDict
+ * entry (by its target code), to prefill the manual word form.
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Never fails loudly: without examples the form still works.
+ */
+
 import { NextResponse } from "next/server";
 import { dictionaryKeys, prisma } from "@/lib/clients";
 import { cachedExamples } from "@/lib/dictionary/cached";

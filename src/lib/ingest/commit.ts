@@ -77,12 +77,21 @@ const REGISTERS = new Set([
   "SLANG",
 ]);
 
+/**
+ * Keep the register (formal, polite, casual, ...) only if it is one the schema
+ * knows.
+ */
 function normaliseRegister(value: string | null): string | null {
   if (!value) return null;
   const upper = value.toUpperCase().trim();
   return REGISTERS.has(upper) ? upper : null;
 }
 
+/**
+ * Save a batch of approved words for a user: one Material row for the source
+ * text, then each word through persistOne(). Returns what was created, already
+ * saved, or skipped.
+ */
 export async function commitWords(
   prisma: PrismaClient,
   options: {
@@ -125,6 +134,10 @@ export async function commitWords(
   return { materialId: material.id, created, alreadySaved, skipped };
 }
 
+/**
+ * Save one word: entry, senses, examples, categories and both study cards, in
+ * one transaction. Returns false when the user already has this word.
+ */
 async function persistOne(
   prisma: PrismaClient,
   userId: string,

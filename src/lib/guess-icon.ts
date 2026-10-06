@@ -32,6 +32,10 @@ const SYNONYMS: Record<string, string> = {
   holiday: "gift", holidays: "gift", birthday: "gift",
 };
 
+/**
+ * Pick an icon for a category the user named: the first word of the name with a
+ * known icon, else a tag.
+ */
 export function guessIcon(name: string): string {
   const words = name.toLowerCase().split(/[^a-z0-9-]+/).filter((word) => word.length > 2);
   for (const word of words) {

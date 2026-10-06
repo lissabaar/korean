@@ -1,3 +1,15 @@
+/**
+ * "/settings" — study settings, filling in missing meanings / examples /
+ * example translations, AI credits, account.
+ *
+ * Next.js page (server component): runs on the server for every request, may
+ * read the database directly, and returns HTML. The folder path is the URL.
+ *
+ * Reads the current settings and a few counters (words without an example,
+ * without an English meaning, examples without a translation, today's
+ * dictionary lookups) in parallel and passes them to <SettingsPanel/>.
+ */
+
 import SettingsPanel from "@/components/SettingsPanel";
 import { getAiBalance } from "@/lib/ai-budget";
 import { prisma } from "@/lib/db";
@@ -8,6 +20,11 @@ import { countUntranslatedExamples } from "@/lib/words/example-translations";
 
 export const metadata = { title: "Settings · Korean vocabulary" };
 
+/**
+ * The page itself. Next.js calls this default export on the server for each
+ * request and sends the HTML it returns. Here: current settings plus counters,
+ * passed to <SettingsPanel/>.
+ */
 export default async function SettingsPage() {
   const user = await currentUser();
   if (!user) return null;

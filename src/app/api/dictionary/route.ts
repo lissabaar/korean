@@ -1,3 +1,15 @@
+/**
+ * GET /api/dictionary?q=단어 — dictionary lookup for a word typed in by hand
+ * (the "Dictionary" button in the manual word form).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * No AI. Goes through the shared cache (lib/dictionary/cached.ts) and counts
+ * against the plan's daily limit of typed-in lookups (consumeLookup).
+ */
+
 import { NextResponse } from "next/server";
 import { dictionaryKeys, prisma } from "@/lib/clients";
 import { cachedLookup, consumeLookup, LookupLimitError } from "@/lib/dictionary/cached";

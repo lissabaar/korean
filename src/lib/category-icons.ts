@@ -59,6 +59,10 @@ export const SUGGESTED_ICONS = [...new Set([
   "moon", "lightning-charge", "shield-check", "lock", "gem", "magic",
 ])];
 
+/**
+ * The icon to show for a category: the one chosen, else the built-in default for
+ * its name, else a tag.
+ */
 export function categoryIcon(name: string, icon: string | null | undefined): string {
   return icon || DEFAULTS[name as BaseCategory] || "tag";
 }

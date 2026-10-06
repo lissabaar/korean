@@ -41,6 +41,11 @@ export interface MeaningFillResult {
   aiBlocked?: "anonymous" | "user" | "daily";
 }
 
+/**
+ * One run: give words without an English meaning one — from the dictionary by
+ * target code, else from the model (checked against the dictionary). Returns
+ * counts and what remains.
+ */
 export async function fillEnglishMeanings(
   prisma: PrismaClient,
   anthropic: Anthropic,

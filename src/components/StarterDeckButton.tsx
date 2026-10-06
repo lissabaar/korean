@@ -1,13 +1,24 @@
 "use client";
 
+/**
+ * "Add starter words" button on the home page of an empty account
+ * (POST /api/starter-deck, then refresh).
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+/** The button with its busy / error state. */
 export default function StarterDeckButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Add the starter words, then refresh the page so the counters show them. */
   async function add() {
     setBusy(true);
     setError(null);

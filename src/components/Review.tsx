@@ -1,5 +1,23 @@
 "use client";
 
+/**
+ * The study screen, shared by /learn and /review.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Loads a session from /api/review/session, shuffles it, and shows one card
+ * at a time:
+ *   - Intro: a new word not seen yet is first shown whole, with "Start
+ *     learning" / "Skip for 3 days" (/api/review/intro).
+ *   - Question: pick the right option (CHOICE) or type the answer (TYPING);
+ *     the answer goes to /api/review/answer, which grades it.
+ *   - Feedback: right/wrong, then the back of the card (Back).
+ * A learning card that has not graduated comes back 2–5 cards later
+ * (advance). Below: the pieces of a card — Intro, Question, Front, Back.
+ */
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
@@ -13,6 +31,7 @@ type Load = "loading" | "ready" | "error";
 const REQUEUE_MIN = 2;
 const REQUEUE_MAX = 5;
 
+/** How many cards later a repeated learning card comes back: random 2–5. */
 function requeueGap(): number {
   return REQUEUE_MIN + Math.floor(Math.random() * (REQUEUE_MAX - REQUEUE_MIN + 1));
 }
@@ -31,6 +50,10 @@ function shuffle<T>(items: T[]): T[] {
   return out;
 }
 
+/**
+ * The study session. `mode`: "learn" (new words), "review" (due reviews) or
+ * "all". The queue's head is the card on screen.
+ */
 export default function Review({ mode }: { mode: StudyMode }) {
   const [load, setLoad] = useState<Load>("loading");
   const [queue, setQueue] = useState<ReviewItem[]>([]);
@@ -235,6 +258,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
   );
 }
 
+/** Page frame (width and padding) shared by every state of the screen. */
 function Shell({ children }: { children: React.ReactNode }) {
   return <main className="mx-auto max-w-xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
 }
@@ -508,6 +532,10 @@ function Question({
   );
 }
 
+/**
+ * The sentence under an answer: right / almost (with a note) / wrong (with the
+ * expected answer), and how many right answers are left for a new word.
+ */
 function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | null): string {
   if (result.graduated) return "Learned — this word now moves to spaced review.";
   if (result.verdict === "almost") return `${result.note ?? "Close."} Expected: ${result.expected}`;
@@ -551,6 +579,7 @@ function Intro({
     if (autoPlay) speakKorean(item.back.lemma);
   }, [autoPlay, item.back.lemma]);
 
+  /** Press a button: call the parent's action and show an error if it fails. */
   async function run(action: "start" | "skip") {
     setBusy(action);
     setError(null);
@@ -594,7 +623,14 @@ function Intro({
             {back.exampleTranslation && <p className="mt-0.5 text-sm text-muted">{back.exampleTranslation}</p>}
           </div>
         )}
-        {back.contextNote && <p className="mt-3 text-sm text-muted">{back.contextNote}</p>}
+        {/* The model's note on how the word was used in the user's text — labelled,
+            so it is not mistaken for the example's translation. */}
+        {back.contextNote && (
+          <p className="mt-3 rounded-md bg-paper px-3 py-2 text-sm text-muted">
+            <i className="bi bi-info-circle mr-1.5" aria-hidden />
+            Note from your text: {back.contextNote}
+          </p>
+        )}
       </div>
 
       {error && (

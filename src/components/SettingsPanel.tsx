@@ -1,5 +1,20 @@
 "use client";
 
+/**
+ * Everything on /settings: study toggles (direction, Korean definition,
+ * auto-play pronunciation, own meaning first), the learning goal and new words
+ * per session, buttons that fill in missing English meanings / examples /
+ * example translations, AI credits, the account and sign-out.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Each toggle saves at once (PATCH /api/settings) and rolls back on error.
+ * The fill buttons call their endpoint in rounds with a progress bar
+ * (runFill); only one runs at a time.
+ */
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +27,10 @@ interface FillResult {
   aiBlocked?: "anonymous" | "user" | "daily";
 }
 
+/**
+ * The settings screen. Props are the current values and counters read by the
+ * server page.
+ */
 export default function SettingsPanel({
   email,
   askRecognition: initialAsk,
@@ -96,6 +115,10 @@ export default function SettingsPanel({
 
   const fillMeanings = () => runFill("meanings", missingMeanings, setMeaningsDone);
 
+  /**
+   * PATCH /api/settings with one change; `undo` puts the switch back if saving
+   * fails.
+   */
   async function save(change: Record<string, boolean | number>, undo: () => void) {
     setError(null);
     try {
@@ -369,6 +392,7 @@ export default function SettingsPanel({
   );
 }
 
+/** Progress bar with "done of total" for the fill buttons. */
 function Progress({ done, total }: { done: number; total: number }) {
   const percent = total ? Math.round((done / total) * 100) : 0;
   return (
@@ -383,6 +407,7 @@ function Progress({ done, total }: { done: number; total: number }) {
   );
 }
 
+/** A labelled checkbox-style switch; saving is done by the caller in onChange. */
 function Toggle({
   checked,
   onChange,

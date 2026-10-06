@@ -152,6 +152,7 @@ export interface ResolveOptions {
   maxSecondary?: number;
 }
 
+/** Lowercase, trim and collapse spaces, so names compare equal. */
 function clean(value: string): string {
   return value.toLowerCase().trim().replace(/\s+/g, " ");
 }

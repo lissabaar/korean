@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Edit one saved word (opened from /categories): the word, English meaning,
+ * own meaning, definition, example, categories; or delete it. Loads and saves
+ * through /api/words/:id.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useEffect, useState } from "react";
 import type { WordDetails } from "@/lib/words/edit";
 import CategorySelect from "./CategorySelect";
@@ -29,6 +39,7 @@ export default function WordEditor({
       .catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load."));
   }, [wordId]);
 
+  /** Save (PATCH) or delete (DELETE) the word, then tell the list to refresh. */
   async function call(method: "PATCH" | "DELETE") {
     setBusy(true);
     setError(null);

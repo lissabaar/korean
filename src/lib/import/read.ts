@@ -52,6 +52,11 @@ const nextId = (prefix: string) => `${prefix}${Date.now().toString(36)}${(counte
 
 export class UnsupportedFileError extends Error {}
 
+/**
+ * Read one dropped file by its extension (image, Anki, ReWord, CSV/TSV,
+ * subtitles, text) into an ImportSource: its name, and the jobs (parts) to send
+ * for analysis. Throws UnsupportedFileError for anything else.
+ */
 export async function readFile(file: File): Promise<ImportSource> {
   const name = file.name;
   const ext = name.toLowerCase().split(".").pop() ?? "";
@@ -91,6 +96,7 @@ export async function readFile(file: File): Promise<ImportSource> {
   throw new UnsupportedFileError(`${name}: this file type is not supported`);
 }
 
+/** Pasted text as an ImportSource, split into parts like a file. */
 export function sourceFromText(text: string, name = "Pasted text"): ImportSource {
   return textSource(name, proseLines(text), "Text");
 }
@@ -161,6 +167,10 @@ export function fieldsToLine(fields: string[]): string | null {
   return HANGUL.test(line) ? line : null;
 }
 
+/**
+ * One Anki/CSV field as plain text: drop [sound:...] tags, unwrap cloze
+ * deletions, strip HTML, collapse spaces.
+ */
 function cleanField(value: string): string {
   return htmlToText(
     value
@@ -172,12 +182,20 @@ function cleanField(value: string): string {
     .trim();
 }
 
+/**
+ * HTML to plain text using the browser's own parser (only when the text contains
+ * HTML).
+ */
 function htmlToText(html: string): string {
   if (!/[<&]/.test(html)) return html;
   const doc = new DOMParser().parseFromString(html.replace(/<br\s*\/?>/gi, " "), "text/html");
   return doc.body.textContent ?? "";
 }
 
+/**
+ * Remove cue numbers and "00:01 --> 00:03" timing lines from .srt/.vtt
+ * subtitles.
+ */
 function stripSubtitleTiming(text: string): string {
   return text
     .split(/\r?\n/)
@@ -185,6 +203,10 @@ function stripSubtitleTiming(text: string): string {
     .join("\n");
 }
 
+/**
+ * Group lines into parts of at most 40 lines (and a character limit), one
+ * analysis request each.
+ */
 function chunkLines(lines: string[]): string[] {
   const chunks: string[] = [];
   let current: string[] = [];
@@ -241,6 +263,7 @@ async function imageSource(file: File): Promise<ImportSource> {
   };
 }
 
+/** A downscaled image as base64 text, the form the API sends to the model. */
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

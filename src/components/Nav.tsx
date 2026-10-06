@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Top navigation bar shown on every app page: links (Home, Learn, Review,
+ * Add, Categories, Settings) and the account / sign-in link.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys. (it highlights the current page, which needs the
+ * browser's URL).
+ */
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 

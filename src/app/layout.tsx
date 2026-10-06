@@ -1,3 +1,13 @@
+/**
+ * Root layout — the outermost HTML around every page of the site.
+ *
+ * Next.js wraps every page in the nearest layout.tsx files, from the root
+ * down. This one sets <html>/<body>, loads the two web fonts (Public Sans for
+ * Latin text, Gowun Batang for Hangul), the Bootstrap Icons font, and the
+ * global CSS with the design tokens (globals.css). `metadata` and `viewport`
+ * become <title>/<meta> tags.
+ */
+
 import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Public_Sans } from "next/font/google";
 import "bootstrap-icons/font/bootstrap-icons.min.css";
@@ -28,6 +38,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Wraps every page: `children` is the page (or the nested layout) Next.js
+ * renders inside. The font classes put the fonts' CSS variables on <body>.
+ */
 export default function RootLayout({
   children,
 }: {

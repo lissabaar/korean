@@ -1,8 +1,24 @@
+/**
+ * POST /api/ingest/commit — save approved word candidates: entries, senses,
+ * examples, categories and study cards (lib/ingest/commit.ts).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * The candidates come back from the browser, so they are validated again:
+ * a word with neither dictionary data nor a meaning is refused.
+ */
+
 import { NextResponse } from "next/server";
 import { commitWords, resolveEntry, type ApprovedWord } from "@/lib/ingest/commit";
 import { prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 
+/**
+ * Validate the approved words and save them. Answers 401 when nobody is signed
+ * in.
+ */
 export async function POST(request: Request) {
   let body: { text?: string; title?: string; kind?: string; words?: ApprovedWord[] };
 

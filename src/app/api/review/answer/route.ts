@@ -1,8 +1,24 @@
+/**
+ * POST /api/review/answer — record one answer.
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * The browser sends only what was picked or typed; grading happens here on
+ * the server from the card itself (lib/review/submit.ts), then the card is
+ * moved on: the learning streak, or the next FSRS review date.
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { CardNotFoundError, submitAnswer, type AnswerInput } from "@/lib/review/submit";
 
+/**
+ * Body: { cardId, answer? | knewIt?, usedHint? }. Returns the grading
+ * (AnswerResult). 404 if the card is not this user's.
+ */
 export async function POST(request: Request) {
   let body: Partial<AnswerInput>;
   try {

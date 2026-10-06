@@ -1,3 +1,15 @@
+/**
+ * PATCH /api/settings — save study settings (toggles and numbers from the
+ * Settings page).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Only known fields with valid values are accepted; anything else in the
+ * request is ignored.
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";

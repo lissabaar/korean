@@ -13,6 +13,11 @@
 
 import type { PrismaClient } from "@prisma/client";
 
+/**
+ * Move words, categories, source materials, cards and AI usage from the
+ * anonymous user to the real one, merging categories by name and dropping words
+ * the account already has.
+ */
 export async function moveAnonymousData(
   prisma: PrismaClient,
   fromUserId: string,

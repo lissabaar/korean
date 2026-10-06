@@ -44,6 +44,9 @@ src/lib/
     merge-anonymous.ts      anonymous → real account on sign-up/sign-in
     edit.ts                 rename/merge/delete categories, edit/delete words
     examples.ts             fill missing examples: KRDict view API first, AI after
+    example-translations.ts English for example sentences (shared cache for dictionary ones)
+    meanings.ts             fill missing English meanings
+    verify.ts               re-check words saved while the dictionary was down
   plans.ts                  plan prices and credits (DRAFT) — pricing page + billing
   ingest/
     extract.ts              model → lemmas + categories (no DB writes)
@@ -56,9 +59,11 @@ src/lib/
     distractors.ts          plausible wrong options for multiple choice
     queue.ts                cards → ReviewItem[] for a session (reads only)
     submit.ts               grade one answer, advance learning or FSRS
+    intro.ts                first meeting with a new word: start / skip 3 days
 src/lib/import/             browser-only: dropped files → analysis jobs
   read.ts                   images (downscaled), CSV/TSV, text, subtitles; chunking
   anki.ts                   .apkg/.colpkg via fflate + fzstd + sql.js (lazy-loaded)
+  reword.ts                 ReWord .reword export (zip + JSON)
 scripts/copy-sqljs-wasm.mjs postinstall: puts sql.js's wasm in public/
 src/app/(app)/              app pages: home, /learn, /review, /add, /categories,
                             /settings, /pricing; layout starts an anonymous session
@@ -69,10 +74,22 @@ src/app/api/{words,categories,settings,starter-deck,dictionary}/
                             dictionary lookup for typed-in words (no AI)
 ```
 
-Docs for the owner (Russian): `SETUP.md` new machine, `VERCEL.md` deploys,
+Docs for the owner (Russian): `GUIDE.md` how the project is built — tech,
+Next.js basics, data flows, every file (update it when files are added,
+moved or change purpose), `SETUP.md` new machine, `VERCEL.md` deploys,
 `PRICING.md` how plan numbers were derived, `PAYMENTS.md` plan for billing
 (two businesses: RU cards via a Russian acquirer, foreign cards via a
 merchant of record from Uruguay — never help route around sanctions).
+
+## Comments — always, and detailed
+
+The owner reads the code to understand it: she knows programming, not
+Next.js/React in depth. Every source file starts with a block comment: what
+it is (page / route handler / client component / library), what it does,
+what calls it and what it calls. Every function, component and non-obvious
+constant gets a comment saying what it does and why. Write comments in
+English (repo convention); explanations in Russian go to `GUIDE.md`. New
+code without these comments is not finished.
 
 ## Key design rules — don't break these
 
@@ -211,10 +228,23 @@ dictionary answers; `GeneratedExample` is keyed by KRDict target code
 beginners"): `ExtractSource` kind `topic`, TOPIC_PROMPT; the dictionary still
 rejects any word it does not know. Saved as material kind GENERATED.
 
-**Learning goal.** `User.learningGoal` (2–5, default 3) right answers in a
+**Learning goal.** `User.learningGoal` (2–10, default 5) right answers in a
 row graduate a word; every step is picked from options except the last,
 which is typed. `pickExercise(card, goal)` and `advanceLearning(card, ok, goal)`
 take it; the client mirrors the switch when it requeues a card.
+
+**Meet the word before the drill.** A LEARNING card with no
+`Card.introducedAt` is first shown whole in the session (`intro` on
+ReviewItem): "Start learning" sets introducedAt for every card of the sense;
+"Skip for 3 days" sets `snoozedUntil` (studyScope's learn filter excludes
+snoozed cards) and the session gets a replacement word. Answering a card
+also sets introducedAt.
+
+**Example translations.** KRDict examples are Korean only; the example a
+card shows gets English from the model (`words/example-translations.ts`,
+metered). Translations of dictionary sentences are shared in
+`ExampleTranslation`; sentences from the user's own text (source USER) are
+never put there.
 
 **Examples: dictionary first.**
 `words/examples.ts` fetches from KRDict's view API (`fetchExamples`, free)

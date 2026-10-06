@@ -1,3 +1,12 @@
+/**
+ * Server-side clients that need secret keys: the Anthropic SDK (the AI) and
+ * the dictionary API keys. Re-exports `prisma` from db.ts for convenience.
+ *
+ * Keys come from environment variables (.env locally, the Vercel dashboard
+ * in production); a missing required key fails loudly at start-up. Server
+ * only — never import this from a "use client" file.
+ */
+
 import Anthropic from "@anthropic-ai/sdk";
 import type { DictionaryKeys } from "./dictionary/krdict";
 
@@ -12,6 +21,10 @@ export const dictionaryKeys: DictionaryKeys = {
   stdict: process.env.STDICT_API_KEY,
 };
 
+/**
+ * An environment variable that must be set; throws a clear message if it is
+ * missing.
+ */
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {

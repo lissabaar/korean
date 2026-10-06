@@ -1,3 +1,17 @@
+/**
+ * /api/words/:id — one saved word (the word editor on /categories).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ *   GET     the word with its meanings, example and categories
+ *   PATCH   edit any of them
+ *   DELETE  delete the word with its cards
+ *
+ * The rules live in lib/words/edit.ts.
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
@@ -5,6 +19,10 @@ import { deleteWord, EditError, getWord, updateWord } from "@/lib/words/edit";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * Turns an error into an HTTP response: EditError carries its own status
+ * (400/404/409); anything else is logged and answered 500.
+ */
 function failure(error: unknown) {
   if (error instanceof EditError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
@@ -13,6 +31,10 @@ function failure(error: unknown) {
   return NextResponse.json({ error: "Could not save that change." }, { status: 500 });
 }
 
+/**
+ * The word with everything editable about it. Answers 401 when nobody is signed
+ * in.
+ */
 export async function GET(_request: Request, { params }: Params) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -23,6 +45,10 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
+/**
+ * Save edits; only string fields that were sent are changed. Answers 401 when
+ * nobody is signed in.
+ */
 export async function PATCH(request: Request, { params }: Params) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -45,6 +71,10 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 }
 
+/**
+ * Delete the word together with its senses, examples and cards. Answers 401 when
+ * nobody is signed in.
+ */
 export async function DELETE(_request: Request, { params }: Params) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });

@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * One word in the import preview on /add: the word as a heading with a
+ * pronunciation button, its meaning (English, the user's own, or the AI's),
+ * notes (already in your words, saved with the AI meaning, a conflict
+ * between your meaning and the dictionary's), the definition,
+ * a category picker, the sentence it came from, and — when the dictionary has
+ * several words with this spelling — a picker for the right one.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * It holds no state of its own: every change goes up through onChange to
+ * <AddWords/>, which owns the list.
+ */
+
 import { useState } from "react";
 import type { WordCandidate } from "@/lib/ingest/analyze";
 import CategorySelect from "./CategorySelect";
@@ -13,6 +29,10 @@ interface Props {
   categories: string[];
 }
 
+/**
+ * One preview row. `candidate` is the word with everything known about it;
+ * `onChange` reports edits; `categories` fills the category picker.
+ */
 export default function CandidateRow({ candidate, onChange, categories }: Props) {
   const [open, setOpen] = useState(false);
 

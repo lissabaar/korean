@@ -102,6 +102,10 @@ function text(node: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * The XML parser gives one child as an object and several as an array; this
+ * always gives an array.
+ */
 function asArray<T>(value: T | T[] | undefined): T[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
@@ -118,6 +122,11 @@ interface FetchOptions {
  */
 const REQUEST_TIMEOUT_MS = 8000;
 
+/**
+ * GET a dictionary URL with an 8-second timeout and parse the XML. Network
+ * failures and timeouts become DictionaryUnavailableError; an API error code
+ * becomes DictionaryError.
+ */
 async function fetchXml(url: string, options: FetchOptions = {}): Promise<unknown> {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const response = await fetch(url, {
@@ -148,6 +157,10 @@ async function fetchXml(url: string, options: FetchOptions = {}): Promise<unknow
   return parsed;
 }
 
+/**
+ * Turn one KRDict <item> into our DictEntry: headword, hanja, level, part of
+ * speech, and senses with definition and translation.
+ */
 function mapKrdictItem(item: XmlNode): DictEntry {
   const senses: DictSense[] = asArray(item.sense).map((sense: XmlNode) => {
     const translations = asArray(sense.translation);
@@ -179,6 +192,7 @@ export interface LookupOptions {
   signal?: AbortSignal;
 }
 
+/** Search KRDict (the learners' dictionary) for an exact headword. */
 export async function lookupKrdict(
   word: string,
   apiKey: string,
@@ -202,6 +216,10 @@ export async function lookupKrdict(
   return items.map(mapKrdictItem).filter((entry) => entry.lemma);
 }
 
+/**
+ * Search STDICT (the standard dictionary) — the optional fallback when KRDict
+ * has nothing.
+ */
 export async function lookupStdict(
   word: string,
   apiKey: string,
@@ -350,6 +368,10 @@ export async function lookupMany(
   const results = new Map<string, DictEntry[] | null>();
   const queue = [...new Set(words)];
 
+  /**
+   * One of the parallel workers: takes words from the shared queue until it is
+   * empty.
+   */
   async function worker(): Promise<void> {
     for (;;) {
       const word = queue.shift();

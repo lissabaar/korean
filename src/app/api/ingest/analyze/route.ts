@@ -1,3 +1,17 @@
+/**
+ * POST /api/ingest/analyze — the main AI step: text, an image or a topic in,
+ * word candidates out (nothing is saved here).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Accepts one of: { text }, { image: { data, mediaType } } or { topic }.
+ * Checks the AI budget, then lib/ingest/analyze.ts asks the model for lemmas
+ * and categories and looks every lemma up in the dictionary. The browser
+ * sends big inputs in parts of 40 lines, one request per part.
+ */
+
 import { NextResponse } from "next/server";
 import { analyzeText } from "@/lib/ingest/analyze";
 import { anthropic, dictionaryKeys, prisma } from "@/lib/clients";
@@ -17,6 +31,12 @@ export const maxDuration = 300;
 /** Images are downscaled in the browser; anything near this is a mistake. */
 const MAX_IMAGE_BASE64 = 4_000_000;
 
+/**
+ * Validate the input (text / image / topic and their size limits), check the AI
+ * budget, run analyzeText(), and return the candidates with the credits left.
+ * Errors map to friendly messages: no account 401, out of credits 402, daily AI
+ * budget 503, dictionary quota 429, the rest 500.
+ */
 export async function POST(request: Request) {
   let body: {
     text?: string;

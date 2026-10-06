@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * Shown on a visitor's very first load (no session yet): creates an anonymous
+ * account in the browser and reloads, so the app works without signing up.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Done in the browser on purpose: search-engine crawlers do not run
+ * JavaScript, so they never create accounts.
+ */
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";

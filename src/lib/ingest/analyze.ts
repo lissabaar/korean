@@ -106,6 +106,12 @@ export interface AnalyzeOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * The whole analysis of one part: the model extracts lemmas → usage is recorded
+ * → every lemma is looked up in the dictionary (through the cache) → each
+ * becomes a WordCandidate with a status (new, duplicate, ai, unreachable) and a
+ * pre-selected homograph. Saves nothing.
+ */
 export async function analyzeText(
   prisma: PrismaClient,
   anthropic: Anthropic,
@@ -229,6 +235,10 @@ export async function analyzeText(
 
 const STOPWORDS = new Set(["a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "be", "is", "it", "this", "that", "here", "used", "meaning", "word", "as", "with", "by"]);
 
+/**
+ * Lowercase English words without filler words — used to compare the model's
+ * gloss with dictionary translations.
+ */
 function words(text: string | undefined | null): string[] {
   return (text ?? "")
     .toLowerCase()

@@ -22,6 +22,11 @@ const SQL_WASM_URL = "/sql-wasm-browser.wasm";
 
 const STUB_TEXT = "update to the latest Anki version";
 
+/**
+ * Read an Anki .apkg/.colpkg (a zip with an SQLite database inside, sometimes
+ * zstd-compressed) and return one text line per note that contains Hangul. Media
+ * files are never read.
+ */
 export async function readAnkiPackage(buffer: ArrayBuffer): Promise<string[]> {
   let files: Record<string, Uint8Array>;
   try {

@@ -1,3 +1,14 @@
+/**
+ * Home page ("/"): deck counters (due now, new to learn, total words) and
+ * the three ways in — Learn, Review, Add words.
+ *
+ * Next.js page (server component): runs on the server for every request, may
+ * read the database directly, and returns HTML. The folder path is the URL.
+ *
+ * Also mounts <BackgroundVerify/>, which quietly re-checks words saved while
+ * the dictionary was down, and offers the starter deck to an empty account.
+ */
+
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAiBalance } from "@/lib/ai-budget";
@@ -7,6 +18,11 @@ import StarterDeckButton from "@/components/StarterDeckButton";
 import { currentUser } from "@/lib/session";
 import { STARTER_DECK } from "@/lib/words/starter-deck";
 
+/**
+ * The page itself. Next.js calls this default export on the server for each
+ * request and sends the HTML it returns. Here: deck counters and the Learn /
+ * Review / Add entry points.
+ */
 export default async function Home() {
   const user = await currentUser();
   if (!user) return null;
@@ -82,6 +98,10 @@ export default async function Home() {
   );
 }
 
+/**
+ * One counter tile (Due now, New to learn, Words). `accent` highlights it when
+ * there is work.
+ */
 function Stat({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
   return (
     <div className="rounded-lg border border-line bg-surface px-4 py-3">
@@ -93,6 +113,7 @@ function Stat({ label, value, accent = false }: { label: string; value: number; 
   );
 }
 
+/** "in 3 h", "tomorrow", "in 4 days" — when the next review is due. */
 function formatWhen(date: Date): string {
   const hours = (date.getTime() - Date.now()) / 3_600_000;
   if (hours < 1) return "in under an hour";
@@ -101,6 +122,10 @@ function formatWhen(date: Date): string {
   return days === 1 ? "tomorrow" : `in ${days} days`;
 }
 
+/**
+ * One big entry button (Learn, Review, Add words) with an icon and a short note;
+ * `primary` paints it in the accent colour.
+ */
 function Action({
   href,
   icon,

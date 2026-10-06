@@ -24,6 +24,11 @@ export interface VerifyResult {
   remaining: number;
 }
 
+/**
+ * Check up to 40 needsCheck words against the dictionary: found → dictionary
+ * data replaces the placeholder; not in the dictionary → kept with the AI
+ * meaning; still no answer → left for next time.
+ */
 export async function verifyPending(
   prisma: PrismaClient,
   keys: DictionaryKeys,

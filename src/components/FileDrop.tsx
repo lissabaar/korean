@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * Drop zone / file picker for imports on /add (images, .apkg/.colpkg Anki
+ * decks, CSV/TSV, .reword, text, subtitles). Only collects the files and
+ * passes them up; reading them is lib/import/read.ts's job.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { ACCEPTED_FILES } from "@/lib/import/read";
 

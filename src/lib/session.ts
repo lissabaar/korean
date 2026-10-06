@@ -1,3 +1,11 @@
+/**
+ * Who is making this request — server-side helpers around Better Auth.
+ *
+ *   getSession()   the session or null (cached per request)
+ *   getUserId()    for API routes: the user id or null (the route answers 401)
+ *   currentUser()  for pages: the user or null (first visit, see (app)/layout)
+ */
+
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "./auth";

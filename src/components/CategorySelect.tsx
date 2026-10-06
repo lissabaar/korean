@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * A category dropdown with a "New category…" option that turns into a text
+ * field. Used in the import preview and the manual word form.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ */
+
 import { useState } from "react";
 
 const NEW = "__new__";
@@ -30,6 +39,10 @@ export default function CategorySelect({
   const all = options.includes(value) || !value ? options : [value, ...options];
   const label = placeholder ?? "Category";
 
+  /**
+   * Finish typing a new category name: normalise it and report it up; an empty
+   * name cancels.
+   */
   function commit() {
     const name = draft.replace(/\s+/g, " ").trim().toLowerCase();
     if (name) onChange(name);

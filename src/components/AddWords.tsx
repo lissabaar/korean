@@ -1,5 +1,28 @@
 "use client";
 
+/**
+ * The whole "Add words" screen (/add) — the largest component in the app.
+ *
+ * React client component ("use client"): runs in the browser, so it can hold
+ * state, react to clicks and call the API with fetch(). It cannot touch the
+ * database or secret keys.
+ *
+ * Flow:
+ *   1. Input: pasted text, a topic request, or dropped files (<FileDrop/>).
+ *      Files are parsed right here in the browser (lib/import/*) and split
+ *      into parts ("jobs") of 40 lines.
+ *   2. Analysis: parts are sent to /api/ingest/analyze, 3 at a time
+ *      (runJobs). Each returns word candidates.
+ *   3. Saving: in "Add automatically" mode every part is saved as soon as it
+ *      is read (/api/ingest/commit), so Stop keeps what was found; finished
+ *      parts are remembered in localStorage, so dropping the same file again
+ *      resumes. In "Let me review first" mode the user ticks words in the
+ *      preview (<CandidateRow/>) and presses Save.
+ *   4. Afterwards: words the dictionary did not answer for are checked again
+ *      (/api/verify), then missing meanings, examples and their translations
+ *      are filled in (fillExamples).
+ */
+
 import Link from "next/link";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { AnalysisResult, RecheckResult, WordCandidate } from "@/lib/ingest/analyze";
@@ -30,6 +53,10 @@ const PARALLEL_PARTS = 3;
 function doneKey(source: ImportSource) {
   return `hangugo:parts-done:${source.name}:${source.text.length}:${source.jobs.length}`;
 }
+/**
+ * Which parts of this file were already analysed and saved (from localStorage) —
+ * used to resume an interrupted import.
+ */
 function loadDoneParts(source: ImportSource): Set<number> {
   try {
     return new Set(JSON.parse(localStorage.getItem(doneKey(source)) ?? "[]") as number[]);
@@ -37,6 +64,10 @@ function loadDoneParts(source: ImportSource): Set<number> {
     return new Set();
   }
 }
+/**
+ * Remember that one part of this file is saved, so dropping the same file again
+ * skips it.
+ */
 function markPartDone(source: ImportSource, index: number) {
   try {
     const done = loadDoneParts(source);
@@ -48,10 +79,15 @@ function markPartDone(source: ImportSource, index: number) {
 }
 /** The add-mode preference lives in localStorage; this keeps React in sync with it. */
 const autoAddListeners = new Set<() => void>();
+/** Lets React re-render when the add-mode preference is changed on this page. */
 function subscribeAutoAdd(listener: () => void) {
   autoAddListeners.add(listener);
   return () => autoAddListeners.delete(listener);
 }
+/**
+ * Save the add-mode preference: true = add automatically, false = let me review
+ * first.
+ */
 function setAutoAdd(value: boolean) {
   try {
     localStorage.setItem("hangugo:auto-add", value ? "1" : "0");
@@ -60,6 +96,7 @@ function setAutoAdd(value: boolean) {
   }
   autoAddListeners.forEach((listener) => listener());
 }
+/** Read the add-mode preference; automatic unless the user turned it off. */
 function loadAutoAdd(): boolean {
   try {
     return localStorage.getItem("hangugo:auto-add") !== "0";
@@ -300,6 +337,10 @@ export default function AddWords({
     }
   }
 
+  /**
+   * Run the parts that failed (timeout, network) once more, keeping everything
+   * already found.
+   */
   async function retryFailed() {
     const jobs = failedJobs;
     setFailedJobs([]);
@@ -320,6 +361,10 @@ export default function AddWords({
     return c.selected && !c.saved && Boolean(c.dictionary || c.aiMeaning || c.userMeaning);
   }
 
+  /**
+   * Shape a candidate the way /api/ingest/commit expects it (the ApprovedWord
+   * type in lib/ingest/commit.ts).
+   */
   function toApproved(c: Candidate) {
     return {
       lemma: c.lemma,
@@ -338,6 +383,10 @@ export default function AddWords({
     };
   }
 
+  /**
+   * Save one file's ticked words in batches through /api/ingest/commit and count
+   * what happened: created, already saved, failed.
+   */
   async function commitWords(source: ImportSource, words: Candidate[]) {
     const result = { created: 0, pending: 0, alreadySaved: 0, failed: [] as string[] };
     if (words.length === 0) return result;
@@ -360,6 +409,10 @@ export default function AddWords({
     return result;
   }
 
+  /**
+   * "Save" in review mode: commit every source's ticked words, show the summary,
+   * then verify and fill in examples in the background.
+   */
   async function save() {
     setBusy(true);
     setError(null);
@@ -433,6 +486,10 @@ export default function AddWords({
     }
   }
 
+  /**
+   * Apply a change from one <CandidateRow/> (ticked, category, homograph,
+   * meaning choice) to the list.
+   */
   function update(next: WordCandidate) {
     setCandidates((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
   }
@@ -553,12 +610,20 @@ export default function AddWords({
     setExamples((current) => ({ added, done: true, note: current?.note }));
   }
 
+  /**
+   * Select all / Clear: tick or untick every word that can still be added (not
+   * duplicates, not already saved).
+   */
   function setAll(selected: boolean) {
     setCandidates((list) =>
       list.map((c) => (c.status !== "duplicate" && !c.saved ? { ...c, selected } : c)),
     );
   }
 
+  /**
+   * Start over: clear the input, files, results and messages, back to the input
+   * stage.
+   */
   function reset() {
     setText("");
     setFiles([]);

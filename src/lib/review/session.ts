@@ -27,6 +27,7 @@ import {
 export const DEFAULT_LEARNING_GOAL = 5;
 export const MAX_LEARNING_GOAL = 10;
 
+/** The user's learning goal kept within 2–10. */
 export function clampLearningGoal(value: number | null | undefined): number {
   const n = Math.round(value ?? DEFAULT_LEARNING_GOAL);
   return Math.min(MAX_LEARNING_GOAL, Math.max(2, Number.isFinite(n) ? n : DEFAULT_LEARNING_GOAL));
@@ -165,6 +166,7 @@ export interface SchedulerState {
   lastReview: Date | null;
 }
 
+/** Our card's columns in the shape the ts-fsrs library expects. */
 function toFsrsCard(state: SchedulerState): FsrsCard {
   return {
     due: state.due,

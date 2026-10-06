@@ -27,11 +27,13 @@ const PARTS_OF_SPEECH: Record<string, string> = {
   "품사 없음": "",
 };
 
+/** KRDict's level (초급/중급/고급) in English; null when there is none. */
 export function levelLabel(level: string | null | undefined): string | null {
   if (!level || level === "없음") return null;
   return LEVELS[level] ?? level;
 }
 
+/** KRDict's part of speech (명사, 동사, ...) in English. */
 export function posLabel(pos: string | null | undefined): string | null {
   if (!pos) return null;
   const label = PARTS_OF_SPEECH[pos];

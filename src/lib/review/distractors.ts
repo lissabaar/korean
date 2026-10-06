@@ -38,6 +38,11 @@ const TIER_CATEGORY = 2;
 const TIER_POS = 3;
 const TIER_FALLBACK = 4;
 
+/**
+ * How good a wrong option this word is for the target — lower is better: a
+ * confusable word, then a synonym/antonym, the same category, the same part of
+ * speech, anything else.
+ */
 function tierOf(target: DistractorTarget, candidate: DistractorCandidate): number {
   if (candidate.relation === "CONFUSABLE") return TIER_CONFUSABLE;
   if (candidate.relation === "SYNONYM" || candidate.relation === "ANTONYM") {
@@ -55,6 +60,10 @@ function tierOf(target: DistractorTarget, candidate: DistractorCandidate): numbe
   return TIER_FALLBACK;
 }
 
+/**
+ * Random order (Fisher–Yates), so the right option is not always in the same
+ * place.
+ */
 function shuffle<T>(items: T[]): T[] {
   const out = [...items];
   for (let i = out.length - 1; i > 0; i--) {

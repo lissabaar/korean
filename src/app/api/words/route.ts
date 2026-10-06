@@ -1,3 +1,14 @@
+/**
+ * POST /api/words — add one word typed in by hand (the manual form on /add).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * No AI. What the user typed is stored as their own fact (source USER);
+ * dictionary data is attached if they picked an entry. Duplicate → 409.
+ */
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";

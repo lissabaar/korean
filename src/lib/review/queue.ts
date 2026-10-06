@@ -22,6 +22,7 @@ import {
  */
 export const NEW_PER_SESSION = 10;
 
+/** New words per session from the user's setting, kept within 5–50. */
 export function clampNewPerSession(value: number | null | undefined): number {
   const n = Math.round(value ?? NEW_PER_SESSION);
   return Math.min(50, Math.max(5, Number.isFinite(n) ? n : NEW_PER_SESSION));
@@ -215,6 +216,10 @@ const cardInclude = {
   },
 } as const;
 
+/**
+ * Counters for the home page: reviews due now, new words to learn, total words,
+ * and when the next review is.
+ */
 export async function getDeckStats(prisma: PrismaClient, userId: string): Promise<DeckStats> {
   const now = new Date();
   const { learn, review } = await studyScope(prisma, userId);
@@ -236,6 +241,7 @@ export async function getDeckStats(prisma: PrismaClient, userId: string): Promis
 /** learn = new words only, review = scheduled reviews only, all = both. */
 export type StudyMode = "learn" | "review" | "all";
 
+/** The ?mode= query value as a StudyMode; anything unknown means "all". */
 export function parseStudyMode(value: string | null | undefined): StudyMode {
   return value === "learn" || value === "review" ? value : "all";
 }
@@ -247,6 +253,11 @@ export interface SessionOptions {
   newLimit?: number;
 }
 
+/**
+ * The cards for one session: due reviews (oldest first, up to 50) and/or new
+ * words (up to the user's setting), each turned into a ReviewItem — exercise,
+ * options, what each side shows.
+ */
 export async function buildSession(
   prisma: PrismaClient,
   userId: string,

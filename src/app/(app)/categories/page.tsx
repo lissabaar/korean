@@ -1,3 +1,15 @@
+/**
+ * "/categories" — every category with its words: rename, merge, delete,
+ * change icon, switch Learn/Review on or off, edit single words.
+ *
+ * Next.js page (server component): runs on the server for every request, may
+ * read the database directly, and returns HTML. The folder path is the URL.
+ *
+ * Before reading, it repairs data: words without any category are put into
+ * "uncategorised" (which always exists). The list is then passed to
+ * <CategoryList/>, the interactive part.
+ */
+
 import CategoryList, { type CategoryView } from "@/components/CategoryList";
 import { categoryIcon } from "@/lib/category-icons";
 import { prisma } from "@/lib/db";
@@ -8,6 +20,11 @@ import { repairLooseWords } from "@/lib/words/edit";
 
 export const metadata = { title: "Categories · Korean vocabulary" };
 
+/**
+ * The page itself. Next.js calls this default export on the server for each
+ * request and sends the HTML it returns. Here: repairs words without a category,
+ * then loads every category with its words for <CategoryList/>.
+ */
 export default async function CategoriesPage() {
   const user = await currentUser();
   if (!user) return null;

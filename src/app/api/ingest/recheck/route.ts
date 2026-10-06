@@ -1,3 +1,14 @@
+/**
+ * POST /api/ingest/recheck — ask the dictionary again about candidates it
+ * did not answer for ("Check again" in the preview). No AI.
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * At most 60 words per call; input is trimmed and normalised (NFC) first.
+ */
+
 import { NextResponse } from "next/server";
 import { dictionaryKeys, prisma } from "@/lib/clients";
 import { recheckDictionary, type RecheckItem } from "@/lib/ingest/analyze";

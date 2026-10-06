@@ -54,6 +54,10 @@ async function untranslated(prisma: PrismaClient, userId: string): Promise<Shown
 /** Dictionary text may be cached for everyone; the user's own text may not. */
 const shareable = (example: Shown) => example.source !== "USER";
 
+/**
+ * One run: cached translations first (free), then up to two model calls of 40
+ * sentences. Returns how many were filled and how many remain.
+ */
 export async function translateExamples(
   prisma: PrismaClient,
   anthropic: Anthropic,

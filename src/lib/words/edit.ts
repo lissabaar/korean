@@ -22,10 +22,12 @@ export class EditError extends Error {
 type Tx = Prisma.TransactionClient;
 const TX = { maxWait: 10_000, timeout: 30_000 };
 
+/** A category name as stored: lowercase, single spaces, at most 60 characters. */
 function cleanName(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 60);
 }
 
+/** The id of the user's "uncategorised" category, created if missing. */
 async function uncategorisedId(tx: Tx, userId: string): Promise<string> {
   const category = await tx.category.upsert({
     where: { userId_language_name: { userId, language: "KO", name: UNCATEGORISED } },
@@ -113,6 +115,7 @@ export interface WordDetails {
   categories: string[];
 }
 
+/** One word with its first sense, example and category names, for the editor. */
 export async function getWord(prisma: PrismaClient, userId: string, id: string): Promise<WordDetails> {
   const entry = await prisma.entry.findFirst({
     where: { id, userId },
@@ -134,6 +137,10 @@ export async function getWord(prisma: PrismaClient, userId: string, id: string):
   };
 }
 
+/**
+ * Save edits to a word. Changing the spelling checks for a duplicate; an empty
+ * category list puts the word in "uncategorised".
+ */
 export async function updateWord(
   prisma: PrismaClient,
   userId: string,
@@ -202,6 +209,7 @@ export async function updateWord(
   }, TX);
 }
 
+/** Delete a word; its senses, examples and cards go with it (cascade). */
 export async function deleteWord(prisma: PrismaClient, userId: string, id: string): Promise<void> {
   const { count } = await prisma.entry.deleteMany({ where: { id, userId } });
   if (count === 0) throw new EditError("No such word.", 404);

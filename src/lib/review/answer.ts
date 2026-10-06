@@ -66,6 +66,11 @@ export interface GradeOptions {
   alternatives?: string[];
 }
 
+/**
+ * Compare a typed answer with the expected one after normalising (NFC, case,
+ * spaces, punctuation): correct, almost (a small typo, accepted with a note), or
+ * wrong. `alternatives` are other accepted answers.
+ */
 export function gradeTypedAnswer(
   typed: string,
   expected: string,

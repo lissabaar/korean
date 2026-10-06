@@ -1,3 +1,15 @@
+/**
+ * POST /api/meanings — add an English meaning to saved words that only have
+ * the user's own (for example, imported with a Russian translation).
+ *
+ * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
+ * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
+ * Runs on the server only, so it may use secret keys and the database.
+ *
+ * Dictionary first, then AI checked against the dictionary
+ * (lib/words/meanings.ts). Called in rounds until `remaining` is 0.
+ */
+
 import { NextResponse } from "next/server";
 import { anthropic, dictionaryKeys, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";

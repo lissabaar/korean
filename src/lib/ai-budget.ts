@@ -37,6 +37,7 @@ export interface TokenUsage {
 }
 const FALLBACK_PRICE = { input: 5, output: 25 };
 
+/** A non-negative integer from an environment variable, or the fallback. */
 function envInt(name: string, fallback: number): number {
   const value = Number.parseInt(process.env[name] ?? "", 10);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
@@ -48,6 +49,7 @@ export const freeCredits = () => envInt("FREE_AI_CREDITS", 50);
 /** Shared budget per UTC day for everyone who is not unlimited. */
 export const dailyBudgetCredits = () => envInt("AI_DAILY_BUDGET_CREDITS", 300);
 
+/** Whether this email is in UNLIMITED_AI_EMAILS (the owner): no metering at all. */
 export function isUnlimited(email: string): boolean {
   const list = (process.env.UNLIMITED_AI_EMAILS ?? "")
     .split(",")
@@ -56,6 +58,10 @@ export function isUnlimited(email: string): boolean {
   return list.includes(email.toLowerCase());
 }
 
+/**
+ * What a model call cost, in micro-dollars, from its token counts and the
+ * model's price.
+ */
 export function costMicros(model: string, usage: TokenUsage): number {
   // Exact name first, then the longest known prefix (a dated snapshot of a
   // known model is priced like it).
@@ -80,6 +86,10 @@ export interface AiBalance {
   allowance: number;
 }
 
+/**
+ * The user's AI credits: allowance (free + bonus), how much is left, and whether
+ * they are unlimited or anonymous.
+ */
 export async function getAiBalance(prisma: PrismaClient, userId: string): Promise<AiBalance> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -140,6 +150,10 @@ export async function assertCanUseAi(prisma: PrismaClient, userId: string): Prom
   return balance;
 }
 
+/**
+ * Log one model call (tokens and cost) in AiUsage. Call right after every call —
+ * the money is spent whether or not its result is used.
+ */
 export async function recordAiUsage(
   prisma: PrismaClient,
   userId: string,
