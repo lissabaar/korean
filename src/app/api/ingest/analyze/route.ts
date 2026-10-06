@@ -75,18 +75,15 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof AiQuotaError) {
+      const messages = {
+        anonymous: "Create a free account to find words with AI — it comes with free credits.",
+        user: "Your free AI credits are used up. Reviews and your saved words keep working.",
+        daily: "The AI part is resting for today — try again tomorrow.",
+      };
+      const status = { anonymous: 401, user: 402, daily: 503 }[error.scope];
       return NextResponse.json(
-        error.scope === "user"
-          ? {
-              error:
-                "Your free AI credits are used up. Reviews and your saved words keep working.",
-              aiQuota: "user",
-            }
-          : {
-              error: "The AI part is resting for today — try again tomorrow.",
-              aiQuota: "daily",
-            },
-        { status: error.scope === "user" ? 402 : 503 },
+        { error: messages[error.scope], aiQuota: error.scope },
+        { status },
       );
     }
     if (error instanceof DictionaryError && error.code === "010") {

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Public_Sans } from "next/font/google";
+import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "./globals.css";
 
 const publicSans = Public_Sans({

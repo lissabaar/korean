@@ -20,8 +20,55 @@ export const NEW_PER_SESSION = 10;
 export const REVIEWS_PER_SESSION = 50;
 
 /** REGISTER cards are not created yet; only these two directions are asked. */
-const ASKED_DIRECTIONS = ["RECOGNITION", "RECALL"] as const;
-type AskedDirection = (typeof ASKED_DIRECTIONS)[number];
+type AskedDirection = "RECOGNITION" | "RECALL";
+
+/**
+ * Which cards the user is studying right now. Two filters on top of the
+ * plain "not suspended":
+ *
+ *   direction — RECALL (meaning → Korean) always; RECOGNITION only when the
+ *               user turned it on, since recall is the skill that lags.
+ *   category  — a word takes part in learning if any of its categories has
+ *               learnActive, in review if any has reviewActive. A word with
+ *               no category at all always takes part, so deleting a
+ *               category can never make words silently disappear.
+ */
+async function studyScope(prisma: PrismaClient, userId: string) {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { askRecognition: true, hideTranslationAfterStability: true },
+  });
+  const directions: AskedDirection[] = user.askRecognition
+    ? ["RECALL", "RECOGNITION"]
+    : ["RECALL"];
+  const base = { userId, suspended: false, direction: { in: directions } };
+
+  const learn = {
+    ...base,
+    phase: "LEARNING" as const,
+    sense: {
+      entry: {
+        OR: [
+          { categories: { some: { category: { learnActive: true } } } },
+          { categories: { none: {} } },
+        ],
+      },
+    },
+  };
+  const review = {
+    ...base,
+    phase: "SCHEDULED" as const,
+    sense: {
+      entry: {
+        OR: [
+          { categories: { some: { category: { reviewActive: true } } } },
+          { categories: { none: {} } },
+        ],
+      },
+    },
+  };
+  return { user, learn, review };
+}
 
 interface SenseText {
   translation: string | null;
@@ -115,14 +162,14 @@ const cardInclude = {
 
 export async function getDeckStats(prisma: PrismaClient, userId: string): Promise<DeckStats> {
   const now = new Date();
-  const base = { userId, suspended: false, direction: { in: [...ASKED_DIRECTIONS] } };
+  const { learn, review } = await studyScope(prisma, userId);
 
   const [due, learning, words, next] = await Promise.all([
-    prisma.card.count({ where: { ...base, phase: "SCHEDULED", due: { lte: now } } }),
-    prisma.card.count({ where: { ...base, phase: "LEARNING" } }),
+    prisma.card.count({ where: { ...review, due: { lte: now } } }),
+    prisma.card.count({ where: learn }),
     prisma.entry.count({ where: { userId } }),
     prisma.card.findFirst({
-      where: { ...base, phase: "SCHEDULED", due: { gt: now } },
+      where: { ...review, due: { gt: now } },
       orderBy: { due: "asc" },
       select: { due: true },
     }),
@@ -136,21 +183,17 @@ export async function buildSession(
   userId: string,
 ): Promise<ReviewItem[]> {
   const now = new Date();
-  const base = { userId, suspended: false, direction: { in: [...ASKED_DIRECTIONS] } };
+  const { user, learn, review } = await studyScope(prisma, userId);
 
-  const [user, scheduled, learning] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { hideTranslationAfterStability: true },
-    }),
+  const [scheduled, learning] = await Promise.all([
     prisma.card.findMany({
-      where: { ...base, phase: "SCHEDULED", due: { lte: now } },
+      where: { ...review, due: { lte: now } },
       include: cardInclude,
       orderBy: { due: "asc" },
       take: REVIEWS_PER_SESSION,
     }),
     prisma.card.findMany({
-      where: { ...base, phase: "LEARNING" },
+      where: learn,
       include: cardInclude,
       // Oldest words first, and both directions of a word together.
       orderBy: [{ sense: { entry: { createdAt: "asc" } } }, { direction: "asc" }],

@@ -49,6 +49,14 @@ model User {
   // 1 credit = 1 US cent of model cost. See src/lib/ai-budget.ts.
   aiBonusCredits Int @default(0)
 
+  // Also ask Korean → meaning. Off by default: reviews show the meaning and
+  // ask for the Korean word, which is the skill that lags behind.
+  askRecognition Boolean @default(false)
+
+  // Set by Better Auth's anonymous plugin: "try without an account" users.
+  // They get no AI; on sign-up their data moves to the real account.
+  isAnonymous Boolean? @default(false)
+
   entries    Entry[]
   categories Category[]
   cards      Card[]
@@ -224,6 +232,15 @@ model Category {
 
   // Seeded categories ship with the app and have no userId.
   isBuiltIn Boolean @default(false)
+
+  // Which study processes draw words from this category. A word takes part
+  // when any of its categories is active (or it has no category at all).
+  learnActive  Boolean @default(true) // new words get introduced
+  reviewActive Boolean @default(true) // learned words come up for review
+
+  // Bootstrap Icons name ("cup-hot"). Null = the default for the name, see
+  // src/lib/category-icons.ts.
+  icon String?
 
   entries EntryCategory[]
 

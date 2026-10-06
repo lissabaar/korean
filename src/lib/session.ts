@@ -1,11 +1,14 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "./auth";
 
-/** Current session, or null. Safe to call anywhere on the server. */
-export async function getSession() {
+/**
+ * Current session, or null. Safe to call anywhere on the server; cached per
+ * request, so the layout and the page share one lookup.
+ */
+export const getSession = cache(async () => {
   return auth.api.getSession({ headers: await headers() });
-}
+});
 
 /**
  * For route handlers. Returns the user id or null — callers decide the
@@ -17,10 +20,11 @@ export async function getUserId(): Promise<string | null> {
 }
 
 /**
- * For pages. Sends anyone without a session to the sign-in screen.
+ * For pages in the (app) group. Null only on a visitor's very first load:
+ * the layout then starts an anonymous session in the browser and reloads,
+ * so pages simply render nothing in that moment.
  */
-export async function requireUser() {
+export async function currentUser() {
   const session = await getSession();
-  if (!session) redirect("/sign-in");
-  return session.user;
+  return session?.user ?? null;
 }

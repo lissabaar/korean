@@ -411,10 +411,14 @@ function Back({ item }: { item: ReviewItem }) {
         {back.partOfSpeech && <span className="korean text-xs text-muted">{back.partOfSpeech}</span>}
       </div>
       {back.translation && <p className="mt-2 font-medium">{back.translation}</p>}
-      {back.definitionTarget && <p className="korean mt-2 text-sm">{back.definitionTarget}</p>}
+      {back.definitionTarget && (
+        <p className="korean mt-2 text-base sm:text-sm">{back.definitionTarget}</p>
+      )}
       {back.definitionKnown && <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>}
       {back.example && (
-        <p className="korean mt-3 border-l-2 border-celadon pl-3 text-sm text-muted">{back.example}</p>
+        <p className="korean mt-3 border-l-2 border-celadon pl-3 text-lg leading-relaxed text-muted sm:text-base">
+          {back.example}
+        </p>
       )}
       {back.contextNote && <p className="mt-2 text-xs text-muted">From your text: {back.contextNote}</p>}
     </div>

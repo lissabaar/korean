@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import type { AnalysisResult, WordCandidate } from "@/lib/ingest/analyze";
 import { readFile, sourceFromText, type ImportSource } from "@/lib/import/read";
 import CandidateRow from "./CandidateRow";
 import FileDrop from "./FileDrop";
+import ManualWord from "./ManualWord";
 
 type Stage = "input" | "preview" | "done";
 
@@ -23,7 +25,19 @@ interface SaveSummary {
 }
 
 /** null = unlimited. */
-export default function AddWords({ initialCredits }: { initialCredits: number | null }) {
+export default function AddWords({
+  initialCredits,
+  anonymous,
+  categories,
+}: {
+  /** null = unlimited. */
+  initialCredits: number | null;
+  /** No account: AI is off, typing words in works. */
+  anonymous: boolean;
+  /** The user's categories plus the built-in ones, for the pickers. */
+  categories: string[];
+}) {
+  const [mode, setMode] = useState<"ai" | "manual">(anonymous ? "manual" : "ai");
   const [credits, setCredits] = useState(initialCredits);
   const outOfCredits = credits !== null && credits <= 0;
   const [stage, setStage] = useState<Stage>("input");
@@ -241,6 +255,55 @@ export default function AddWords({ initialCredits }: { initialCredits: number | 
       )}
 
       {stage === "input" && (
+        <div role="tablist" className="mb-6 flex gap-1 rounded-lg bg-celadon-soft p-1 text-sm">
+          {(
+            [
+              ["ai", "From text & files", "bi-magic"],
+              ["manual", "Type a word", "bi-pencil"],
+            ] as const
+          ).map(([value, label, icon]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={mode === value}
+              onClick={() => setMode(value)}
+              className={`flex-1 rounded-md px-3 py-2 ${
+                mode === value ? "bg-surface font-medium shadow-sm" : "text-muted"
+              }`}
+            >
+              <i className={`bi ${icon} mr-1.5`} aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {stage === "input" && mode === "manual" && <ManualWord categories={categories} />}
+
+      {stage === "input" && mode === "ai" && anonymous && (
+        <div className="rounded-lg border border-line bg-surface p-6">
+          <p className="font-medium">Finding words with AI needs a free account</p>
+          <p className="mt-1 text-sm text-muted">
+            Paste texts, drop screenshots, Anki decks or tables — the AI picks out the words and
+            the dictionary fills them in. New accounts get free AI credits, and everything you
+            have added so far comes along.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/sign-up"
+              className="rounded-md bg-celadon-deep px-5 py-2.5 text-sm font-medium text-paper"
+            >
+              Create account
+            </Link>
+            <Link href="/sign-in" className="rounded-md border border-line px-5 py-2.5 text-sm">
+              Sign in
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {stage === "input" && mode === "ai" && !anonymous && (
         <>
           <label className="flex flex-col gap-2">
             <span className="text-sm text-muted">
@@ -399,7 +462,12 @@ export default function AddWords({ initialCredits }: { initialCredits: number | 
                   {rows.length > 0 && (
                     <ul className="overflow-hidden rounded-lg border border-line bg-surface">
                       {rows.map((candidate) => (
-                        <CandidateRow key={candidate.id} candidate={candidate} onChange={update} />
+                        <CandidateRow
+                          key={candidate.id}
+                          candidate={candidate}
+                          onChange={update}
+                          categories={categories}
+                        />
                       ))}
                     </ul>
                   )}

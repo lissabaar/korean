@@ -59,6 +59,8 @@ export function costMicros(model: string, usage: Anthropic.Usage): number {
 
 export interface AiBalance {
   unlimited: boolean;
+  /** No account yet: AI is off until they sign up (and get free credits). */
+  anonymous: boolean;
   /** Whole credits; Infinity for unlimited users. */
   remaining: number;
   allowance: number;
@@ -67,10 +69,13 @@ export interface AiBalance {
 export async function getAiBalance(prisma: PrismaClient, userId: string): Promise<AiBalance> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true, aiBonusCredits: true },
+    select: { email: true, aiBonusCredits: true, isAnonymous: true },
   });
+  if (user.isAnonymous) {
+    return { unlimited: false, anonymous: true, remaining: 0, allowance: 0 };
+  }
   if (isUnlimited(user.email)) {
-    return { unlimited: true, remaining: Infinity, allowance: Infinity };
+    return { unlimited: true, anonymous: false, remaining: Infinity, allowance: Infinity };
   }
   const used = await prisma.aiUsage.aggregate({
     where: { userId },
@@ -80,14 +85,21 @@ export async function getAiBalance(prisma: PrismaClient, userId: string): Promis
   const usedCredits = (used._sum.costMicros ?? 0) / MICROS_PER_CREDIT;
   return {
     unlimited: false,
+    anonymous: false,
     remaining: Math.max(0, Math.floor(allowance - usedCredits)),
     allowance,
   };
 }
 
 export class AiQuotaError extends Error {
-  constructor(readonly scope: "user" | "daily") {
-    super(scope === "user" ? "AI credits used up" : "Daily AI budget reached");
+  constructor(readonly scope: "user" | "daily" | "anonymous") {
+    super(
+      scope === "user"
+        ? "AI credits used up"
+        : scope === "daily"
+          ? "Daily AI budget reached"
+          : "AI needs an account",
+    );
   }
 }
 
@@ -99,6 +111,7 @@ export class AiQuotaError extends Error {
 export async function assertCanUseAi(prisma: PrismaClient, userId: string): Promise<AiBalance> {
   const balance = await getAiBalance(prisma, userId);
   if (balance.unlimited) return balance;
+  if (balance.anonymous) throw new AiQuotaError("anonymous");
   if (balance.remaining <= 0) throw new AiQuotaError("user");
 
   const dayStart = new Date();

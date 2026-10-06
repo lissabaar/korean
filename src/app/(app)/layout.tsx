@@ -1,12 +1,18 @@
 import Nav from "@/components/Nav";
-import { requireUser } from "@/lib/session";
+import StartAnonymous from "@/components/StartAnonymous";
+import { currentUser } from "@/lib/session";
 
-/** Everything in this group needs a signed-in user and shares the nav. */
+/**
+ * Everything in this group works without signing up. A first-time visitor
+ * gets an anonymous session (created in the browser, so crawlers that do not
+ * run JavaScript never create users); signing up later keeps their words.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  const user = await currentUser();
+  if (!user) return <StartAnonymous />;
   return (
     <>
-      <Nav email={user.email} />
+      <Nav email={user.isAnonymous ? null : user.email} />
       {children}
     </>
   );

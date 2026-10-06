@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import type { WordCandidate } from "@/lib/ingest/analyze";
-import { BASE_CATEGORIES } from "@/lib/ingest/categories";
+import CategorySelect from "./CategorySelect";
 import type { DictEntry } from "@/lib/dictionary/krdict";
 
 interface Props {
   candidate: WordCandidate;
   onChange: (next: WordCandidate) => void;
+  /** Category names to choose from: the user's own plus the built-in set. */
+  categories: string[];
 }
 
-export default function CandidateRow({ candidate, onChange }: Props) {
+export default function CandidateRow({ candidate, onChange, categories }: Props) {
   const [open, setOpen] = useState(false);
 
   const sense = candidate.dictionary?.senses[0];
@@ -80,10 +82,11 @@ export default function CandidateRow({ candidate, onChange }: Props) {
           )}
 
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <CategoryPicker
+            <CategorySelect
               value={candidate.primaryCategory}
+              options={categories}
               onChange={(primaryCategory) =>
-                onChange({ ...candidate, primaryCategory, edited: true } as WordCandidate)
+                onChange({ ...candidate, primaryCategory, edited: true })
               }
               disabled={disabled}
             />
@@ -112,7 +115,7 @@ export default function CandidateRow({ candidate, onChange }: Props) {
           </button>
 
           {open && (
-            <div className="mt-2 border-l-2 border-celadon pl-3 text-sm">
+            <div className="mt-2 border-l-2 border-celadon pl-3 text-base sm:text-sm">
               <p className="korean">{candidate.sentence}</p>
               <p className="mt-1 text-muted">{candidate.contextNote}</p>
               {sense?.examples.slice(0, 2).map((example) => (
@@ -125,32 +128,6 @@ export default function CandidateRow({ candidate, onChange }: Props) {
         </div>
       </div>
     </li>
-  );
-}
-
-function CategoryPicker({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  disabled: boolean;
-}) {
-  return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      aria-label="Category"
-      className="max-w-[12rem] rounded-full border border-celadon bg-surface px-2.5 py-1 text-xs text-celadon-deep disabled:opacity-50"
-    >
-      {BASE_CATEGORIES.map((name) => (
-        <option key={name} value={name}>
-          {name}
-        </option>
-      ))}
-    </select>
   );
 }
 

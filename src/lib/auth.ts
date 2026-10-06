@@ -17,7 +17,9 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { anonymous } from "better-auth/plugins";
 import { prisma } from "./db";
+import { moveAnonymousData } from "./words/merge-anonymous";
 
 /**
  * Origins allowed to call the auth endpoints. Better Auth rejects any other
@@ -65,8 +67,20 @@ export const auth = betterAuth({
     },
   },
 
-  // Must come last: it lets server actions set the session cookie.
-  plugins: [nextCookies()],
+  plugins: [
+    // "Try without an account": a real user row flagged isAnonymous, so the
+    // whole app works unchanged — except AI, which ai-budget.ts refuses.
+    anonymous({
+      emailDomainName: "anonymous.hangugo.invalid",
+      // The plugin deletes the anonymous user right after this hook, and
+      // all data cascades from User — move it first.
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        await moveAnonymousData(prisma, anonymousUser.user.id, newUser.user.id);
+      },
+    }),
+    // Must come last: it lets server actions set the session cookie.
+    nextCookies(),
+  ],
 });
 
 export type Session = typeof auth.$Infer.Session;

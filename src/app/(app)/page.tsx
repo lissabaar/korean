@@ -2,10 +2,13 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAiBalance } from "@/lib/ai-budget";
 import { getDeckStats } from "@/lib/review/queue";
-import { requireUser } from "@/lib/session";
+import StarterDeckButton from "@/components/StarterDeckButton";
+import { currentUser } from "@/lib/session";
+import { STARTER_DECK } from "@/lib/words/starter-deck";
 
 export default async function Home() {
-  const user = await requireUser();
+  const user = await currentUser();
+  if (!user) return null;
   const [stats, ai] = await Promise.all([
     getDeckStats(prisma, user.id),
     getAiBalance(prisma, user.id),
@@ -42,11 +45,22 @@ export default async function Home() {
               : "bg-celadon-deep text-paper"
           }`}
         >
-          Add words from a text
+          Add words
         </Link>
       </div>
 
-      {!ai.unlimited && (
+      {stats.words === 0 && (
+        <div className="mt-6 rounded-lg border border-line bg-surface p-5">
+          <p className="font-medium">No words yet?</p>
+          <p className="mt-1 text-sm text-muted">
+            Start with {STARTER_DECK.length} everyday words to see how learning works — you can
+            switch their categories off later.
+          </p>
+          <StarterDeckButton />
+        </div>
+      )}
+
+      {!ai.unlimited && !ai.anonymous && (
         <p className="mt-5 text-xs text-muted">
           {ai.remaining > 0
             ? `${ai.remaining} of ${ai.allowance} free AI credits left for finding new words.`
@@ -57,7 +71,7 @@ export default async function Home() {
       {!hasWork && (
         <p className="mt-5 text-sm text-muted">
           {stats.words === 0
-            ? "Nothing here yet. Paste a Korean text and pick the words worth learning."
+            ? "Add words by typing them in, or — with a free account — from texts, screenshots and Anki decks."
             : stats.nextDue
               ? `All caught up. Next review ${formatWhen(stats.nextDue)}.`
               : "All caught up."}

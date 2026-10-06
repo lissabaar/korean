@@ -27,12 +27,17 @@ src/app/                    Next.js pages and API routes
 src/components/             React client components
 src/lib/
   ai-budget.ts              free AI credits, usage log, daily cap
-  auth.ts                   Better Auth config
+  auth.ts                   Better Auth config (+ anonymous plugin)
+  category-icons.ts         Bootstrap Icons defaults per category
   auth-client.ts            client-side auth helpers ("use client")
   session.ts                server-side session helpers
   db.ts                     Prisma singleton
   clients.ts                Anthropic client + dictionary keys
   dictionary/krdict.ts      KRDict → STDICT lookup chain (both free, XML)
+  words/
+    manual.ts               word typed in by hand (source USER), no AI
+    starter-deck.ts         ready-made deck for empty accounts (DRAFT content)
+    merge-anonymous.ts      anonymous → real account on sign-up/sign-in
   ingest/
     extract.ts              model → lemmas + categories (no DB writes)
     categories.ts           fixed taxonomy, alias folding
@@ -48,8 +53,10 @@ src/lib/import/             browser-only: dropped files → analysis jobs
   read.ts                   images (downscaled), CSV/TSV, text, subtitles; chunking
   anki.ts                   .apkg/.colpkg via fflate + fzstd + sql.js (lazy-loaded)
 scripts/copy-sqljs-wasm.mjs postinstall: puts sql.js's wasm in public/
-src/app/(app)/              signed-in pages (home, /review, /add); layout = auth + Nav
+src/app/(app)/              app pages (home, /review, /add, /categories); layout starts
+                            an anonymous session for first-time visitors
 src/app/api/review/         session (GET) and answer (POST) routes
+src/app/api/{words,categories,settings,starter-deck}/   manual words, category flags
 ```
 
 Docs: `SETUP.md` (Russian, for the owner) — setting up on a new machine.
@@ -110,6 +117,25 @@ the meter; `AI_DAILY_BUDGET_CREDITS` caps all free users together per UTC
 day. Out of credits only blocks finding new words — never reviews. Any new
 feature that calls the model must use the same two functions.
 
+**No login wall; AI needs an account.**
+A first-time visitor gets an anonymous Better Auth user (created in the
+browser by `StartAnonymous`, so crawlers never create rows). Everything works
+for them except AI (`ai-budget.ts` refuses with scope `anonymous`). On
+sign-up/sign-in the anonymous plugin calls `onLinkAccount` and then DELETES
+the anonymous user — `moveAnonymousData()` must run first or the words go
+with it. Pages in `(app)` use `currentUser()`, never a redirect to sign-in.
+
+**Typed-in words are the user's own facts.**
+The one exception to "dictionaries decide": `words/manual.ts` stores what
+the user wrote with source USER (starter deck: source AI, since its draft
+content was written by the assistant).
+
+**Study scope = direction × categories.**
+`studyScope()` in `review/queue.ts`: RECALL (English → Korean) always,
+RECOGNITION only if `User.askRecognition`. A word is learned if any of its
+categories has `learnActive`, reviewed if any has `reviewActive`; a word
+with no category always takes part. Stats and sessions both go through it.
+
 **Auth owns nothing in `clients.ts`.**
 Prisma lives in `db.ts`; auth in `auth.ts`. Both import from `db.ts`.
 Never create a second Prisma instance.
@@ -147,6 +173,11 @@ Run Node through `npm run …`: the project `.npmrc` sets
 `npm.cmd …` rather than changing the execution policy.
 
 ## What's not built yet
+
+- Starter deck content is a 10-word draft — replace with a real,
+  dictionary-checked deck
+- Anonymous users that never sign up are never cleaned up
+- Typed-in words could be auto-filled from KRDict (free, no AI)
 
 - Example sentences — KRDict's search API has none; needs its view API
   (`/api/view`, by `target_code`)

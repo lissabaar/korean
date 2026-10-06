@@ -76,6 +76,7 @@ src/lib/
     categories.ts             fixed taxonomy and alias folding
     analyze.ts                text → candidates, homograph ranking, writes nothing
     commit.ts                 approved candidates → entries and cards
+  words/                      manual words, starter deck, anonymous → account merge
   import/                     browser-side: dropped files → analysis jobs
     read.ts                   images, CSV/TSV, text, subtitles; chunking
     anki.ts                   Anki .apkg/.colpkg (fflate + fzstd + sql.js)
