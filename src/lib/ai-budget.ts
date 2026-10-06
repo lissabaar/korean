@@ -11,7 +11,6 @@
  * is the polite layer in front of it.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import type { PrismaClient } from "@prisma/client";
 
 /** 1 credit = 1 cent = 10 000 micro-dollars. */
@@ -23,8 +22,19 @@ const MICROS_PER_CREDIT = 10_000;
  * the most expensive known rate rather than for free.
  */
 const PRICES: Record<string, { input: number; output: number }> = {
+  "claude-sonnet-5-5": { input: 2, output: 10 },
+  // The server-side fallback for Sonnet 5.5 refusals runs on Sonnet 5.
+  "claude-sonnet-5": { input: 2, output: 10 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
 };
+
+/** Token counts as both the regular and the beta Messages API report them. */
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
 const FALLBACK_PRICE = { input: 5, output: 25 };
 
 function envInt(name: string, fallback: number): number {
@@ -46,8 +56,12 @@ export function isUnlimited(email: string): boolean {
   return list.includes(email.toLowerCase());
 }
 
-export function costMicros(model: string, usage: Anthropic.Usage): number {
-  const price = PRICES[model] ?? FALLBACK_PRICE;
+export function costMicros(model: string, usage: TokenUsage): number {
+  // Exact name first, then the longest known prefix (a dated snapshot of a
+  // known model is priced like it).
+  const known = Object.keys(PRICES).sort((x, y) => y.length - x.length);
+  const price =
+    PRICES[model] ?? PRICES[known.find((name) => model.startsWith(name)) ?? ""] ?? FALLBACK_PRICE;
   // Cache reads and writes are input tokens too; count them at full price
   // (the extraction prompt is not cached, so this is exact in practice).
   const input =
@@ -131,7 +145,7 @@ export async function recordAiUsage(
   userId: string,
   unlimited: boolean,
   model: string,
-  usage: Anthropic.Usage,
+  usage: TokenUsage,
 ): Promise<void> {
   await prisma.aiUsage.create({
     data: {

@@ -9,7 +9,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const data: { askRecognition?: boolean; showKoreanDefinition?: boolean; learningGoal?: number } = {};
-  if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 5) {
+  if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 10) {
     data.learningGoal = body.learningGoal;
   }
   if (typeof body.askRecognition === "boolean") data.askRecognition = body.askRecognition;

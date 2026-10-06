@@ -66,7 +66,7 @@ export default function FileDrop({
     >
       <p className="text-sm font-medium">Drop files here</p>
       <p className="mt-1 text-xs text-muted">
-        Screenshots and photos, Anki decks (.apkg), CSV, text or subtitles — as many as you like.
+        Screenshots and photos, Anki decks (.apkg), ReWord categories (.reword), CSV, text or subtitles — as many as you like.
         Or paste a screenshot with Ctrl+V.
       </p>
       <button

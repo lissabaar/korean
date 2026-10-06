@@ -58,8 +58,8 @@ model User {
   showKoreanDefinition Boolean @default(false)
 
   // Correct answers in a row before a new word counts as learned and moves
-  // to spaced review (2–5). The last step is typed, not picked.
-  learningGoal Int @default(3)
+  // to spaced review (2–10). The last step is typed, not picked.
+  learningGoal Int @default(5)
 
   // Set by Better Auth's anonymous plugin: "try without an account" users.
   // They get no AI; on sign-up their data moves to the real account.

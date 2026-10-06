@@ -11,7 +11,7 @@ looks them up → spaced repetition schedules reviews.
   `url = env(...)` in the datasource and the `prisma-client-js` generator,
   which this schema uses. Upgrading is a deliberate migration, not a bump.
 - **Better Auth** for auth (not NextAuth)
-- **Anthropic SDK** (`claude-sonnet-4-6`) — AI only supplements dictionaries,
+- **Anthropic SDK** (`claude-sonnet-5-5`, effort low, server-side fallback beta) — AI only supplements dictionaries,
   never replaces them. Extraction uses structured outputs
   (`messages.parse` + Zod schema); never go back to "please answer in JSON"
   in the prompt — the model then sometimes answers in prose.

@@ -118,8 +118,8 @@ export default function SettingsPanel({
           the rest picked from options. Its first review is the next day; after that the gaps grow
           (roughly 1, 3, 7–10, 20+ days), shorter whenever you miss it.
         </p>
-        <div role="radiogroup" aria-label="Right answers in a row" className="mt-3 flex gap-2">
-          {[2, 3, 4, 5].map((n) => (
+        <div role="radiogroup" aria-label="Right answers in a row" className="mt-3 flex flex-wrap gap-2">
+          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
             <button
               key={n}
               type="button"

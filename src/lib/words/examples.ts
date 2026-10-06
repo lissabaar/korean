@@ -8,13 +8,13 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { assertCanUseAi, AiQuotaError, recordAiUsage } from "../ai-budget";
 import { cachedExamples } from "../dictionary/cached";
 import type { DictionaryKeys } from "../dictionary/krdict";
-import { EXTRACTION_MODEL } from "../ingest/extract";
+import { EXTRACTION_EFFORT, EXTRACTION_MODEL, FALLBACK_BETA } from "../ingest/extract";
 
 /** One request per run is plenty for a personal deck; run again for more. */
 const MAX_WORDS_PER_RUN = 60;
@@ -124,7 +124,7 @@ export async function fillMissingExamples(
       throw error;
     }
 
-    const response = await anthropic.messages.parse({
+    const response = await anthropic.beta.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 8000,
       system:
@@ -137,9 +137,12 @@ export async function fillMissingExamples(
             .join("\n"),
         },
       ],
-      output_config: { format: zodOutputFormat(ExampleSchema) },
+      output_config: { effort: EXTRACTION_EFFORT, format: betaZodOutputFormat(ExampleSchema) },
+      betas: [FALLBACK_BETA],
+      fallbacks: "default",
     });
-    await recordAiUsage(prisma, userId, unlimited, EXTRACTION_MODEL, response.usage);
+    await recordAiUsage(prisma, userId, unlimited, response.model, response.usage);
+    if (response.stop_reason === "refusal") continue;
 
     const byLemma = new Map(
       (response.parsed_output?.examples ?? []).map((e) => [e.lemma.normalize("NFC").trim(), e]),

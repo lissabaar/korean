@@ -16,17 +16,26 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import type { TokenUsage } from "../ai-budget";
 import { z } from "zod";
 import { BASE_CATEGORIES } from "./categories";
 
-export const EXTRACTION_MODEL = "claude-sonnet-4-6";
+/**
+ * Sonnet 5.5: cheaper than Sonnet 4.6 ($2/$10 vs $3/$15 per MTok). Its
+ * thinking cannot be switched off; extraction runs at effort "low", where
+ * it skips thinking on most requests. Server-side fallback (beta) retries
+ * the rare classifier refusal on Sonnet 5.
+ */
+export const EXTRACTION_MODEL = "claude-sonnet-5-5";
+export const EXTRACTION_EFFORT = "low" as const;
+export const FALLBACK_BETA = "server-side-fallback-2026-07-01" as const;
 
 /** Words plus what the call cost, so the caller can meter it. */
 export interface Extraction {
   words: ExtractedWord[];
   model: string;
-  usage: Anthropic.Usage;
+  usage: TokenUsage;
 }
 
 const REGISTERS = [
@@ -149,7 +158,10 @@ function buildInstructions(options: ExtractOptions): string {
   return parts.join("\n\n");
 }
 
-function buildContent(source: ExtractSource, options: ExtractOptions): Anthropic.ContentBlockParam[] {
+function buildContent(
+  source: ExtractSource,
+  options: ExtractOptions,
+): Anthropic.Beta.BetaContentBlockParam[] {
   const instructions = buildInstructions(options);
   if (source.kind === "text") {
     return [{ type: "text", text: `${instructions}\n\nText:\n${source.text}` }];
@@ -173,27 +185,34 @@ function buildContent(source: ExtractSource, options: ExtractOptions): Anthropic
 async function requestWords(
   client: Anthropic,
   system: string,
-  content: string | Anthropic.ContentBlockParam[],
+  content: string | Anthropic.Beta.BetaContentBlockParam[],
   signal?: AbortSignal,
 ): Promise<Extraction> {
-  const response = await client.messages.parse(
+  const response = await client.beta.messages.parse(
     {
       model: EXTRACTION_MODEL,
+      // Thinking counts towards max_tokens as well as the JSON.
       max_tokens: 16000,
       system,
       messages: [{ role: "user", content }],
-      output_config: { format: zodOutputFormat(ExtractionSchema) },
+      output_config: { effort: EXTRACTION_EFFORT, format: betaZodOutputFormat(ExtractionSchema) },
+      betas: [FALLBACK_BETA],
+      fallbacks: "default",
     },
     { signal },
   );
 
+  if (response.stop_reason === "refusal") {
+    throw new Error(`The model declined this input (${response.stop_details?.category ?? "no category"})`);
+  }
   if (!response.parsed_output) {
-    // max_tokens cuts the JSON off; refusal returns no JSON at all.
+    // max_tokens cuts the JSON off.
     throw new Error(`Extraction returned no result (stop_reason: ${response.stop_reason})`);
   }
   return {
     words: response.parsed_output.words,
-    model: EXTRACTION_MODEL,
+    // The model that actually answered — the fallback one if it ran.
+    model: response.model,
     usage: response.usage,
   };
 }

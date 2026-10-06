@@ -30,6 +30,8 @@ export interface ImportSource {
   text: string;
   /** Human summary, e.g. "Anki deck · 312 notes". */
   summary: string;
+  /** A category name the file itself carries (a ReWord category). */
+  suggestedCategory?: string;
   jobs: ImportJob[];
 }
 
@@ -43,7 +45,7 @@ const IMAGE_MAX_EDGE = 1568;
 const HANGUL = /[가-힣ᄀ-ᇿ㄰-㆏]/;
 
 export const ACCEPTED_FILES =
-  "image/png,image/jpeg,image/webp,image/gif,.apkg,.colpkg,.csv,.tsv,.txt,.md,.srt,.vtt";
+  "image/png,image/jpeg,image/webp,image/gif,.apkg,.colpkg,.reword,.csv,.tsv,.txt,.md,.srt,.vtt";
 
 let counter = 0;
 const nextId = (prefix: string) => `${prefix}${Date.now().toString(36)}${(counter++).toString(36)}`;
@@ -61,6 +63,17 @@ export async function readFile(file: File): Promise<ImportSource> {
     const { readAnkiPackage } = await import("./anki");
     const lines = await readAnkiPackage(await file.arrayBuffer());
     return textSource(name, lines, `Anki deck · ${lines.length} notes with Korean`);
+  }
+  if (ext === "reword") {
+    const { readRewordPackage } = await import("./reword");
+    const deck = readRewordPackage(await file.arrayBuffer());
+    const source = textSource(
+      name,
+      deck.lines,
+      `ReWord · ${deck.lines.length} words${deck.duplicates ? ` (${deck.duplicates} repeats removed)` : ""}`,
+    );
+    if (deck.name) source.suggestedCategory = deck.name.toLowerCase();
+    return source;
   }
   if (ext === "csv" || ext === "tsv") {
     const lines = tableLines(await file.text());

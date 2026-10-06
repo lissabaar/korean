@@ -453,7 +453,7 @@ export default function AddWords({
           <div className="flex flex-col gap-5">
             {sources.map((source) => {
               const rows = candidates.filter((c) => c.sourceId === source.id);
-              const showHeader = grouped || source.error;
+              const showHeader = grouped || source.error || source.suggestedCategory;
               if (!showHeader && rows.length === 0) return null;
               return (
                 <section key={source.id}>
@@ -467,6 +467,22 @@ export default function AddWords({
                             ? `part ${source.partsDone + 1} of ${source.jobs.length}`
                             : `${rows.length} words`}
                       </span>
+                      {source.suggestedCategory && rows.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = source.suggestedCategory!;
+                            setCandidates((list) =>
+                              list.map((c) =>
+                                c.sourceId === source.id ? { ...c, primaryCategory: name, edited: true } : c,
+                              ),
+                            );
+                          }}
+                          className="ml-auto rounded-full border border-celadon px-2.5 py-0.5 text-xs text-celadon-deep"
+                        >
+                          Put all in “{source.suggestedCategory}”
+                        </button>
+                      )}
                       {source.error && <span className="w-full text-xs text-clay">{source.error}</span>}
                     </h2>
                   )}

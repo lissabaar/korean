@@ -22,13 +22,14 @@ import {
 
 /**
  * Correct answers in a row before a new word graduates. A per-user setting
- * (User.learningGoal, 2–5); this is the default and the fallback.
+ * (User.learningGoal, 2–10); this is the default and the fallback.
  */
-export const DEFAULT_LEARNING_GOAL = 3;
+export const DEFAULT_LEARNING_GOAL = 5;
+export const MAX_LEARNING_GOAL = 10;
 
 export function clampLearningGoal(value: number | null | undefined): number {
   const n = Math.round(value ?? DEFAULT_LEARNING_GOAL);
-  return Math.min(5, Math.max(2, Number.isFinite(n) ? n : DEFAULT_LEARNING_GOAL));
+  return Math.min(MAX_LEARNING_GOAL, Math.max(2, Number.isFinite(n) ? n : DEFAULT_LEARNING_GOAL));
 }
 
 /**
