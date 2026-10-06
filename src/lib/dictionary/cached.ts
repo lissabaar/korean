@@ -67,9 +67,9 @@ export async function cachedLookupMany(
   keys: DictionaryKeys,
   options: LookupOptions & { concurrency?: number } = {},
 ): Promise<Map<string, DictEntry[] | null>> {
-  // Measured from Vercel: 1.5–3 s per lookup. More parallel requests than
-  // this only slow the dictionary down further.
-  const { concurrency = 6, ...lookupOptions } = options;
+  // KRDict throttles bursts: with 3 import parts in parallel, 6 lookups each
+  // (18 at once) made it stop answering for minutes. 2 per part stays under.
+  const { concurrency = 2, ...lookupOptions } = options;
   const results = new Map<string, DictEntry[] | null>();
   const queue = [...new Set(words)];
 

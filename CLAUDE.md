@@ -277,6 +277,10 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 ## What's not built yet
 
+- **Re-sort into categories** (owner's request): after the user reshapes
+  their categories, the model re-assigns every word to the current set.
+  Must show the expected AI cost first and go through `ai-budget.ts`.
+
 - Starter deck content is a 10-word draft — replace with a real,
   dictionary-checked deck
 - Billing: plans exist only as a placeholder page; see PAYMENTS.md

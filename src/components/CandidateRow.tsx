@@ -22,9 +22,6 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
   const duplicate = candidate.status === "duplicate";
   const disabled = duplicate;
   // More than three syllables do not fit the square word cell on a phone.
-  // Only one or two syllables fit the square cell (three overflow at the
-  // larger desktop size); longer words get a stretching box.
-  const long = candidate.kind === "phrase" || candidate.lemma.length > 2;
   // As on the cards: English (dictionary, else AI) leads, the user's own
   // meaning is shown under it — it is kept, never replaced.
   const english = sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
@@ -33,14 +30,15 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
 
   return (
     <li
-      className={`border-b border-line last:border-b-0 ${
+      className={`border-b border-line px-4 py-4 last:border-b-0 sm:px-5 ${
         candidate.selected || saved ? "" : "opacity-55"
       }`}
     >
-      <div className="flex gap-3 px-4 py-4 sm:gap-4 sm:px-5">
+      {/* Row 1: the word as the heading — it can wrap, nothing sits beside it. */}
+      <div className="flex items-start gap-3">
         {saved ? (
           <i
-            className="bi bi-check-circle-fill mt-1 shrink-0 text-lg text-celadon-deep"
+            className="bi bi-check-circle-fill mt-1.5 shrink-0 text-lg text-celadon-deep"
             aria-label="Added"
             title="Added"
           />
@@ -50,36 +48,34 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
             checked={candidate.selected}
             onChange={(event) => onChange({ ...candidate, selected: event.target.checked })}
             aria-label={`Include ${candidate.lemma}`}
-            className="mt-1.5 size-5 shrink-0 accent-celadon-deep"
+            className="mt-2 size-5 shrink-0 accent-celadon-deep"
           />
         )}
-
-        {/* The word is the hero: a Hangul-block-shaped cell, set large. */}
-        <div
-          className={`grid shrink-0 place-items-center rounded-sm ${
-            long ? "max-w-[40%] min-h-14 min-w-0 px-2.5 py-2" : "size-16 sm:size-20"
-          } ${aiOnly || unreachable ? "bg-clay-soft" : "bg-celadon-soft"}`}
+        <h3
+          className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${
+            candidate.kind === "phrase" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
+          }`}
         >
-          <span
-            className={`korean break-words text-center leading-snug [overflow-wrap:anywhere] ${long ? "text-base sm:text-xl" : "text-2xl leading-none sm:text-3xl"}`}
-          >
-            {candidate.lemma}
-          </span>
-        </div>
+          {candidate.lemma}
+        </h3>
+        <SpeakButton text={candidate.lemma} />
+      </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1">
-            <div className="min-w-0 flex-1">
-              {english && <p className="font-medium break-words">{english}</p>}
-              {own && <p className="text-sm text-muted break-words">Yours: {own}</p>}
-            </div>
-            <SpeakButton text={candidate.lemma} className="ml-auto -mt-1" />
-          </div>
+      {/* Row 2: two columns on wide screens, one on phones. */}
+      <div className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+        <div className="min-w-0">
+          {english && <p className="font-medium [overflow-wrap:anywhere]">{english}</p>}
+          {own && <p className="text-sm text-muted [overflow-wrap:anywhere]">Yours: {own}</p>}
 
-          {(aiOnly || candidate.kind === "phrase") && (
-            <p className="mt-0.5 flex flex-wrap gap-1.5 text-xs">
+          {(aiOnly || candidate.kind === "phrase" || candidate.register) && (
+            <p className="mt-1 flex flex-wrap gap-1.5 text-xs">
               {candidate.kind === "phrase" && (
                 <span className="rounded-full bg-celadon-soft px-2 py-0.5 text-celadon-deep">phrase</span>
+              )}
+              {candidate.register && (
+                <span className="rounded-full bg-celadon-soft px-2 py-0.5 text-celadon-deep">
+                  {candidate.register.toLowerCase()}
+                </span>
               )}
               {aiOnly && (
                 <span className="rounded-full bg-clay-soft px-2 py-0.5 text-clay">
@@ -88,10 +84,12 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
               )}
             </p>
           )}
+
           {unreachable && (
-            <p className="text-sm text-clay">
-              The dictionary did not respond, so this is not checked. Run it again for dictionary data
-              — or keep it with {candidate.userMeaning ? "your meaning" : "the AI meaning"}.
+            <p className="mt-1 text-sm text-clay">
+              {saved
+                ? "Saved with the AI meaning — the dictionary check runs automatically later."
+                : "The dictionary did not answer — it will be checked automatically after saving."}
             </p>
           )}
           {candidate.conflict === "meaning" && (sense?.translation || candidate.aiMeaning) && (
@@ -101,18 +99,20 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
                 {sense?.translation ? "The dictionary says" : "Suggested"}:{" "}
                 <strong>{sense?.translation ?? candidate.aiMeaning}</strong>
               </p>
-              <label className="mt-1 flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={candidate.useDictionaryMeaning}
-                  onChange={(event) =>
-                    onChange({ ...candidate, useDictionaryMeaning: event.target.checked })
-                  }
-                  className="size-4 accent-celadon-deep"
-                />
-                Use {sense?.translation ? "the dictionary" : "the suggested"} meaning instead of “
-                {candidate.userMeaning}”
-              </label>
+              {!saved && (
+                <label className="mt-1 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={candidate.useDictionaryMeaning}
+                    onChange={(event) =>
+                      onChange({ ...candidate, useDictionaryMeaning: event.target.checked })
+                    }
+                    className="size-4 accent-celadon-deep"
+                  />
+                  Use {sense?.translation ? "the dictionary" : "the suggested"} meaning instead of “
+                  {candidate.userMeaning}”
+                </label>
+              )}
             </div>
           )}
           {candidate.conflict === "spelling" && (
@@ -121,69 +121,52 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
               spelling.
             </p>
           )}
-          {duplicate && (
-            <p className="text-sm text-muted">Already in your words.</p>
-          )}
+          {duplicate && <p className="mt-1 text-sm text-muted">Already in your words.</p>}
 
-          {!disabled && candidate.homographs.length > 1 && (
+          {!disabled && !saved && candidate.homographs.length > 1 && (
             <HomographPicker
               candidate={candidate}
               onPick={(dictionary) => onChange({ ...candidate, dictionary })}
             />
           )}
+        </div>
 
+        <div className="min-w-0">
           {sense?.definition && (
-            <p className="korean mt-1 line-clamp-2 text-sm text-muted">
-              {sense.definition}
-            </p>
+            <p className="korean line-clamp-3 text-sm text-muted">{sense.definition}</p>
           )}
-
-          <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
             <CategorySelect
               value={candidate.primaryCategory}
               options={categories}
-              onChange={(primaryCategory) =>
-                onChange({ ...candidate, primaryCategory, edited: true })
-              }
-              disabled={disabled}
+              onChange={(primaryCategory) => onChange({ ...candidate, primaryCategory, edited: true })}
+              disabled={disabled || saved}
             />
-            {candidate.secondaryCategories.map((name) => (
-              <span
-                key={name}
-                className="rounded-full border border-line px-2.5 py-1 text-xs text-muted"
-              >
-                {name}
-              </span>
-            ))}
-            {candidate.register && (
-              <span className="rounded-full bg-celadon-soft px-2.5 py-1 text-xs text-celadon-deep">
-                {candidate.register.toLowerCase()}
-              </span>
-            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            className="mt-2 text-xs text-muted underline underline-offset-4"
-          >
-            {open ? "Hide context" : "Show context"}
-          </button>
-
-          {open && (
-            <div className="mt-2 border-l-2 border-celadon pl-3 text-base sm:text-sm">
-              <p className="korean">{candidate.sentence}</p>
-              <p className="mt-1 text-muted">{candidate.contextNote}</p>
-              {sense?.examples.slice(0, 2).map((example) => (
-                <p key={example} className="korean mt-1 text-muted">
-                  {example}
-                </p>
-              ))}
-            </div>
-          )}
+          {(candidate.sentence || candidate.contextNote || sense?.examples.length) ? (
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              className="mt-2 text-xs text-muted underline underline-offset-4"
+            >
+              {open ? "Hide context" : "Show context"}
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {open && (
+        <div className="mt-2 border-l-2 border-celadon pl-3 text-base sm:text-sm">
+          {candidate.sentence && <p className="korean">{candidate.sentence}</p>}
+          {candidate.contextNote && <p className="mt-1 text-muted">{candidate.contextNote}</p>}
+          {sense?.examples.slice(0, 2).map((example) => (
+            <p key={example} className="korean mt-1 text-muted">
+              {example}
+            </p>
+          ))}
+        </div>
+      )}
     </li>
   );
 }

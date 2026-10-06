@@ -121,6 +121,7 @@ export default function AddWords({
   const forcedRef = useRef<Record<string, string>>({});
   const [forced, setForced] = useState<Record<string, string>>({});
   const [rechecking, setRechecking] = useState(false);
+  const [verifyNote, setVerifyNote] = useState<string | null>(null);
   /** Background example filling after a save: null = not started. */
   const [examples, setExamples] = useState<{ added: number; done: boolean; note?: string } | null>(null);
 
@@ -386,6 +387,37 @@ export default function AddWords({
     }
   }
 
+  /** "Check now" in automatic mode: verify saved words and show the preview's rows as checked. */
+  async function checkSavedNow() {
+    setRechecking(true);
+    setVerifyNote(null);
+    let confirmed = 0;
+    let missing = 0;
+    let remaining = 0;
+    try {
+      for (let round = 0; round < 10; round++) {
+        const response = await fetch("/api/verify", { method: "POST" });
+        if (!response.ok) break;
+        const data: { confirmed: number; notInDictionary: number; remaining: number } = await response.json();
+        confirmed += data.confirmed;
+        missing += data.notInDictionary;
+        remaining = data.remaining;
+        if (data.remaining === 0 || data.confirmed + data.notInDictionary === 0) break;
+      }
+      // The saved words are updated in the database; mirror it in the list.
+      if (confirmed + missing > 0) {
+        await recheck(candidates.filter((c) => c.status === "unreachable"));
+      }
+      setVerifyNote(
+        remaining > 0
+          ? `Checked ${confirmed + missing}; the dictionary is still not answering for ${remaining} — they will be tried again later.`
+          : `All checked: ${confirmed} confirmed by the dictionary, ${missing} not in it (AI meaning kept).`,
+      );
+    } finally {
+      setRechecking(false);
+    }
+  }
+
   /** Words saved without a dictionary answer: check them, quietly. */
   async function verifyInBackground() {
     for (let round = 0; round < 30; round++) {
@@ -511,7 +543,7 @@ export default function AddWords({
 
   function setAll(selected: boolean) {
     setCandidates((list) =>
-      list.map((c) => (c.status === "new" || c.status === "ai" ? { ...c, selected } : c)),
+      list.map((c) => (c.status !== "duplicate" && !c.saved ? { ...c, selected } : c)),
     );
   }
 
@@ -796,6 +828,26 @@ export default function AddWords({
             </div>
           )}
 
+          {autoAdd && unreachableCount > 0 && !running && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-3 text-sm">
+              <span className="flex-1">
+                {unreachableCount} {unreachableCount === 1 ? "word was" : "words were"} saved while the
+                dictionary was not answering — with the AI meaning for now. They are checked against the
+                dictionary automatically (also each time you open the app).
+                {verifyNote && <span className="mt-1 block text-muted">{verifyNote}</span>}
+              </span>
+              <button
+                type="button"
+                disabled={rechecking}
+                onClick={checkSavedNow}
+                className="rounded-md bg-celadon-deep px-3 py-1.5 text-paper disabled:opacity-50"
+              >
+                <i className={`bi ${rechecking ? "bi-hourglass-split" : "bi-arrow-clockwise"} mr-1.5`} aria-hidden />
+                {rechecking ? "Checking…" : "Check now"}
+              </button>
+            </div>
+          )}
+
           {!autoAdd && unreachableCount > 0 && !running && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-3 text-sm">
               <span className="flex-1">
@@ -851,25 +903,27 @@ export default function AddWords({
               {count("duplicate") > 0 && `, ${count("duplicate")} already yours`}
               {count("ai") > 0 && `, ${count("ai")} with AI meaning`}
               {count("unreachable") > 0 &&
-                `, ${count("unreachable")} not checked — dictionary did not respond`}
+                `, ${count("unreachable")} waiting for the dictionary`}
               {merged > 0 && `, ${merged} repeats merged`}
             </p>
-            <div className="flex gap-3 text-sm">
-              <button
-                type="button"
-                onClick={() => setAll(true)}
-                className="text-celadon-deep underline underline-offset-4"
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                onClick={() => setAll(false)}
-                className="text-muted underline underline-offset-4"
-              >
-                Clear
-              </button>
-            </div>
+            {!autoAdd && (
+              <div className="flex gap-3 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setAll(true)}
+                  className="text-celadon-deep underline underline-offset-4"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAll(false)}
+                  className="text-muted underline underline-offset-4"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-5">

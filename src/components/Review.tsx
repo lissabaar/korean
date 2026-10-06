@@ -363,9 +363,13 @@ function Question({
               onChange={(event) => setTyped(event.target.value)}
               disabled={Boolean(result) || busy}
               lang={recall ? "ko" : "en"}
+              // Keyboard suggestions would give the answer away. Browsers honour
+              // these; a system predictive bar can still need turning off.
               autoComplete="off"
+              autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
+              data-gramm="false"
               className={`rounded-md border border-line bg-surface px-4 py-3 outline-none focus:border-celadon ${
                 recall ? "korean text-2xl" : "text-lg"
               }`}
