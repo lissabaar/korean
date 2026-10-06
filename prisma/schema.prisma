@@ -541,3 +541,12 @@ model DictionaryUsage {
 
   @@id([userId, day])
 }
+
+// English translations of KRDict example sentences, shared by all users:
+// the dictionary has none, so the model writes them once per sentence.
+// Only dictionary text goes here — never a sentence from a user's input.
+model ExampleTranslation {
+  text        String   @id
+  translation String
+  createdAt   DateTime @default(now())
+}

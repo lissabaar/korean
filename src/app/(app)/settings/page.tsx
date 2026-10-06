@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { lookupsToday } from "@/lib/dictionary/cached";
 import { userPlan } from "@/lib/plan-limits";
 import { currentUser } from "@/lib/session";
+import { countUntranslatedExamples } from "@/lib/words/example-translations";
 
 export const metadata = { title: "Settings · Korean vocabulary" };
 
@@ -11,7 +12,7 @@ export default async function SettingsPage() {
   const user = await currentUser();
   if (!user) return null;
 
-  const [settings, ai, missingExamples, plan, lookups, missingMeanings] = await Promise.all([
+  const [settings, ai, missingExamples, plan, lookups, missingMeanings, untranslated] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: {
@@ -28,6 +29,7 @@ export default async function SettingsPage() {
     userPlan(prisma, user.id),
     lookupsToday(prisma, user.id),
     prisma.sense.count({ where: { order: 0, translation: null, entry: { userId: user.id } } }),
+    countUntranslatedExamples(prisma, user.id),
   ]);
 
   return (
@@ -42,6 +44,7 @@ export default async function SettingsPage() {
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
       missingMeanings={missingMeanings}
+      untranslatedExamples={untranslated}
       planName={plan.name}
       lookups={{ used: lookups, limit: plan.dictionaryLookupsPerDay }}
     />

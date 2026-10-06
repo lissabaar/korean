@@ -538,6 +538,18 @@ export default function AddWords({
       // No progress this round (dictionary down, nothing generated): stop.
       if (data.fromDictionary + data.fromAi === 0) break;
     }
+    // Dictionary examples are Korean only: add English translations.
+    for (let round = 0; round < 40; round++) {
+      try {
+        const response = await fetch("/api/translations", { method: "POST" });
+        if (!response.ok) break;
+        const data: { fromDictionary: number; fromAi: number; remaining: number; aiBlocked?: string } =
+          await response.json();
+        if (data.remaining === 0 || data.aiBlocked || data.fromDictionary + data.fromAi === 0) break;
+      } catch {
+        break;
+      }
+    }
     setExamples((current) => ({ added, done: true, note: current?.note }));
   }
 

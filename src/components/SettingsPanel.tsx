@@ -23,6 +23,7 @@ export default function SettingsPanel({
   credits,
   missingExamples,
   missingMeanings,
+  untranslatedExamples,
   planName,
   lookups,
 }: {
@@ -37,6 +38,8 @@ export default function SettingsPanel({
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
+  /** Examples shown on cards that have no English translation yet. */
+  untranslatedExamples: number;
   missingMeanings: number;
   planName: string;
   /** Typed-in dictionary lookups today; limit null = unlimited. */
@@ -51,17 +54,18 @@ export default function SettingsPanel({
   const [perSession, setPerSession] = useState(initialNewPerSession);
   const [error, setError] = useState<string | null>(null);
   /** One fill at a time: while one runs, the other button waits. */
-  const [task, setTask] = useState<"meanings" | "examples" | null>(null);
+  const [task, setTask] = useState<"meanings" | "examples" | "translations" | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [filled, setFilled] = useState<FillResult | null>(null);
   const [meaningsDone, setMeaningsDone] = useState<FillResult | null>(null);
+  const [translated, setTranslated] = useState<FillResult | null>(null);
 
   /**
    * Runs a fill endpoint round after round (each handles up to ~60 words)
    * until nothing is left, nothing more can be done, or AI credits run out.
    */
   async function runFill(
-    kind: "meanings" | "examples",
+    kind: "meanings" | "examples" | "translations",
     total: number,
     onDone: (result: FillResult) => void,
   ) {
@@ -108,6 +112,7 @@ export default function SettingsPanel({
   }
 
   const fillExamples = () => runFill("examples", missingExamples, setFilled);
+  const translateExamples = () => runFill("translations", untranslatedExamples, setTranslated);
 
   const section = "rounded-lg border border-line bg-surface p-4";
 
@@ -282,6 +287,35 @@ export default function SettingsPanel({
                 : filled.aiBlocked
                   ? "out of AI credits for now."
                   : "the dictionary did not answer; try again later.")}
+          </p>
+        )}
+
+        <p className="mt-4 text-sm text-muted">
+          {untranslatedExamples === 0
+            ? "Every example on your cards has an English translation."
+            : `${untranslatedExamples} ${untranslatedExamples === 1 ? "example has" : "examples have"} no English translation (the dictionary gives Korean only). The AI translates them${email === null ? " — needs an account" : ""}.`}
+        </p>
+        {untranslatedExamples > 0 && (
+          <button
+            type="button"
+            onClick={translateExamples}
+            disabled={task !== null}
+            className="mt-3 rounded-md bg-celadon-deep px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
+          >
+            <i className={`bi ${task === "translations" ? "bi-hourglass-split" : "bi-translate"} mr-1.5`} aria-hidden />
+            {task === "translations" ? "Translating…" : "Translate examples"}
+          </button>
+        )}
+        {task === "translations" && <Progress {...progress} />}
+        {translated && (
+          <p className="mt-3 text-sm">
+            Translated {translated.fromDictionary + translated.fromAi}.
+            {translated.remaining > 0 &&
+              (translated.aiBlocked === "anonymous"
+                ? ` ${translated.remaining} left — create an account to translate them.`
+                : translated.aiBlocked
+                  ? ` ${translated.remaining} left — out of AI credits for now.`
+                  : ` ${translated.remaining} left — try again.`)}
           </p>
         )}
       </section>
