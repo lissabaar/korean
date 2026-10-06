@@ -70,6 +70,8 @@ export default function CategoryList({
     }
   }
 
+  // A word in two categories is still one word.
+  const totalWords = new Set(categories.flatMap((c) => c.words.map((w) => w.id))).size;
   const learning = categories.filter((c) => c.learnActive).length;
   const reviewing = categories.filter((c) => c.reviewActive).length;
 
@@ -78,6 +80,10 @@ export default function CategoryList({
       <header className="mb-6">
         <p className="korean text-4xl text-celadon-deep">분류</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Categories</h1>
+        <p className="mt-1 text-sm font-medium text-celadon-deep">
+          {totalWords} {totalWords === 1 ? "word" : "words"} in {categories.length}{" "}
+          {categories.length === 1 ? "category" : "categories"}
+        </p>
         <p className="mt-2 text-sm text-muted">
           <strong className="font-medium text-ink">Learn</strong> — new words for{" "}
           <em>Learn new words</em> come from these.{" "}

@@ -10,7 +10,22 @@ import SpeakButton, { speakKorean } from "./SpeakButton";
 type Load = "loading" | "ready" | "error";
 
 /** A learning card answered but not graduated comes back this many cards later. */
-const REQUEUE_GAP = 3;
+const REQUEUE_MIN = 2;
+const REQUEUE_MAX = 5;
+
+/**
+ * Order of the cards in a session is shuffled — learning the same words in
+ * the same sequence teaches the sequence, not the words. (The exercise type
+ * of each card stays a pure function of its state; only order is random.)
+ */
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 export default function Review({ mode }: { mode: StudyMode }) {
   const [load, setLoad] = useState<Load>("loading");
@@ -27,7 +42,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load reviews.");
-        setQueue(data.items);
+        setQueue(shuffle(data.items));
         setTotal(data.items.length);
         setStats(data.stats);
         setAutoPlay(Boolean(data.autoPlay));
@@ -57,7 +72,9 @@ export default function Review({ mode }: { mode: StudyMode }) {
         hint: typed && answer ? [...answer][0] : null,
         selfGraded: typed ? head.direction === "RECOGNITION" && !head.back.translation : head.choices === null,
       };
-      const at = Math.min(REQUEUE_GAP, rest.length);
+      // Comes back a few cards later — how many varies, so the gap cannot be learned either.
+      const gap = REQUEUE_MIN + Math.floor(Math.random() * (REQUEUE_MAX - REQUEUE_MIN + 1));
+      const at = Math.min(gap, rest.length);
       return [...rest.slice(0, at), again, ...rest.slice(at)];
     });
   }
