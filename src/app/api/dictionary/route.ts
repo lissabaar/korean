@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { dictionaryKeys, prisma } from "@/lib/clients";
 import { cachedLookup, consumeLookup, LookupLimitError } from "@/lib/dictionary/cached";
 import { DictionaryError, TRANS_LANG } from "@/lib/dictionary/krdict";
-import { readableMeaning } from "@/lib/dictionary/romanize";
 import { userPlan } from "@/lib/plan-limits";
 import { getUserId } from "@/lib/session";
 
@@ -30,11 +29,7 @@ export async function GET(request: Request) {
         originalForm: entry.originalForm ?? null,
         partOfSpeech: entry.partOfSpeech ?? null,
         level: entry.level ?? null,
-        translation: readableMeaning(
-          entry.lemma,
-          entry.senses[0]?.translation,
-          entry.senses[0]?.translatedDefinition,
-        ),
+        translation: entry.senses[0]?.translation ?? null,
         definition: entry.senses[0]?.definition ?? null,
       })),
     });

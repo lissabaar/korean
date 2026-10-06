@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { WordCandidate } from "@/lib/ingest/analyze";
-import { readableMeaning } from "@/lib/dictionary/romanize";
 import CategorySelect from "./CategorySelect";
 import SpeakButton from "./SpeakButton";
 import type { DictEntry } from "@/lib/dictionary/krdict";
@@ -28,11 +27,7 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
   const long = candidate.kind === "phrase" || candidate.lemma.length > 2;
   // As on the cards: English (dictionary, else AI) leads, the user's own
   // meaning is shown under it — it is kept, never replaced.
-  const english = sense?.translation
-    ? readableMeaning(candidate.lemma, sense.translation, candidate.aiMeaning)
-    : aiOnly || unreachable
-      ? candidate.aiMeaning
-      : null;
+  const english = sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
   const own = candidate.userMeaning && !candidate.useDictionaryMeaning ? candidate.userMeaning : null;
   const saved = Boolean((candidate as { saved?: boolean }).saved);
 

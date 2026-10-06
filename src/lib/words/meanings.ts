@@ -18,7 +18,6 @@ import { z } from "zod";
 import { AiQuotaError, assertCanUseAi, recordAiUsage } from "../ai-budget";
 import { cachedLookup } from "../dictionary/cached";
 import { DictionaryUnavailableError, TRANS_LANG, type DictionaryKeys } from "../dictionary/krdict";
-import { isTransliteration, readableMeaning } from "../dictionary/romanize";
 import { rankHomographs } from "../ingest/analyze";
 import { EXTRACTION_MODEL } from "../ingest/extract";
 
@@ -75,8 +74,7 @@ export async function fillEnglishMeanings(
       const entries = await cachedLookup(prisma, sense.entry.lemma, keys, { transLang: TRANS_LANG.EN });
       const match = entries.find((entry) => entry.targetCode === code);
       const translation = match?.senses[0]?.translation;
-      // A bare transliteration ("jeonse") needs the model's English too.
-      if (!translation || isTransliteration(sense.entry.lemma, translation)) {
+      if (!translation) {
         needAi.push(sense);
         continue;
       }
@@ -151,7 +149,7 @@ export async function fillEnglishMeanings(
           prisma.sense.update({
             where: { id: sense.id },
             data: {
-              translation: readableMeaning(sense.entry.lemma, dictionary.senses[0].translation, item.english),
+              translation: dictionary.senses[0].translation,
               definitionTarget: sense.definitionTarget ?? dictionary.senses[0].definition ?? null,
               definitionKnown: dictionary.senses[0].translatedDefinition ?? undefined,
               definitionSource: "KRDICT",
