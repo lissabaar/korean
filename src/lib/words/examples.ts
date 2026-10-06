@@ -45,6 +45,11 @@ export async function fillMissingExamples(
   keys: DictionaryKeys,
   userId: string,
 ): Promise<FillResult> {
+  // Two runs at once (two tabs, a double tap) must not give a word two
+  // examples: every write checks again right before it happens.
+  const stillWithout = async (senseId: string) =>
+    (await prisma.example.count({ where: { senseId } })) === 0;
+
   const senses = await prisma.sense.findMany({
     where: { order: 0, examples: { none: {} }, entry: { userId } },
     select: {
@@ -67,16 +72,19 @@ export async function fillMissingExamples(
         try {
           found = (await cachedExamples(prisma, code, keys)).slice(0, 2);
         } catch {
-          // Unreachable dictionary: leave the word for the next run rather
-          // than spending AI on something the dictionary probably has.
-          continue;
+          // Dictionary not answering: the AI writes one instead of leaving
+          // the word without an example (it used to wait for a later run,
+          // which on a bad day meant "0 examples added").
+          found = [];
         }
       }
       if (found.length) {
-        await prisma.example.createMany({
-          data: found.map((text) => ({ senseId: sense.id, text, source: "KRDICT" as const })),
-        });
-        fromDictionary += 1;
+        if (await stillWithout(sense.id)) {
+          await prisma.example.createMany({
+            data: found.map((text) => ({ senseId: sense.id, text, source: "KRDICT" as const })),
+          });
+          fromDictionary += 1;
+        }
       } else {
         needAi.push(sense);
       }
@@ -113,10 +121,12 @@ export async function fillMissingExamples(
       uncached.push(sense);
       continue;
     }
-    await prisma.example.create({
-      data: { senseId: sense.id, text: row.text, translation: row.translation, source: "AI" },
-    });
-    fromAi += 1;
+    if (await stillWithout(sense.id)) {
+      await prisma.example.create({
+        data: { senseId: sense.id, text: row.text, translation: row.translation, source: "AI" },
+      });
+      fromAi += 1;
+    }
   }
 
   // ---- model, for what neither the dictionary nor the cache covered
@@ -160,6 +170,7 @@ export async function fillMissingExamples(
       if (!generated?.example.trim()) continue;
       const text = generated.example.normalize("NFC").trim().slice(0, 500);
       const translation = generated.translation.trim().slice(0, 500) || null;
+      if (!(await stillWithout(sense.id))) continue;
       await prisma.example.create({
         data: { senseId: sense.id, text, translation, source: "AI" },
       });

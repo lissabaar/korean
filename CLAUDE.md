@@ -193,6 +193,16 @@ marked unreachable at once), and the preview re-asks automatically once
 and offers "Check again" (`/api/ingest/recheck`, no AI). Unreachable words
 stay selected with the user's or the AI meaning — never silently dropped.
 
+**Imports never need ticking.** Default mode "Add automatically": parts
+run 3 at a time and each is committed as soon as it is read, so Stop keeps
+everything read so far; finished parts are remembered per file in
+localStorage and skipped when the same file is added again (resume).
+Words the dictionary did not answer are saved with `Entry.needsCheck` and
+verified in the background (`words/verify.ts`, `/api/verify`, run after an
+import and on opening the home page) — dictionary data replaces the AI
+placeholder, the user's meaning stays. "Let me review first" keeps the old
+tick-and-save flow. Routes doing model + dictionary work allow 300 s.
+
 **User text never goes into shared tables.** `DictionaryCache` holds only
 dictionary answers; `GeneratedExample` is keyed by KRDict target code
 (`krdict:<code>`), so words without a dictionary entry do not use it.

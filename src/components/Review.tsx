@@ -136,10 +136,10 @@ export default function Review({ mode }: { mode: StudyMode }) {
         <div className="mb-1.5 flex justify-between text-xs text-muted">
           <span>
             {current.phase === "LEARNING"
-              ? `New word · ${current.learningStreak} of ${current.learningGoal} in a row`
+              ? `New word · right in a row: ${current.learningStreak}/${current.learningGoal}`
               : "Review"}
           </span>
-          <span className="tabular-nums">{queue.length} left</span>
+          <span className="tabular-nums">{queue.length} cards left this session</span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-line" aria-hidden>
           <div
@@ -185,6 +185,7 @@ function Question({
   const [stale, setStale] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
+  const frontRef = useRef<HTMLDivElement>(null);
 
   const submit = useCallback(
     async (body: { answer?: string; knewIt?: boolean }) => {
@@ -247,7 +248,10 @@ function Question({
 
   return (
     <div>
-      <Front item={item} />
+      {/* scroll-mt clears the sticky nav when this is scrolled into view. */}
+      <div ref={frontRef} className="scroll-mt-16">
+        <Front item={item} />
+      </div>
 
       {error && (
         <p role="alert" className="mt-4 rounded-md bg-clay-soft px-3 py-2 text-sm text-clay">
@@ -352,6 +356,9 @@ function Question({
             </span>
             <input
               ref={inputRef}
+              // iOS scrolls the focused field above the keyboard and pushes
+              // the question off screen; bring the question back into view.
+              onFocus={() => setTimeout(() => frontRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 300)}
               value={typed}
               onChange={(event) => setTyped(event.target.value)}
               disabled={Boolean(result) || busy}

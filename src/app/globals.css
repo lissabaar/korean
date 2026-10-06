@@ -83,3 +83,49 @@ body {
     font-size: max(16px, 1em) !important;
   }
 }
+
+/*
+  Tailwind v4 resets buttons to the default cursor. Everything clickable
+  gets the pointer back, and a light hover/press response so a tap or a
+  mouse-over visibly lands.
+*/
+@layer base {
+  button:not(:disabled),
+  [role="button"],
+  [role="switch"],
+  [role="radio"],
+  [role="tab"],
+  select:not(:disabled),
+  summary,
+  label:has(> input[type="checkbox"]),
+  input[type="checkbox"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+
+  button,
+  a {
+    transition:
+      filter 0.15s ease,
+      background-color 0.15s ease,
+      color 0.15s ease,
+      transform 0.1s ease;
+  }
+
+  @media (hover: hover) {
+    button:not(:disabled):hover,
+    a[class*="rounded"]:hover {
+      filter: brightness(0.94);
+    }
+  }
+
+  button:not(:disabled):active,
+  a[class*="rounded"]:active {
+    filter: brightness(0.88);
+    transform: translateY(1px);
+  }
+}

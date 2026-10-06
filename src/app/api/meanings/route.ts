@@ -4,7 +4,8 @@ import { getUserId } from "@/lib/session";
 import { fillEnglishMeanings } from "@/lib/words/meanings";
 
 /** Dictionary lookups plus up to two model calls. */
-export const maxDuration = 120;
+// Hobby plan maximum. A part runs the model and up to 40 dictionary lookups.
+export const maxDuration = 300;
 
 /** Add English meanings to saved words that only have the user's own. */
 export async function POST() {

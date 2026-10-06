@@ -18,6 +18,8 @@ export interface ApprovedWord {
   secondaryCategories: string[];
   /** False once the user has edited the categories. */
   categoriesFromAi: boolean;
+  /** The dictionary did not answer for it: verify in the background later. */
+  needsCheck?: boolean;
   /** The dictionary's entry; absent when the dictionary does not have it. */
   dictionary?: DictEntry | null;
   /** The model's English meaning, used when there is no dictionary entry. */
@@ -174,6 +176,7 @@ async function persistOne(
         register: normaliseRegister(word.register) as never,
         krdictTargetCode: dict.targetCode ?? null,
         source: dict.source as never,
+        needsCheck: Boolean(word.needsCheck) && !word.dictionary?.senses?.length,
         categories: {
           create: categoryIds.map((categoryId) => ({
             categoryId,

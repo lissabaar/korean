@@ -4,7 +4,8 @@ import { getUserId } from "@/lib/session";
 import { fillMissingExamples } from "@/lib/words/examples";
 
 /** Dictionary lookups plus possibly one model call. */
-export const maxDuration = 120;
+// Hobby plan maximum. A part runs the model and up to 40 dictionary lookups.
+export const maxDuration = 300;
 
 /** Fill in examples for saved words that have none. */
 export async function POST() {

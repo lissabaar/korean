@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAiBalance } from "@/lib/ai-budget";
 import { getDeckStats } from "@/lib/review/queue";
+import BackgroundVerify from "@/components/BackgroundVerify";
 import StarterDeckButton from "@/components/StarterDeckButton";
 import { currentUser } from "@/lib/session";
 import { STARTER_DECK } from "@/lib/words/starter-deck";
@@ -9,14 +10,16 @@ import { STARTER_DECK } from "@/lib/words/starter-deck";
 export default async function Home() {
   const user = await currentUser();
   if (!user) return null;
-  const [stats, ai] = await Promise.all([
+  const [stats, ai, pendingCheck] = await Promise.all([
     getDeckStats(prisma, user.id),
     getAiBalance(prisma, user.id),
+    prisma.entry.count({ where: { userId: user.id, needsCheck: true } }),
   ]);
   const hasWork = stats.due + stats.learning > 0;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8 sm:px-6">
+      <BackgroundVerify pending={pendingCheck} />
       <header className="mb-8">
         <p className="korean text-4xl text-celadon-deep">안녕하세요</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Your words</h1>

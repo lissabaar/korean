@@ -11,7 +11,8 @@ import {
 } from "@/lib/ingest/extract";
 
 /** Extraction plus up to forty dictionary calls takes a while. */
-export const maxDuration = 120;
+// Hobby plan maximum. A part runs the model and up to 40 dictionary lookups.
+export const maxDuration = 300;
 
 /** Images are downscaled in the browser; anything near this is a mistake. */
 const MAX_IMAGE_BASE64 = 4_000_000;

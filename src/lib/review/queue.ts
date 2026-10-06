@@ -22,6 +22,11 @@ import {
  */
 export const NEW_PER_SESSION = 10;
 
+export function clampNewPerSession(value: number | null | undefined): number {
+  const n = Math.round(value ?? NEW_PER_SESSION);
+  return Math.min(50, Math.max(5, Number.isFinite(n) ? n : NEW_PER_SESSION));
+}
+
 /** Cap on scheduled reviews per session, so a backlog cannot become a wall. */
 export const REVIEWS_PER_SESSION = 50;
 
@@ -47,6 +52,7 @@ async function studyScope(prisma: PrismaClient, userId: string) {
       showKoreanDefinition: true,
       learningGoal: true,
       myMeaningFirst: true,
+      newPerSession: true,
       hideTranslationAfterStability: true,
     },
   });
@@ -248,7 +254,7 @@ export async function buildSession(
       include: cardInclude,
       // Oldest words first, and both directions of a word together.
       orderBy: [{ sense: { entry: { createdAt: "asc" } } }, { direction: "asc" }],
-      take: NEW_PER_SESSION,
+      take: clampNewPerSession(user.newPerSession),
     }),
   ]);
 

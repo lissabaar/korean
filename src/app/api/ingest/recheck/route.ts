@@ -4,7 +4,8 @@ import { recheckDictionary, type RecheckItem } from "@/lib/ingest/analyze";
 import { getUserId } from "@/lib/session";
 
 /** Dictionary lookups only — retrying can take a while on a slow network. */
-export const maxDuration = 120;
+// Hobby plan maximum. A part runs the model and up to 40 dictionary lookups.
+export const maxDuration = 300;
 
 /** Re-ask the dictionary about words it did not answer for. No AI involved. */
 export async function POST(request: Request) {

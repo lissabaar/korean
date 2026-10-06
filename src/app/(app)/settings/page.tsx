@@ -20,6 +20,7 @@ export default async function SettingsPage() {
         learningGoal: true,
         autoPlayAudio: true,
         myMeaningFirst: true,
+        newPerSession: true,
       },
     }),
     getAiBalance(prisma, user.id),
@@ -37,6 +38,7 @@ export default async function SettingsPage() {
       learningGoal={settings.learningGoal}
       autoPlayAudio={settings.autoPlayAudio}
       myMeaningFirst={settings.myMeaningFirst}
+      newPerSession={settings.newPerSession}
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
       missingMeanings={missingMeanings}

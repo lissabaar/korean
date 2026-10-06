@@ -84,7 +84,7 @@ export default function CategorySelect({
         else onChange(event.target.value);
       }}
       aria-label={label}
-      className={`max-w-[14rem] rounded-full border border-celadon bg-surface px-2.5 py-1 text-xs text-celadon-deep disabled:opacity-50 ${className}`}
+      className={`min-w-0 max-w-full truncate sm:max-w-[14rem] rounded-full border border-celadon bg-surface px-2.5 py-1 text-xs text-celadon-deep disabled:opacity-50 ${className}`}
     >
       {placeholder && (
         <option value="" disabled>

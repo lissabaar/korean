@@ -21,38 +21,45 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
   const unreachable = candidate.status === "unreachable";
   const duplicate = candidate.status === "duplicate";
   const disabled = duplicate;
-  // Phrases and long compounds do not fit the square word cell.
-  const long = candidate.kind === "phrase" || candidate.lemma.length > 5;
-  // The user's own meaning first, unless they chose the dictionary's.
+  // More than three syllables do not fit the square word cell on a phone.
+  const long = candidate.kind === "phrase" || candidate.lemma.length > 3;
+  // As on the cards: English (dictionary, else AI) leads, the user's own
+  // meaning is shown under it — it is kept, never replaced.
+  const english = sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
   const own = candidate.userMeaning && !candidate.useDictionaryMeaning ? candidate.userMeaning : null;
-  const meaning =
-    own ?? sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
+  const saved = Boolean((candidate as { saved?: boolean }).saved);
 
   return (
     <li
       className={`border-b border-line last:border-b-0 ${
-        candidate.selected ? "" : "opacity-55"
+        candidate.selected || saved ? "" : "opacity-55"
       }`}
     >
       <div className="flex gap-3 px-4 py-4 sm:gap-4 sm:px-5">
-        <input
-          type="checkbox"
-          checked={candidate.selected}
-          onChange={(event) =>
-            onChange({ ...candidate, selected: event.target.checked })
-          }
-          aria-label={`Include ${candidate.lemma}`}
-          className="mt-1.5 size-5 shrink-0 accent-celadon-deep"
-        />
+        {saved ? (
+          <i
+            className="bi bi-check-circle-fill mt-1 shrink-0 text-lg text-celadon-deep"
+            aria-label="Added"
+            title="Added"
+          />
+        ) : (
+          <input
+            type="checkbox"
+            checked={candidate.selected}
+            onChange={(event) => onChange({ ...candidate, selected: event.target.checked })}
+            aria-label={`Include ${candidate.lemma}`}
+            className="mt-1.5 size-5 shrink-0 accent-celadon-deep"
+          />
+        )}
 
         {/* The word is the hero: a Hangul-block-shaped cell, set large. */}
         <div
           className={`grid shrink-0 place-items-center rounded-sm ${
-            long ? "max-w-[45%] min-h-16 px-3 py-2" : "size-16 sm:size-20"
+            long ? "max-w-[40%] min-h-14 min-w-0 px-2.5 py-2" : "size-16 sm:size-20"
           } ${aiOnly || unreachable ? "bg-clay-soft" : "bg-celadon-soft"}`}
         >
           <span
-            className={`korean leading-snug ${long ? "text-lg sm:text-xl" : "text-2xl leading-none sm:text-3xl"}`}
+            className={`korean break-words text-center leading-snug [overflow-wrap:anywhere] ${long ? "text-base sm:text-xl" : "text-2xl leading-none sm:text-3xl"}`}
           >
             {candidate.lemma}
           </span>
@@ -60,7 +67,10 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1">
-            {meaning && <p className="flex-1 font-medium">{meaning}</p>}
+            <div className="min-w-0 flex-1">
+              {english && <p className="font-medium break-words">{english}</p>}
+              {own && <p className="text-sm text-muted break-words">Yours: {own}</p>}
+            </div>
             <SpeakButton text={candidate.lemma} className="ml-auto -mt-1" />
           </div>
 
@@ -71,7 +81,7 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
               )}
               {aiOnly && (
                 <span className="rounded-full bg-clay-soft px-2 py-0.5 text-clay">
-                  AI meaning — not in the dictionary
+                  English by AI — not in the dictionary
                 </span>
               )}
             </p>
@@ -126,7 +136,7 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
             </p>
           )}
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5">
             <CategorySelect
               value={candidate.primaryCategory}
               options={categories}

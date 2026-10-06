@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import type { AnalysisResult, RecheckResult, WordCandidate } from "@/lib/ingest/analyze";
 import {
   isTopicRequest,
   readFile,
   sourceFromText,
   sourceFromTopic,
+  type ImportJob,
   type ImportSource,
 } from "@/lib/import/read";
 import CandidateRow from "./CandidateRow";
@@ -16,12 +17,62 @@ import ManualWord from "./ManualWord";
 
 type Stage = "input" | "preview" | "done";
 
-/** originalCategory: the model's pick, restored when "Put every word in" is unticked. */
-type Candidate = WordCandidate & { sourceId: string; originalCategory: string };
+/**
+ * originalCategory: the model's pick, restored when "Put every word in" is unticked.
+ * saved: already added (automatic mode) — shown as added, not saved again.
+ */
+type Candidate = WordCandidate & { sourceId: string; originalCategory: string; saved?: boolean };
+
+/** Parts read at the same time. */
+const PARALLEL_PARTS = 3;
+
+/** Remembered per file, so adding the same file again resumes where it stopped. */
+function doneKey(source: ImportSource) {
+  return `hangugo:parts-done:${source.name}:${source.text.length}:${source.jobs.length}`;
+}
+function loadDoneParts(source: ImportSource): Set<number> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(doneKey(source)) ?? "[]") as number[]);
+  } catch {
+    return new Set();
+  }
+}
+function markPartDone(source: ImportSource, index: number) {
+  try {
+    const done = loadDoneParts(source);
+    done.add(index);
+    localStorage.setItem(doneKey(source), JSON.stringify([...done]));
+  } catch {
+    // Private mode or storage blocked: resuming just will not skip parts.
+  }
+}
+/** The add-mode preference lives in localStorage; this keeps React in sync with it. */
+const autoAddListeners = new Set<() => void>();
+function subscribeAutoAdd(listener: () => void) {
+  autoAddListeners.add(listener);
+  return () => autoAddListeners.delete(listener);
+}
+function setAutoAdd(value: boolean) {
+  try {
+    localStorage.setItem("hangugo:auto-add", value ? "1" : "0");
+  } catch {
+    // Not remembered beyond this visit.
+  }
+  autoAddListeners.forEach((listener) => listener());
+}
+function loadAutoAdd(): boolean {
+  try {
+    return localStorage.getItem("hangugo:auto-add") !== "0";
+  } catch {
+    return true;
+  }
+}
 
 interface SourceState extends ImportSource {
   status: "waiting" | "analysing" | "done" | "error";
   partsDone: number;
+  /** Parts finished in an earlier run of the same file, skipped this time. */
+  skippedParts?: number;
   error?: string;
 }
 
@@ -60,6 +111,12 @@ export default function AddWords({
   const [merged, setMerged] = useState(0);
   const [running, setRunning] = useState(false);
   const stopRef = useRef<AbortController | null>(null);
+  const seenRef = useRef<Set<string>>(new Set());
+  const [failedJobs, setFailedJobs] = useState<ImportJob[]>([]);
+  /** Running totals of automatic adding. */
+  const [added, setAdded] = useState({ created: 0, pending: 0, alreadySaved: 0 });
+  /** Add each part's words as soon as it is read (default), or review first. */
+  const autoAdd = useSyncExternalStore(subscribeAutoAdd, loadAutoAdd, () => true);
   /** Sources whose words all go into the file's own category (read inside the async loop). */
   const forcedRef = useRef<Record<string, string>>({});
   const [forced, setForced] = useState<Record<string, string>>({});
@@ -97,6 +154,13 @@ export default function AddWords({
 
   // ---------------------------------------------------------------- analyse
 
+  /**
+   * Parts run three at a time (the model is the slow step; the dictionary
+   * handles that fine). In "add automatically" mode each part is saved as
+   * soon as it is read, so stopping never loses what was already read, and
+   * the parts a file had already finished are skipped when it is added
+   * again — that is how an import resumes.
+   */
   async function analyse() {
     let all: ImportSource[] = files;
     if (pasted) {
@@ -109,31 +173,48 @@ export default function AddWords({
     }
     if (all.length === 0) return;
 
-    const initial: SourceState[] = all.map((s) => ({ ...s, status: "waiting", partsDone: 0 }));
+    const initial: SourceState[] = all.map((s) => {
+      const doneBefore = autoAdd ? loadDoneParts(s) : new Set<number>();
+      return {
+        ...s,
+        status: "waiting",
+        partsDone: doneBefore.size,
+        skippedParts: doneBefore.size,
+      };
+    });
     setSources(initial);
+    seenRef.current = new Set();
     setCandidates([]);
     setMerged(0);
+    setFailedJobs([]);
+    setAdded({ created: 0, pending: 0, alreadySaved: 0 });
     setError(null);
     setStage("preview");
-    setRunning(true);
 
+    const jobs = initial.flatMap((source) => {
+      const doneBefore = autoAdd ? loadDoneParts(source) : new Set<number>();
+      return source.jobs.filter((_, index) => !doneBefore.has(index));
+    });
+    await runJobs(jobs, initial);
+  }
+
+  /** Run the given parts; also used to retry the ones that failed. */
+  async function runJobs(jobs: ImportJob[], sourceList: SourceState[]) {
+    setRunning(true);
     const controller = new AbortController();
     stopRef.current = controller;
-    const seen = new Set<string>();
     const unreachable: WordCandidate[] = [];
-    const patch = (id: string, change: Partial<SourceState>) =>
-      setSources((list) => list.map((s) => (s.id === id ? { ...s, ...change } : s)));
+    const failed: ImportJob[] = [];
+    const byId = new Map(sourceList.map((s) => [s.id, s]));
+    const patch = (id: string, change: (s: SourceState) => Partial<SourceState>) =>
+      setSources((list) => list.map((s) => (s.id === id ? { ...s, ...change(s) } : s)));
 
-    // One part at a time: gentle on the dictionary API, and stopping
-    // halfway leaves everything found so far usable.
-    for (const source of initial) {
-      if (controller.signal.aborted) break;
-      patch(source.id, { status: "analysing" });
-      let partsDone = 0;
-      let failure: string | undefined;
-
-      for (const job of source.jobs) {
-        if (controller.signal.aborted) break;
+    const queue = [...jobs];
+    async function worker() {
+      for (let job = queue.shift(); job; job = queue.shift()) {
+        if (controller.signal.aborted) return;
+        const source = byId.get(job.sourceId)!;
+        patch(source.id, () => ({ status: "analysing" }));
         try {
           const response = await fetch("/api/ingest/analyze", {
             method: "POST",
@@ -147,7 +228,7 @@ export default function AddWords({
             if (data.aiQuota === "user") setCredits(0);
             setError(data.error);
             controller.abort();
-            break;
+            return;
           }
           if (!response.ok) throw new Error(data.error ?? "Analysis failed.");
           if (data.aiCreditsLeft !== undefined) setCredits(data.aiCreditsLeft);
@@ -158,11 +239,11 @@ export default function AddWords({
           for (const candidate of result.candidates) {
             // The same word from two files or two parts: keep the first.
             const key = `${candidate.lemma}|${candidate.dictionary?.targetCode ?? ""}`;
-            if (seen.has(key)) {
+            if (seenRef.current.has(key)) {
               repeats += 1;
               continue;
             }
-            seen.add(key);
+            seenRef.current.add(key);
             const forcedName = forcedRef.current[source.id];
             const id = `${job.id}:${candidate.id}`;
             fresh.push({
@@ -174,31 +255,109 @@ export default function AddWords({
             });
             if (candidate.status === "unreachable") unreachable.push({ ...candidate, id });
           }
+
+          if (autoAdd) {
+            const saved = await commitWords(source, fresh.filter(isAddable));
+            for (const c of fresh) if (isAddable(c)) c.saved = true;
+            markPartDone(source, source.jobs.indexOf(job));
+            setAdded((a) => ({
+              created: a.created + saved.created,
+              pending: a.pending + saved.pending,
+              alreadySaved: a.alreadySaved + saved.alreadySaved,
+            }));
+          }
           setCandidates((list) => [...list, ...fresh]);
           setMerged((n) => n + repeats);
         } catch (cause) {
-          if (controller.signal.aborted) break;
-          failure = cause instanceof Error ? cause.message : "Analysis failed.";
+          if (controller.signal.aborted) return;
+          failed.push(job);
+          const message = cause instanceof Error ? cause.message : "Analysis failed.";
+          patch(source.id, () => ({ error: message }));
           // A daily-limit error will fail every remaining part too.
-          if (/daily limit/i.test(failure)) controller.abort();
+          if (/daily limit/i.test(message)) controller.abort();
         }
-        partsDone += 1;
-        patch(source.id, { partsDone });
+        patch(source.id, (s) => ({ partsDone: s.partsDone + 1 }));
       }
-
-      patch(source.id, {
-        status: failure ? "error" : "done",
-        error: failure && partsDone > 1 ? `Some parts failed: ${failure}` : failure,
-      });
     }
+    await Promise.all(Array.from({ length: PARALLEL_PARTS }, worker));
 
+    setSources((list) =>
+      list.map((s) => ({ ...s, status: s.partsDone >= s.jobs.length ? "done" : s.status === "waiting" ? "waiting" : "done" })),
+    );
+    setFailedJobs(failed);
     setRunning(false);
-    // One automatic second try for words the dictionary did not answer.
-    if (unreachable.length && !controller.signal.aborted) await recheck(unreachable);
     stopRef.current = null;
+
+    if (autoAdd) {
+      // Words saved without the dictionary get checked in the background,
+      // then English meanings and examples are filled in.
+      verifyInBackground();
+      fillExamples();
+    } else if (unreachable.length && !controller.signal.aborted) {
+      // Review mode: one automatic second try before the user looks.
+      await recheck(unreachable);
+    }
+  }
+
+  async function retryFailed() {
+    const jobs = failedJobs;
+    setFailedJobs([]);
+    setSources((list) =>
+      list.map((s) => ({
+        ...s,
+        error: undefined,
+        partsDone: Math.max(0, s.partsDone - jobs.filter((j) => j.sourceId === s.id).length),
+      })),
+    );
+    await runJobs(jobs, sources);
   }
 
   // ---------------------------------------------------------------- save
+
+  /** What gets added: everything ticked that has some meaning to store. */
+  function isAddable(c: Candidate): boolean {
+    return c.selected && !c.saved && Boolean(c.dictionary || c.aiMeaning || c.userMeaning);
+  }
+
+  function toApproved(c: Candidate) {
+    return {
+      lemma: c.lemma,
+      sentence: c.sentence,
+      contextNote: c.contextNote,
+      register: c.register,
+      primaryCategory: c.primaryCategory,
+      secondaryCategories: c.secondaryCategories,
+      categoriesFromAi: !c.edited,
+      dictionary: c.dictionary,
+      aiMeaning: c.aiMeaning,
+      userMeaning: c.userMeaning,
+      useDictionaryMeaning: c.useDictionaryMeaning,
+      // Not checked by the dictionary yet: verified later in the background.
+      needsCheck: c.status === "unreachable",
+    };
+  }
+
+  async function commitWords(source: ImportSource, words: Candidate[]) {
+    const result = { created: 0, pending: 0, alreadySaved: 0, failed: [] as string[] };
+    if (words.length === 0) return result;
+    const response = await fetch("/api/ingest/commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: source.kind,
+        title: source.name,
+        text: source.text,
+        words: words.map(toApproved),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Could not save.");
+    result.created = data.created;
+    result.pending = words.filter((w) => w.status === "unreachable").length;
+    result.alreadySaved = data.alreadySaved?.length ?? 0;
+    result.failed = data.skipped ?? [];
+    return result;
+  }
 
   async function save() {
     setBusy(true);
@@ -206,48 +365,39 @@ export default function AddWords({
     const total: SaveSummary = { created: 0, alreadySaved: 0, failed: [] };
     try {
       for (const source of sources) {
-        const words = candidates
-          .filter(
-            (c) => c.sourceId === source.id && c.selected && (c.dictionary || c.aiMeaning || c.userMeaning),
-          )
-          .map((c) => ({
-            lemma: c.lemma,
-            sentence: c.sentence,
-            contextNote: c.contextNote,
-            register: c.register,
-            primaryCategory: c.primaryCategory,
-            secondaryCategories: c.secondaryCategories,
-            categoriesFromAi: !c.edited,
-            dictionary: c.dictionary,
-            aiMeaning: c.aiMeaning,
-            userMeaning: c.userMeaning,
-            useDictionaryMeaning: c.useDictionaryMeaning,
-          }));
-        if (words.length === 0) continue;
-
-        const response = await fetch("/api/ingest/commit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kind: source.kind,
-            title: source.name,
-            text: source.text,
-            words,
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "Could not save.");
-        total.created += data.created;
-        total.alreadySaved += data.alreadySaved?.length ?? 0;
-        total.failed.push(...(data.skipped ?? []));
+        const saved = await commitWords(
+          source,
+          candidates.filter((c) => c.sourceId === source.id && isAddable(c)),
+        );
+        total.created += saved.created;
+        total.alreadySaved += saved.alreadySaved;
+        total.failed.push(...saved.failed);
       }
       setSummary(total);
-      if (total.created > 0) fillExamples();
+      if (total.created > 0) {
+        verifyInBackground();
+        fillExamples();
+      }
       setStage("done");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Words saved without a dictionary answer: check them, quietly. */
+  async function verifyInBackground() {
+    for (let round = 0; round < 30; round++) {
+      try {
+        const response = await fetch("/api/verify", { method: "POST" });
+        if (!response.ok) return;
+        const data: { confirmed: number; notInDictionary: number; remaining: number } =
+          await response.json();
+        if (data.remaining === 0 || data.confirmed + data.notInDictionary === 0) return;
+      } catch {
+        return;
+      }
     }
   }
 
@@ -493,6 +643,34 @@ export default function AddWords({
             </span>
           </div>
 
+          <div role="radiogroup" aria-label="When to add" className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Then</span>
+            {(
+              [
+                [true, "Add automatically"],
+                [false, "Let me review first"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={autoAdd === value}
+                onClick={() => setAutoAdd(value)}
+                className={`rounded-full border px-3 py-1 ${
+                  autoAdd === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="w-full text-xs text-muted">
+              {autoAdd
+                ? "Words are saved as each part is read — stopping keeps them, and adding the same file again continues where it stopped. Words the dictionary could not check are verified later on their own."
+                : "You see every word first and choose what to add."}
+            </span>
+          </div>
+
           {(files.length > 0 || reading > 0 || fileErrors.length > 0) && (
             <ul className="mt-4 flex flex-col gap-2">
               {files.map((source) => (
@@ -567,7 +745,8 @@ export default function AddWords({
             <div className="mb-4 rounded-md border border-line bg-surface px-4 py-3">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span>
-                  Reading and looking up words… {partsDone} of {partsTotal}
+                  Read {partsDone} of {partsTotal} parts
+                  {autoAdd && added.created > 0 && ` · ${added.created} words added`}
                 </span>
                 <button
                   type="button"
@@ -586,7 +765,38 @@ export default function AddWords({
             </div>
           )}
 
-          {unreachableCount > 0 && !running && (
+          {failedJobs.length > 0 && !running && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-clay-soft px-4 py-3 text-sm">
+              <span className="flex-1 text-clay">
+                {failedJobs.length} {failedJobs.length === 1 ? "part" : "parts"} could not be read.
+              </span>
+              <button
+                type="button"
+                onClick={retryFailed}
+                className="rounded-md border border-clay px-3 py-1.5 text-clay"
+              >
+                <i className="bi bi-arrow-clockwise mr-1.5" aria-hidden />
+                Read them again
+              </button>
+            </div>
+          )}
+
+          {autoAdd && !running && (added.created > 0 || added.alreadySaved > 0) && (
+            <div className="mb-4 rounded-md bg-celadon-soft px-4 py-3 text-sm text-celadon-deep">
+              <p className="font-medium">
+                {added.created} {added.created === 1 ? "word" : "words"} added.
+              </p>
+              <p className="mt-0.5">
+                {added.alreadySaved > 0 && `${added.alreadySaved} were already yours. `}
+                {added.pending > 0 &&
+                  `${added.pending} are waiting for the dictionary and will be checked automatically. `}
+                {examples && !examples.done && `Adding examples… ${examples.added} so far.`}
+                {examples?.done && `${examples.added} examples added.`}
+              </p>
+            </div>
+          )}
+
+          {!autoAdd && unreachableCount > 0 && !running && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-3 text-sm">
               <span className="flex-1">
                 The dictionary did not answer for {unreachableCount}{" "}
@@ -608,10 +818,12 @@ export default function AddWords({
             </div>
           )}
 
-          <p className="mb-3 text-sm text-muted">
-            <i className="bi bi-check2-square mr-1.5" aria-hidden />
-            Ticked words will be added — untick anything you don&apos;t want.
-          </p>
+          {!autoAdd && (
+            <p className="mb-3 text-sm text-muted">
+              <i className="bi bi-check2-square mr-1.5" aria-hidden />
+              Ticked words will be added — untick anything you don&apos;t want.
+            </p>
+          )}
 
           {conflicts > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-clay-soft px-4 py-3 text-sm">
@@ -671,11 +883,8 @@ export default function AddWords({
                     <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm">
                       <span className="font-medium">{source.name}</span>
                       <span className="text-xs text-muted">
-                        {source.status === "waiting"
-                          ? "waiting"
-                          : source.status === "analysing"
-                            ? `part ${source.partsDone + 1} of ${source.jobs.length}`
-                            : `${rows.length} words`}
+                        {`${source.partsDone} of ${source.jobs.length} parts read · ${rows.length} words`}
+                        {source.skippedParts ? ` · ${source.skippedParts} done earlier, skipped` : ""}
                       </span>
                       {source.suggestedCategory && (
                         <label className="ml-auto flex items-center gap-1.5 text-xs">
@@ -712,25 +921,55 @@ export default function AddWords({
 
           {/* Fixed on mobile so the action stays reachable in a long list. */}
           <div className="fixed inset-x-0 bottom-0 border-t border-line bg-paper px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
+            {!autoAdd && (
+              <div className="mx-auto mb-2 flex max-w-2xl gap-4 text-sm">
+                <button type="button" onClick={() => setAll(true)} className="text-celadon-deep underline underline-offset-4">
+                  Select all
+                </button>
+                <button type="button" onClick={() => setAll(false)} className="text-muted underline underline-offset-4">
+                  Clear
+                </button>
+              </div>
+            )}
             <div className="mx-auto flex max-w-2xl gap-3">
               <button
                 type="button"
                 onClick={() => {
                   stopRef.current?.abort();
-                  setStage("input");
+                  if (autoAdd && added.created > 0) reset();
+                  else setStage("input");
                 }}
                 className="rounded-md border border-line px-4 py-3 text-sm"
               >
-                Back
+                {autoAdd && !running ? "Add more" : "Back"}
               </button>
-              <button
-                type="button"
-                onClick={save}
-                disabled={busy || running || chosen === 0}
-                className="flex-1 rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper disabled:opacity-50"
-              >
-                {busy ? "Saving…" : running ? "Still reading…" : `Add ${chosen} to my words`}
-              </button>
+              {autoAdd ? (
+                running ? (
+                  <button
+                    type="button"
+                    onClick={() => stopRef.current?.abort()}
+                    className="flex-1 rounded-md border border-line bg-surface px-4 py-3 font-medium"
+                  >
+                    Stop — keep what is added
+                  </button>
+                ) : (
+                  <Link
+                    href="/learn"
+                    className="flex-1 rounded-md bg-celadon-deep px-4 py-3 text-center font-medium text-paper"
+                  >
+                    Start learning
+                  </Link>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={busy || running || chosen === 0}
+                  className="flex-1 rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper disabled:opacity-50"
+                >
+                  {busy ? "Saving…" : running ? "Still reading…" : `Add ${chosen} to my words`}
+                </button>
+              )}
             </div>
           </div>
         </>

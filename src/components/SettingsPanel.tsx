@@ -19,6 +19,7 @@ export default function SettingsPanel({
   learningGoal: initialGoal,
   autoPlayAudio: initialAutoPlay,
   myMeaningFirst: initialMyFirst,
+  newPerSession: initialNewPerSession,
   credits,
   missingExamples,
   missingMeanings,
@@ -32,6 +33,7 @@ export default function SettingsPanel({
   learningGoal: number;
   autoPlayAudio: boolean;
   myMeaningFirst: boolean;
+  newPerSession: number;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
@@ -46,27 +48,49 @@ export default function SettingsPanel({
   const [goal, setGoal] = useState(initialGoal);
   const [autoPlay, setAutoPlay] = useState(initialAutoPlay);
   const [myFirst, setMyFirst] = useState(initialMyFirst);
+  const [perSession, setPerSession] = useState(initialNewPerSession);
   const [error, setError] = useState<string | null>(null);
-  const [filling, setFilling] = useState(false);
+  /** One fill at a time: while one runs, the other button waits. */
+  const [task, setTask] = useState<"meanings" | "examples" | null>(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [filled, setFilled] = useState<FillResult | null>(null);
-  const [meaningsBusy, setMeaningsBusy] = useState(false);
   const [meaningsDone, setMeaningsDone] = useState<FillResult | null>(null);
 
-  async function fillMeanings() {
-    setMeaningsBusy(true);
+  /**
+   * Runs a fill endpoint round after round (each handles up to ~60 words)
+   * until nothing is left, nothing more can be done, or AI credits run out.
+   */
+  async function runFill(
+    kind: "meanings" | "examples",
+    total: number,
+    onDone: (result: FillResult) => void,
+  ) {
+    setTask(kind);
+    setProgress({ done: 0, total });
     setError(null);
+    const sum: FillResult = { fromDictionary: 0, fromAi: 0, remaining: total };
     try {
-      const response = await fetch("/api/meanings", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not add meanings.");
-      setMeaningsDone(data);
-      router.refresh();
+      for (let round = 0; round < 50; round++) {
+        const response = await fetch(`/api/${kind}`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Something went wrong.");
+        sum.fromDictionary += data.fromDictionary;
+        sum.fromAi += data.fromAi;
+        sum.remaining = data.remaining;
+        sum.aiBlocked = data.aiBlocked;
+        setProgress({ done: Math.max(0, total - data.remaining), total });
+        if (data.remaining === 0 || data.aiBlocked || data.fromDictionary + data.fromAi === 0) break;
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not add meanings.");
+      setError(cause instanceof Error ? cause.message : "Something went wrong.");
     } finally {
-      setMeaningsBusy(false);
+      onDone(sum);
+      setTask(null);
+      router.refresh();
     }
   }
+
+  const fillMeanings = () => runFill("meanings", missingMeanings, setMeaningsDone);
 
   async function save(change: Record<string, boolean | number>, undo: () => void) {
     setError(null);
@@ -83,21 +107,7 @@ export default function SettingsPanel({
     }
   }
 
-  async function fillExamples() {
-    setFilling(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/examples", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not add examples.");
-      setFilled(data);
-      router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not add examples.");
-    } finally {
-      setFilling(false);
-    }
-  }
+  const fillExamples = () => runFill("examples", missingExamples, setFilled);
 
   const section = "rounded-lg border border-line bg-surface p-4";
 
@@ -195,21 +205,53 @@ export default function SettingsPanel({
             <button
               type="button"
               onClick={fillMeanings}
-              disabled={meaningsBusy}
+              disabled={task !== null}
               className="mt-3 rounded-md bg-celadon-deep px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
             >
-              <i className={`bi ${meaningsBusy ? "bi-hourglass-split" : "bi-translate"} mr-1.5`} aria-hidden />
-              {meaningsBusy ? "Adding meanings…" : "Fill in English meanings"}
+              <i className={`bi ${task === "meanings" ? "bi-hourglass-split" : "bi-translate"} mr-1.5`} aria-hidden />
+              {task === "meanings" ? "Adding meanings…" : "Fill in English meanings"}
             </button>
           )}
+          {task === "meanings" && <Progress {...progress} />}
           {meaningsDone && (
             <p className="mt-3 text-sm">
               Added {meaningsDone.fromDictionary} from the dictionary and {meaningsDone.fromAi} from AI.
-              {meaningsDone.remaining > 0 && ` ${meaningsDone.remaining} left — run it again.`}
+              {meaningsDone.remaining > 0 &&
+                (meaningsDone.aiBlocked
+                  ? ` ${meaningsDone.remaining} left — out of AI credits for now.`
+                  : ` ${meaningsDone.remaining} left — the dictionary did not answer; try again later.`)}
             </p>
           )}
         </section>
       )}
+
+      <section className={section}>
+        <h2 className="font-medium">New words per session</h2>
+        <p className="mt-1 text-sm text-muted">
+          How many new words one Learn session introduces. Each is asked until you get it right
+          {" "}several times in a row, so 10 new words is already a few dozen answers.
+        </p>
+        <div role="radiogroup" aria-label="New words per session" className="mt-3 flex flex-wrap gap-2">
+          {[5, 10, 20, 30, 50].map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={perSession === n}
+              onClick={() => {
+                const before = perSession;
+                setPerSession(n);
+                save({ newPerSession: n }, () => setPerSession(before));
+              }}
+              className={`h-11 min-w-11 rounded-md border px-3 text-base ${
+                perSession === n ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className={section}>
         <h2 className="font-medium">Examples</h2>
@@ -222,13 +264,14 @@ export default function SettingsPanel({
           <button
             type="button"
             onClick={fillExamples}
-            disabled={filling}
+            disabled={task !== null}
             className="mt-3 rounded-md bg-celadon-deep px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
           >
-            <i className={`bi ${filling ? "bi-hourglass-split" : "bi-chat-quote"} mr-1.5`} aria-hidden />
-            {filling ? "Adding examples…" : "Add missing examples"}
+            <i className={`bi ${task === "examples" ? "bi-hourglass-split" : "bi-chat-quote"} mr-1.5`} aria-hidden />
+            {task === "examples" ? "Adding examples…" : "Add missing examples"}
           </button>
         )}
+        {task === "examples" && <Progress {...progress} />}
         {filled && (
           <p className="mt-3 text-sm">
             Added {filled.fromDictionary} from the dictionary and {filled.fromAi} written by AI.
@@ -238,7 +281,7 @@ export default function SettingsPanel({
                 ? "create an account to let the AI fill those."
                 : filled.aiBlocked
                   ? "out of AI credits for now."
-                  : "run it again.")}
+                  : "the dictionary did not answer; try again later.")}
           </p>
         )}
       </section>
@@ -288,6 +331,20 @@ export default function SettingsPanel({
         )}
       </section>
     </main>
+  );
+}
+
+function Progress({ done, total }: { done: number; total: number }) {
+  const percent = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <div className="mt-3">
+      <div className="h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
+        <div className="h-full bg-celadon transition-[width]" style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-1 text-xs text-muted tabular-nums">
+        {done} of {total} — keep this page open
+      </p>
+    </div>
   );
 }
 

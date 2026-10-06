@@ -78,15 +78,17 @@ export async function fillEnglishMeanings(
         needAi.push(sense);
         continue;
       }
-      await prisma.sense.update({
-        where: { id: sense.id },
+      // updateMany with translation: null — a second run in parallel cannot
+      // overwrite what the first one wrote.
+      const { count } = await prisma.sense.updateMany({
+        where: { id: sense.id, translation: null },
         data: {
           translation,
           definitionTarget: sense.definitionTarget ?? match.senses[0]?.definition ?? null,
           definitionKnown: match.senses[0]?.translatedDefinition ?? undefined,
         },
       });
-      fromDictionary += 1;
+      fromDictionary += count;
     } catch (error) {
       if (!(error instanceof DictionaryUnavailableError)) throw error;
       // Left for the next run — no point spending AI on what the dictionary has.
@@ -166,11 +168,11 @@ export async function fillEnglishMeanings(
         ]);
         fromDictionary += 1;
       } else {
-        await prisma.sense.update({
-          where: { id: sense.id },
+        const { count } = await prisma.sense.updateMany({
+          where: { id: sense.id, translation: null },
           data: { translation: item.english.trim().slice(0, 200) },
         });
-        fromAi += 1;
+        fromAi += count;
       }
     }
   }
