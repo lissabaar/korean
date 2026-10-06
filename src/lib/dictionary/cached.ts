@@ -67,16 +67,32 @@ export async function cachedLookupMany(
   keys: DictionaryKeys,
   options: LookupOptions & { concurrency?: number } = {},
 ): Promise<Map<string, DictEntry[] | null>> {
-  const { concurrency = 4, ...lookupOptions } = options;
+  // Measured from Vercel: 1.5–3 s per lookup. More parallel requests than
+  // this only slow the dictionary down further.
+  const { concurrency = 6, ...lookupOptions } = options;
   const results = new Map<string, DictEntry[] | null>();
   const queue = [...new Set(words)];
 
+  // Circuit breaker: after this many failures in a row the dictionary is
+  // treated as down for the rest of the batch — the remaining words are
+  // marked unreachable at once (cache hits still served) instead of each
+  // waiting for its own timeout. "Check again" picks them up later.
+  const BREAK_AFTER = 6;
+  let failuresInARow = 0;
+
   async function worker(): Promise<void> {
     for (let word = queue.shift(); word !== undefined; word = queue.shift()) {
+      if (failuresInARow >= BREAK_AFTER) {
+        const hit = await readCache<DictEntry[]>(prisma, `search:${lookupOptions.transLang ?? 1}:${word}`);
+        results.set(word, hit ?? null);
+        continue;
+      }
       try {
         results.set(word, await cachedLookup(prisma, word, keys, lookupOptions));
+        failuresInARow = 0;
       } catch (error) {
         if (!(error instanceof DictionaryUnavailableError)) throw error;
+        failuresInARow += 1;
         results.set(word, null);
       }
     }

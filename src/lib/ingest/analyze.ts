@@ -37,6 +37,8 @@ export interface WordCandidate {
   surface: string;
   sentence: string;
   contextNote: string;
+  /** The model's short English reading — used to rank homographs, also on a recheck. */
+  gloss: string;
   register: string | null;
 
   primaryCategory: string;
@@ -183,6 +185,7 @@ export async function analyzeText(
       surface: word.surface,
       sentence: word.sentence,
       contextNote: word.contextNote,
+      gloss: word.gloss,
       register: word.register ?? null,
       primaryCategory: primary,
       secondaryCategories: secondary,
@@ -201,13 +204,13 @@ export async function analyzeText(
             ? "spelling"
             : null,
       useDictionaryMeaning: false,
-      // Duplicates stay off: already being learned. Unreachable words stay
-      // off unless the user gave a meaning or it is a phrase (the dictionary
-      // rarely has phrases) — otherwise a retry gets better data.
+      // Duplicates stay off: already being learned.
       selected:
         status === "new" ||
         (status === "ai" && Boolean(word.meaning.trim() || word.userMeaning.trim())) ||
-        (status === "unreachable" && (Boolean(word.userMeaning.trim()) || word.kind === "phrase")),
+        // Unreachable: kept rather than lost — with the user's meaning or
+        // the AI one; "Check again" can still bring in dictionary data.
+        (status === "unreachable" && Boolean(word.userMeaning.trim() || word.meaning.trim())),
     };
   });
 
@@ -263,4 +266,61 @@ export function rankHomographs(entries: DictEntry[], gloss: string, contextNote:
     .map((entry, index) => ({ entry, index, points: score(entry) }))
     .sort((a, b) => b.points - a.points || a.index - b.index)
     .map(({ entry }) => entry);
+}
+
+export interface RecheckItem {
+  id: string;
+  lemma: string;
+  gloss: string;
+  contextNote: string;
+}
+
+export interface RecheckResult {
+  id: string;
+  status: CandidateStatus;
+  dictionary: DictEntry | null;
+  homographs: DictEntry[];
+}
+
+/**
+ * Ask the dictionary again about words it did not answer for the first
+ * time — no model call, so it costs no AI credits. Words it still cannot
+ * reach come back as "unreachable".
+ */
+export async function recheckDictionary(
+  prisma: PrismaClient,
+  keys: DictionaryKeys,
+  userId: string,
+  items: RecheckItem[],
+): Promise<RecheckResult[]> {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { explanationLang: true },
+  });
+  const transLang = EXPLANATION_LANG[user.explanationLang] ?? TRANS_LANG.EN;
+  const found = await cachedLookupMany(prisma, items.map((item) => item.lemma), keys, { transLang });
+  const existing = await prisma.entry.findMany({
+    where: { userId, language: "KO", lemma: { in: items.map((item) => item.lemma) } },
+    select: { lemma: true, krdictTargetCode: true },
+  });
+
+  return items.map((item) => {
+    const entries = found.get(item.lemma);
+    if (entries === null || entries === undefined) {
+      return { id: item.id, status: "unreachable", dictionary: null, homographs: [] };
+    }
+    const homographs = rankHomographs(entries, item.gloss, item.contextNote);
+    const dictionary = homographs[0] ?? null;
+    const known = existing.some(
+      (entry) =>
+        entry.lemma === item.lemma &&
+        (!entry.krdictTargetCode || !dictionary?.targetCode || entry.krdictTargetCode === dictionary.targetCode),
+    );
+    return {
+      id: item.id,
+      status: known ? "duplicate" : dictionary ? "new" : "ai",
+      dictionary,
+      homographs,
+    };
+  });
 }

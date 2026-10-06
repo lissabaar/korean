@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import type { AnalysisResult, WordCandidate } from "@/lib/ingest/analyze";
+import type { AnalysisResult, RecheckResult, WordCandidate } from "@/lib/ingest/analyze";
 import {
   isTopicRequest,
   readFile,
@@ -16,7 +16,8 @@ import ManualWord from "./ManualWord";
 
 type Stage = "input" | "preview" | "done";
 
-type Candidate = WordCandidate & { sourceId: string };
+/** originalCategory: the model's pick, restored when "Put every word in" is unticked. */
+type Candidate = WordCandidate & { sourceId: string; originalCategory: string };
 
 interface SourceState extends ImportSource {
   status: "waiting" | "analysing" | "done" | "error";
@@ -59,6 +60,12 @@ export default function AddWords({
   const [merged, setMerged] = useState(0);
   const [running, setRunning] = useState(false);
   const stopRef = useRef<AbortController | null>(null);
+  /** Sources whose words all go into the file's own category (read inside the async loop). */
+  const forcedRef = useRef<Record<string, string>>({});
+  const [forced, setForced] = useState<Record<string, string>>({});
+  const [rechecking, setRechecking] = useState(false);
+  /** Background example filling after a save: null = not started. */
+  const [examples, setExamples] = useState<{ added: number; done: boolean; note?: string } | null>(null);
 
   const [summary, setSummary] = useState<SaveSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +120,7 @@ export default function AddWords({
     const controller = new AbortController();
     stopRef.current = controller;
     const seen = new Set<string>();
+    const unreachable: WordCandidate[] = [];
     const patch = (id: string, change: Partial<SourceState>) =>
       setSources((list) => list.map((s) => (s.id === id ? { ...s, ...change } : s)));
 
@@ -155,7 +163,16 @@ export default function AddWords({
               continue;
             }
             seen.add(key);
-            fresh.push({ ...candidate, id: `${job.id}:${candidate.id}`, sourceId: source.id });
+            const forcedName = forcedRef.current[source.id];
+            const id = `${job.id}:${candidate.id}`;
+            fresh.push({
+              ...candidate,
+              id,
+              sourceId: source.id,
+              originalCategory: candidate.primaryCategory,
+              ...(forcedName && { primaryCategory: forcedName, edited: true }),
+            });
+            if (candidate.status === "unreachable") unreachable.push({ ...candidate, id });
           }
           setCandidates((list) => [...list, ...fresh]);
           setMerged((n) => n + repeats);
@@ -176,6 +193,8 @@ export default function AddWords({
     }
 
     setRunning(false);
+    // One automatic second try for words the dictionary did not answer.
+    if (unreachable.length && !controller.signal.aborted) await recheck(unreachable);
     stopRef.current = null;
   }
 
@@ -223,6 +242,7 @@ export default function AddWords({
         total.failed.push(...(data.skipped ?? []));
       }
       setSummary(total);
+      if (total.created > 0) fillExamples();
       setStage("done");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save.");
@@ -233,6 +253,97 @@ export default function AddWords({
 
   function update(next: WordCandidate) {
     setCandidates((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+  }
+
+  /** Tick: all of the file's words go into its own category. Untick: back to the model's picks. */
+  function putAllIn(sourceId: string, name: string, on: boolean) {
+    const next = { ...forcedRef.current };
+    if (on) next[sourceId] = name;
+    else delete next[sourceId];
+    forcedRef.current = next;
+    setForced(next);
+    setCandidates((list) =>
+      list.map((c) =>
+        c.sourceId !== sourceId
+          ? c
+          : on
+            ? { ...c, primaryCategory: name, edited: true }
+            : { ...c, primaryCategory: c.originalCategory, edited: false },
+      ),
+    );
+  }
+
+  /** Ask the dictionary again about words it did not answer for. No AI, no credits. */
+  async function recheck(items: WordCandidate[]) {
+    if (items.length === 0) return;
+    setRechecking(true);
+    try {
+      for (let i = 0; i < items.length; i += 60) {
+        const batch = items
+          .slice(i, i + 60)
+          .map(({ id, lemma, gloss, contextNote }) => ({ id, lemma, gloss, contextNote }));
+        const response = await fetch("/api/ingest/recheck", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: batch }),
+        });
+        if (!response.ok) break;
+        const { results } = (await response.json()) as { results: RecheckResult[] };
+        const byId = new Map(results.filter((r) => r.status !== "unreachable").map((r) => [r.id, r]));
+        setCandidates((list) =>
+          list.map((c) => {
+            const r = byId.get(c.id);
+            if (!r) return c;
+            return {
+              ...c,
+              status: r.status,
+              dictionary: r.dictionary,
+              homographs: r.homographs,
+              selected: r.status === "duplicate" ? false : r.status === "new" ? true : c.selected,
+            };
+          }),
+        );
+      }
+    } finally {
+      setRechecking(false);
+    }
+  }
+
+  /**
+   * Saved words without an example get one: dictionary first, AI for the
+   * rest (in the user's meaning). Runs in rounds of up to 60 words until
+   * nothing is left or nothing more can be done.
+   */
+  async function fillExamples() {
+    setExamples({ added: 0, done: false });
+    let added = 0;
+    for (let round = 0; round < 40; round++) {
+      let data: { fromDictionary: number; fromAi: number; remaining: number; aiBlocked?: string };
+      try {
+        const response = await fetch("/api/examples", { method: "POST" });
+        if (!response.ok) break;
+        data = await response.json();
+      } catch {
+        break;
+      }
+      added += data.fromDictionary + data.fromAi;
+      setExamples({ added, done: false });
+      if (data.remaining === 0) break;
+      if (data.aiBlocked) {
+        setExamples({
+          added,
+          done: true,
+          note:
+            data.aiBlocked === "anonymous"
+              ? "Create an account to have AI write the rest."
+              : "The rest need AI credits.",
+        });
+        return;
+      }
+      // No progress this round (dictionary down, nothing generated): stop.
+      if (data.fromDictionary + data.fromAi === 0) break;
+    }
+    setExamples((current) => ({ added, done: true, note: current?.note }));
   }
 
   function setAll(selected: boolean) {
@@ -248,6 +359,7 @@ export default function AddWords({
     setSources([]);
     setCandidates([]);
     setSummary(null);
+    setExamples(null);
     setStage("input");
   }
 
@@ -257,6 +369,7 @@ export default function AddWords({
   const partsDone = sources.reduce((sum, s) => sum + s.partsDone, 0);
   const grouped = sources.length > 1;
   const conflicts = candidates.filter((c) => c.conflict === "meaning" && c.selected).length;
+  const unreachableCount = candidates.filter((c) => c.status === "unreachable").length;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-8 sm:px-6">
@@ -460,6 +573,33 @@ export default function AddWords({
             </div>
           )}
 
+          {unreachableCount > 0 && !running && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-3 text-sm">
+              <span className="flex-1">
+                The dictionary did not answer for {unreachableCount}{" "}
+                {unreachableCount === 1 ? "word" : "words"} (a network hiccup). Checking again costs no AI
+                credits and keeps everything else as it is.
+              </span>
+              <button
+                type="button"
+                disabled={rechecking}
+                onClick={() => recheck(candidates.filter((c) => c.status === "unreachable"))}
+                className="rounded-md bg-celadon-deep px-3 py-1.5 text-paper disabled:opacity-50"
+              >
+                <i
+                  className={`bi ${rechecking ? "bi-hourglass-split" : "bi-arrow-clockwise"} mr-1.5`}
+                  aria-hidden
+                />
+                {rechecking ? "Checking…" : "Check again"}
+              </button>
+            </div>
+          )}
+
+          <p className="mb-3 text-sm text-muted">
+            <i className="bi bi-check2-square mr-1.5" aria-hidden />
+            Ticked words will be added — untick anything you don&apos;t want.
+          </p>
+
           {conflicts > 0 && (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md bg-clay-soft px-4 py-3 text-sm">
               <span className="flex-1 text-clay">
@@ -524,21 +664,18 @@ export default function AddWords({
                             ? `part ${source.partsDone + 1} of ${source.jobs.length}`
                             : `${rows.length} words`}
                       </span>
-                      {source.suggestedCategory && rows.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const name = source.suggestedCategory!;
-                            setCandidates((list) =>
-                              list.map((c) =>
-                                c.sourceId === source.id ? { ...c, primaryCategory: name, edited: true } : c,
-                              ),
-                            );
-                          }}
-                          className="ml-auto rounded-full border border-celadon px-2.5 py-0.5 text-xs text-celadon-deep"
-                        >
-                          Put all in “{source.suggestedCategory}”
-                        </button>
+                      {source.suggestedCategory && (
+                        <label className="ml-auto flex items-center gap-1.5 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(forced[source.id])}
+                            onChange={(event) =>
+                              putAllIn(source.id, source.suggestedCategory!, event.target.checked)
+                            }
+                            className="size-4 accent-celadon-deep"
+                          />
+                          Put every word in “{source.suggestedCategory}”
+                        </label>
                       )}
                       {source.error && <span className="w-full text-xs text-clay">{source.error}</span>}
                     </h2>
@@ -597,6 +734,18 @@ export default function AddWords({
             {summary.failed.length > 0 && `Could not save: ${summary.failed.join(", ")}. `}
             They are ready to learn whenever you are.
           </p>
+          {examples && (
+            <p className="mt-2 text-sm text-muted">
+              <i
+                className={`bi ${examples.done ? "bi-chat-quote" : "bi-hourglass-split"} mr-1.5`}
+                aria-hidden
+              />
+              {examples.done
+                ? `${examples.added} example ${examples.added === 1 ? "sentence" : "sentences"} added.`
+                : `Adding example sentences… ${examples.added} so far. Keep this page open — or finish later in Settings → Add missing examples.`}
+              {examples.note && ` ${examples.note}`}
+            </p>
+          )}
           <button
             type="button"
             onClick={reset}

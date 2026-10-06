@@ -87,18 +87,28 @@ export async function fillMissingExamples(
   // ---- shared cache of AI-written examples: another learner's word in the
   // same meaning already has one, so no model call is needed for it
   let fromAi = 0;
+  // Keyed by the dictionary entry, never by the card's translation: that can
+  // be the user's own text, and user text stays out of shared tables. Words
+  // without a dictionary entry do not use the shared cache at all.
   const meaningOf = (sense: (typeof senses)[number]) =>
-    (sense.translation ?? "").toLowerCase().trim().slice(0, 200);
+    sense.entry.krdictTargetCode && /^\d+$/.test(sense.entry.krdictTargetCode)
+      ? `krdict:${sense.entry.krdictTargetCode}`
+      : null;
   const cached = needAi.length
     ? await prisma.generatedExample.findMany({
-        where: { OR: needAi.map((sense) => ({ lemma: sense.entry.lemma, meaning: meaningOf(sense) })) },
+        where: {
+          OR: needAi
+            .filter((sense) => meaningOf(sense))
+            .map((sense) => ({ lemma: sense.entry.lemma, meaning: meaningOf(sense)! })),
+        },
       })
     : [];
   const cacheKey = (lemma: string, meaning: string) => `${lemma}|${meaning}`;
   const byKey = new Map(cached.map((row) => [cacheKey(row.lemma, row.meaning), row]));
   const uncached: typeof needAi = [];
   for (const sense of needAi) {
-    const row = byKey.get(cacheKey(sense.entry.lemma, meaningOf(sense)));
+    const key = meaningOf(sense);
+    const row = key ? byKey.get(cacheKey(sense.entry.lemma, key)) : undefined;
     if (!row) {
       uncached.push(sense);
       continue;
@@ -155,13 +165,16 @@ export async function fillMissingExamples(
       await prisma.example.create({
         data: { senseId: sense.id, text, translation, source: "AI" },
       });
-      await prisma.generatedExample
-        .upsert({
-          where: { lemma_meaning: { lemma: sense.entry.lemma, meaning: meaningOf(sense) } },
-          create: { lemma: sense.entry.lemma, meaning: meaningOf(sense), text, translation },
-          update: {},
-        })
-        .catch(() => {}); // the cache is a bonus; never fail the fill over it
+      const key = meaningOf(sense);
+      if (key) {
+        await prisma.generatedExample
+          .upsert({
+            where: { lemma_meaning: { lemma: sense.entry.lemma, meaning: key } },
+            create: { lemma: sense.entry.lemma, meaning: key, text, translation },
+            update: {},
+          })
+          .catch(() => {}); // the cache is a bonus; never fail the fill over it
+      }
       fromAi += 1;
     }
   }

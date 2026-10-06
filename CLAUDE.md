@@ -180,6 +180,17 @@ unreachable never. Typed-in lookups also count against the plan's
 `dictionaryLookupsPerDay` (`consumeLookup`). AI-written examples are cached
 across users in `GeneratedExample` (by lemma + English meaning).
 
+**Unreachable dictionary.** KRDict answers in 1.5–3 s from Vercel and is
+flaky from some networks: requests time out after 8 s, `cachedLookupMany`
+trips a circuit breaker after 6 failures in a row (the rest of the batch is
+marked unreachable at once), and the preview re-asks automatically once
+and offers "Check again" (`/api/ingest/recheck`, no AI). Unreachable words
+stay selected with the user's or the AI meaning — never silently dropped.
+
+**User text never goes into shared tables.** `DictionaryCache` holds only
+dictionary answers; `GeneratedExample` is keyed by KRDict target code
+(`krdict:<code>`), so words without a dictionary entry do not use it.
+
 **Topic requests.** Input with no Hangul is a request ("weather words for
 beginners"): `ExtractSource` kind `topic`, TOPIC_PROMPT; the dictionary still
 rejects any word it does not know. Saved as material kind GENERATED.

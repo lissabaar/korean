@@ -111,9 +111,17 @@ interface FetchOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Per request. KRDict is either quick or not answering at all; waiting the
+ * default ~10 s connect timeout (twice, with the retry) made a 40-word part
+ * take minutes when it was down.
+ */
+const REQUEST_TIMEOUT_MS = 8000;
+
 async function fetchXml(url: string, options: FetchOptions = {}): Promise<unknown> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const response = await fetch(url, {
-    signal: options.signal,
+    signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
     // Dictionary content changes rarely; letting Next cache it keeps us far
     // below the daily quota even with repeated lookups of common words.
     next: { revalidate: 60 * 60 * 24 * 30 },
