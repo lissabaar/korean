@@ -64,6 +64,9 @@ model User {
   // Speak the Korean word after each answer (browser speech synthesis).
   autoPlayAudio Boolean @default(false)
 
+  // Cards lead with the user's own meaning instead of the English one.
+  myMeaningFirst Boolean @default(false)
+
   // Set by Better Auth's anonymous plugin: "try without an account" users.
   // They get no AI; on sign-up their data moves to the real account.
   isAnonymous Boolean? @default(false)
@@ -170,8 +173,13 @@ model Sense {
   // Same, in the user's explanation language.
   definitionKnown String?
 
-  // The bare translation. Hidden once the card is stable enough.
+  // The English meaning — from the dictionary, or from the AI when the
+  // dictionary lacks the word. Hidden once the card is stable enough.
   translation String?
+
+  // The meaning the user wrote themselves (any language). Kept apart from
+  // the dictionary's so neither overwrites the other; cards show both.
+  userMeaning String?
 
   // Why this sense, in this context — written by AI from the material the
   // word was found in. Never a dictionary fact.

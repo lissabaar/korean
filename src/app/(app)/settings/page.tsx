@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   const user = await currentUser();
   if (!user) return null;
 
-  const [settings, ai, missingExamples, plan, lookups] = await Promise.all([
+  const [settings, ai, missingExamples, plan, lookups, missingMeanings] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: {
@@ -19,12 +19,14 @@ export default async function SettingsPage() {
         showKoreanDefinition: true,
         learningGoal: true,
         autoPlayAudio: true,
+        myMeaningFirst: true,
       },
     }),
     getAiBalance(prisma, user.id),
     prisma.sense.count({ where: { order: 0, examples: { none: {} }, entry: { userId: user.id } } }),
     userPlan(prisma, user.id),
     lookupsToday(prisma, user.id),
+    prisma.sense.count({ where: { order: 0, translation: null, entry: { userId: user.id } } }),
   ]);
 
   return (
@@ -34,8 +36,10 @@ export default async function SettingsPage() {
       showKoreanDefinition={settings.showKoreanDefinition}
       learningGoal={settings.learningGoal}
       autoPlayAudio={settings.autoPlayAudio}
+      myMeaningFirst={settings.myMeaningFirst}
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
+      missingMeanings={missingMeanings}
       planName={plan.name}
       lookups={{ used: lookups, limit: plan.dictionaryLookupsPerDay }}
     />

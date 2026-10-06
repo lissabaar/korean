@@ -28,6 +28,8 @@ export interface ManualWordInput {
     level?: string | null;
     partOfSpeech?: string | null;
     originalForm?: string | null;
+    /** The dictionary's English meaning for the picked entry. */
+    translation?: string | null;
   };
 }
 
@@ -38,6 +40,20 @@ const LIMITS = { lemma: 60, translation: 200, definition: 500, example: 500, cat
 
 function clean(value: string | undefined, max: number): string {
   return (value ?? "").normalize("NFC").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+/**
+ * What the user typed is their own meaning. The card's English meaning is
+ * the dictionary's (when they picked an entry), else what they typed if it
+ * is not Cyrillic; otherwise it stays empty until "Fill in English meanings".
+ */
+function meanings(typed: string, dictionary: string | null | undefined) {
+  const fromDictionary = typeof dictionary === "string" ? clean(dictionary, LIMITS.translation) : "";
+  const english = fromDictionary || (/[а-яё]/i.test(typed) ? "" : typed);
+  return {
+    translation: english || null,
+    userMeaning: typed && typed !== english ? typed : null,
+  };
 }
 
 export async function createManualWord(
@@ -85,7 +101,7 @@ export async function createManualWord(
           senses: {
             create: {
               order: 0,
-              translation,
+              ...meanings(translation, input.dictionary?.translation),
               definitionTarget: definition || null,
               definitionSource: source,
               examples: example ? { create: { text: example, source } } : undefined,

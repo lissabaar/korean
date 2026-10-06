@@ -28,7 +28,7 @@ export interface ApprovedWord {
   useDictionaryMeaning?: boolean;
 }
 
-/** The user's own meaning, when it is the one to store. */
+/** The user's own meaning, unless they chose to drop it for the dictionary's. */
 function ownMeaning(word: ApprovedWord): string | null {
   const meaning = word.userMeaning?.trim().slice(0, 300);
   return meaning && !word.useDictionaryMeaning ? meaning : null;
@@ -40,21 +40,18 @@ function ownMeaning(word: ApprovedWord): string | null {
  * compounds, words the dictionary lacks). Null if there is neither.
  */
 export function resolveEntry(word: ApprovedWord): DictEntry | null {
-  if (word.dictionary?.senses?.length) {
-    // The user's meaning comes first; the dictionary keeps everything else
-    // (definition, level, hanja, examples) and its other senses.
-    const own = ownMeaning(word);
-    if (!own) return word.dictionary;
-    const [first, ...rest] = word.dictionary.senses;
-    return { ...word.dictionary, senses: [{ ...first, translation: own }, ...rest] };
-  }
-  const meaning = (ownMeaning(word) ?? word.aiMeaning?.trim() ?? "").slice(0, 300);
+  // The dictionary's entry as it is — the user's own meaning is stored next
+  // to it (Sense.userMeaning), never over it.
+  if (word.dictionary?.senses?.length) return word.dictionary;
+  const english = word.aiMeaning?.trim().slice(0, 300) ?? "";
   const lemma = word.lemma?.normalize("NFC").trim().slice(0, 120);
-  if (!meaning || !lemma) return null;
+  if (!lemma || !(english || ownMeaning(word))) return null;
   return {
     lemma,
     source: "AI",
-    senses: [{ definition: "", translation: meaning, examples: [] }],
+    // English from the model when it gave one; otherwise none yet — "Fill in
+    // English meanings" adds it later.
+    senses: [{ definition: "", translation: english || undefined, examples: [] }],
   };
 }
 
@@ -190,6 +187,7 @@ async function persistOne(
             definitionTarget: sense.definition || null,
             definitionKnown: sense.translatedDefinition ?? null,
             translation: sense.translation ?? null,
+            userMeaning: index === 0 ? ownMeaning(word) : null,
             contextNote: index === 0 ? word.contextNote : null,
             definitionSource: dict.source as never,
             examples: {

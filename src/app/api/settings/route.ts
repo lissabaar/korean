@@ -13,12 +13,14 @@ export async function PATCH(request: Request) {
     showKoreanDefinition?: boolean;
     learningGoal?: number;
     autoPlayAudio?: boolean;
+    myMeaningFirst?: boolean;
   } = {};
   if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 10) {
     data.learningGoal = body.learningGoal;
   }
   if (typeof body.askRecognition === "boolean") data.askRecognition = body.askRecognition;
   if (typeof body.autoPlayAudio === "boolean") data.autoPlayAudio = body.autoPlayAudio;
+  if (typeof body.myMeaningFirst === "boolean") data.myMeaningFirst = body.myMeaningFirst;
   if (typeof body.showKoreanDefinition === "boolean") {
     data.showKoreanDefinition = body.showKoreanDefinition;
   }

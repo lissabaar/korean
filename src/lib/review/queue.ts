@@ -46,6 +46,7 @@ async function studyScope(prisma: PrismaClient, userId: string) {
       askRecognition: true,
       showKoreanDefinition: true,
       learningGoal: true,
+      myMeaningFirst: true,
       hideTranslationAfterStability: true,
     },
   });
@@ -83,13 +84,34 @@ async function studyScope(prisma: PrismaClient, userId: string) {
 
 interface SenseText {
   translation: string | null;
+  userMeaning: string | null;
   definitionKnown: string | null;
   definitionTarget: string | null;
 }
 
 /** The meaning shown for a sense: translation first, then definitions. */
-export function meaningText(sense: SenseText): string {
-  return sense.translation ?? sense.definitionKnown ?? sense.definitionTarget ?? "";
+/**
+ * The meaning a card leads with: the English one (dictionary, else AI) by
+ * default, the user's own when they prefer it. Falls back to whatever exists.
+ */
+export function meaningText(sense: SenseText, myMeaningFirst = false): string {
+  const own = sense.userMeaning?.trim() || null;
+  return (
+    (myMeaningFirst ? own : null) ??
+    sense.translation ??
+    sense.definitionKnown ??
+    own ??
+    sense.definitionTarget ??
+    ""
+  );
+}
+
+/** The other meaning, shown smaller under the main one — null if there is none. */
+export function secondMeaning(sense: SenseText, myMeaningFirst = false): string | null {
+  const main = meaningText(sense, myMeaningFirst);
+  const own = sense.userMeaning?.trim() || null;
+  const other = myMeaningFirst ? sense.translation : own;
+  return other && other !== main ? other : null;
 }
 
 /**
@@ -138,6 +160,8 @@ export interface ReviewItem {
   front: {
     lemma: string | null;
     meaning: string | null;
+    /** The second meaning (user's own or English), shown smaller. */
+    altMeaning: string | null;
     definitionTarget: string | null;
   };
 
@@ -148,6 +172,8 @@ export interface ReviewItem {
     level: string | null;
     partOfSpeech: string | null;
     translation: string | null;
+    /** The user's own meaning, if they wrote one. */
+    userMeaning: string | null;
     definitionTarget: string | null;
     definitionKnown: string | null;
     example: string | null;
@@ -238,7 +264,7 @@ export async function buildSession(
     const exercise = pickExercise(card, user.learningGoal);
     const translationShown = showsTranslation(card, user.hideTranslationAfterStability);
 
-    const meaning = meaningText(sense);
+    const meaning = meaningText(sense, user.myMeaningFirst);
     const correct = direction === "RECOGNITION" ? meaning : entry.lemma;
 
     let choices: string[] | null = null;
@@ -247,7 +273,7 @@ export async function buildSession(
       const candidates: DistractorCandidate[] = pool.senses.map((other) => ({
         senseId: other.id,
         entryId: other.entry.id,
-        text: direction === "RECOGNITION" ? meaningText(other) : other.entry.lemma,
+        text: direction === "RECOGNITION" ? meaningText(other, user.myMeaningFirst) : other.entry.lemma,
         categoryIds: other.entry.categories.map((c) => c.categoryId),
         partOfSpeech: other.entry.partOfSpeech,
         relation: relations?.get(other.entry.id) ?? null,
@@ -265,7 +291,10 @@ export async function buildSession(
       choices = distractors.length > 0 ? buildChoices(correct, distractors).map((c) => c.text) : null;
     }
 
-    const typedAnswer = direction === "RECOGNITION" ? acceptedMeanings([sense.translation])[0] : entry.lemma;
+    const typedAnswer =
+      direction === "RECOGNITION"
+        ? acceptedMeanings([meaning, sense.translation, sense.userMeaning])[0]
+        : entry.lemma;
 
     return {
       cardId: card.id,
@@ -277,15 +306,16 @@ export async function buildSession(
       choices,
       selfGraded:
         (exercise === "CHOICE" && choices === null) ||
-        (exercise === "TYPING" && !canAutoGrade(direction, sense.translation)),
+        (exercise === "TYPING" && !canAutoGrade(direction, sense.translation ?? sense.userMeaning)),
       front:
         direction === "RECOGNITION"
-          ? { lemma: entry.lemma, meaning: null, definitionTarget: null }
+          ? { lemma: entry.lemma, meaning: null, altMeaning: null, definitionTarget: null }
           : {
               lemma: null,
               // Once the word is settled, recall is cued by the Korean
               // definition alone — the translation is the crutch to drop.
               meaning: translationShown ? meaning : null,
+              altMeaning: translationShown ? secondMeaning(sense, user.myMeaningFirst) : null,
               // Otherwise the English meaning is the cue; the Korean
               // definition joins it only if the user asked for it (or there
               // is no English at all).
@@ -300,6 +330,7 @@ export async function buildSession(
         level: entry.level,
         partOfSpeech: entry.partOfSpeech,
         translation: translationShown ? sense.translation : null,
+        userMeaning: sense.userMeaning,
         definitionTarget: sense.definitionTarget,
         definitionKnown: translationShown ? sense.definitionKnown : null,
         example: sense.examples[0]?.text ?? null,
@@ -323,6 +354,7 @@ async function loadDistractorPool(prisma: PrismaClient, userId: string) {
       select: {
         id: true,
         translation: true,
+        userMeaning: true,
         definitionKnown: true,
         definitionTarget: true,
         entry: {

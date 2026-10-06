@@ -18,8 +18,10 @@ export default function SettingsPanel({
   showKoreanDefinition: initialKorean,
   learningGoal: initialGoal,
   autoPlayAudio: initialAutoPlay,
+  myMeaningFirst: initialMyFirst,
   credits,
   missingExamples,
+  missingMeanings,
   planName,
   lookups,
 }: {
@@ -29,9 +31,11 @@ export default function SettingsPanel({
   showKoreanDefinition: boolean;
   learningGoal: number;
   autoPlayAudio: boolean;
+  myMeaningFirst: boolean;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
+  missingMeanings: number;
   planName: string;
   /** Typed-in dictionary lookups today; limit null = unlimited. */
   lookups: { used: number; limit: number | null };
@@ -41,9 +45,28 @@ export default function SettingsPanel({
   const [showKorean, setShowKorean] = useState(initialKorean);
   const [goal, setGoal] = useState(initialGoal);
   const [autoPlay, setAutoPlay] = useState(initialAutoPlay);
+  const [myFirst, setMyFirst] = useState(initialMyFirst);
   const [error, setError] = useState<string | null>(null);
   const [filling, setFilling] = useState(false);
   const [filled, setFilled] = useState<FillResult | null>(null);
+  const [meaningsBusy, setMeaningsBusy] = useState(false);
+  const [meaningsDone, setMeaningsDone] = useState<FillResult | null>(null);
+
+  async function fillMeanings() {
+    setMeaningsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/meanings", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not add meanings.");
+      setMeaningsDone(data);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not add meanings.");
+    } finally {
+      setMeaningsBusy(false);
+    }
+  }
 
   async function save(change: Record<string, boolean | number>, undo: () => void) {
     setError(null);
@@ -94,8 +117,17 @@ export default function SettingsPanel({
       <section className={section}>
         <h2 className="font-medium">Cards</h2>
         <p className="mt-1 text-sm text-muted">
-          Cards show the English meaning and ask for the Korean word.
+          Cards show the meaning and ask for the Korean word. Words you added with your own meaning
+          show both — the English one and yours.
         </p>
+        <Toggle
+          checked={myFirst}
+          onChange={(value) => {
+            setMyFirst(value);
+            save({ myMeaningFirst: value }, () => setMyFirst(!value));
+          }}
+          label="Lead with my own meaning (English below it)"
+        />
         <Toggle
           checked={showKorean}
           onChange={(value) => {
@@ -150,6 +182,34 @@ export default function SettingsPanel({
           ))}
         </div>
       </section>
+
+      {(missingMeanings > 0 || meaningsDone) && (
+        <section className={section}>
+          <h2 className="font-medium">English meanings</h2>
+          <p className="mt-1 text-sm text-muted">
+            {missingMeanings === 0
+              ? "Every word has an English meaning."
+              : `${missingMeanings} ${missingMeanings === 1 ? "word has" : "words have"} only your own meaning. The dictionary fills in English where it can; the AI does the rest. Your meanings stay as they are.`}
+          </p>
+          {missingMeanings > 0 && (
+            <button
+              type="button"
+              onClick={fillMeanings}
+              disabled={meaningsBusy}
+              className="mt-3 rounded-md bg-celadon-deep px-4 py-2.5 text-sm font-medium text-paper disabled:opacity-50"
+            >
+              <i className={`bi ${meaningsBusy ? "bi-hourglass-split" : "bi-translate"} mr-1.5`} aria-hidden />
+              {meaningsBusy ? "Adding meanings…" : "Fill in English meanings"}
+            </button>
+          )}
+          {meaningsDone && (
+            <p className="mt-3 text-sm">
+              Added {meaningsDone.fromDictionary} from the dictionary and {meaningsDone.fromAi} from AI.
+              {meaningsDone.remaining > 0 && ` ${meaningsDone.remaining} left — run it again.`}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className={section}>
         <h2 className="font-medium">Examples</h2>

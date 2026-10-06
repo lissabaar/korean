@@ -33,7 +33,11 @@ export default async function CategoriesPage() {
               select: {
                 id: true,
                 lemma: true,
-                senses: { where: { order: 0 }, select: { translation: true }, take: 1 },
+                senses: {
+                  where: { order: 0 },
+                  select: { translation: true, userMeaning: true },
+                  take: 1,
+                },
               },
             },
           },
@@ -52,7 +56,7 @@ export default async function CategoriesPage() {
     words: category.entries.map(({ entry }) => ({
       id: entry.id,
       lemma: entry.lemma,
-      translation: entry.senses[0]?.translation ?? null,
+      translation: entry.senses[0]?.translation ?? entry.senses[0]?.userMeaning ?? null,
     })),
   }));
 

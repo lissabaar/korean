@@ -11,7 +11,7 @@ looks them up → spaced repetition schedules reviews.
   `url = env(...)` in the datasource and the `prisma-client-js` generator,
   which this schema uses. Upgrading is a deliberate migration, not a bump.
 - **Better Auth** for auth (not NextAuth)
-- **Anthropic SDK** (`claude-sonnet-5-5`, effort low, server-side fallback beta) — AI only supplements dictionaries,
+- **Anthropic SDK** (`claude-sonnet-4-6`, no thinking) — AI only supplements dictionaries,
   never replaces them. Extraction uses structured outputs
   (`messages.parse` + Zod schema); never go back to "please answer in JSON"
   in the prompt — the model then sometimes answers in prose.
@@ -76,9 +76,15 @@ merchant of record from Uruguay — never help route around sanctions).
 
 ## Key design rules — don't break these
 
+**Two meanings, never one over the other.**
+`Sense.translation` is English (dictionary, else AI); `Sense.userMeaning` is
+what the user wrote, any language. Cards lead with English and show the
+user's below (`User.myMeaningFirst` swaps them); typed answers accept both.
+`words/meanings.ts` fills missing English (dictionary by target code first,
+then AI checked against the dictionary) — run after saving and from Settings.
+
 **Order of trust: the user's meaning, then the dictionary, then the AI.**
-- A meaning the user wrote in the input (`userMeaning`) becomes the card's
-  translation. The dictionary is still consulted; when the model judges the
+- A meaning the user wrote in the input (`userMeaning`) is kept and shown. The dictionary is still consulted; when the model judges the
   user's meaning wrong for the word (`userMeaningFits: false`) or corrects
   their spelling, the candidate gets a `conflict` and the user decides
   (`useDictionaryMeaning`, "Use dictionary for all").
@@ -277,6 +283,10 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 ## Decisions already made
 
+- **Model: Sonnet 4.6, not 5.5.** 5.5 was tried: its thinking cannot be
+  turned off, and on real imports it averaged ~4 800 output tokens per call
+  vs ~360 on 4.6 (≈5× the cost). Don't switch back without re-measuring
+  in `AiUsage`.
 - **Prompt caching: not used.** The stable prompt is ~526 tokens; Sonnet 4.6
   caches only from 1024, and most of the cost is output anyway. Revisit on
   a model switch (Sonnet 5.5 is ~33% cheaper and caches from a lower

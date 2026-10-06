@@ -316,6 +316,19 @@ export default function AddWords({
    */
   async function fillExamples() {
     setExamples({ added: 0, done: false });
+    // English meanings first (words saved with only the user's own meaning),
+    // so examples are then written in the right sense.
+    for (let round = 0; round < 20; round++) {
+      try {
+        const response = await fetch("/api/meanings", { method: "POST" });
+        if (!response.ok) break;
+        const data: { fromDictionary: number; fromAi: number; remaining: number; aiBlocked?: string } =
+          await response.json();
+        if (data.remaining === 0 || data.aiBlocked || data.fromDictionary + data.fromAi === 0) break;
+      } catch {
+        break;
+      }
+    }
     let added = 0;
     for (let round = 0; round < 40; round++) {
       let data: { fromDictionary: number; fromAi: number; remaining: number; aiBlocked?: string };

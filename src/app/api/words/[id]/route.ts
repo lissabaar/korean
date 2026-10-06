@@ -32,6 +32,7 @@ export async function PATCH(request: Request, { params }: Params) {
     await updateWord(prisma, userId, (await params).id, {
       lemma: text(body.lemma),
       translation: text(body.translation),
+      userMeaning: text(body.userMeaning),
       definition: text(body.definition),
       example: text(body.example),
       categories: Array.isArray(body.categories)

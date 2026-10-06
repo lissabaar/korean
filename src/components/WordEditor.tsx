@@ -74,7 +74,7 @@ export default function WordEditor({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Meaning
+          Meaning in English
           <input
             value={word.translation}
             onChange={(e) => set({ translation: e.target.value })}
@@ -82,6 +82,14 @@ export default function WordEditor({
           />
         </label>
       </div>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Your own meaning (any language)
+        <input
+          value={word.userMeaning}
+          onChange={(e) => set({ userMeaning: e.target.value })}
+          className={`text-ink ${field}`}
+        />
+      </label>
       <label className="flex flex-col gap-1 text-xs text-muted">
         Example
         <input

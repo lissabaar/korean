@@ -16,20 +16,17 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { TokenUsage } from "../ai-budget";
 import { z } from "zod";
 import { BASE_CATEGORIES } from "./categories";
 
 /**
- * Sonnet 5.5: cheaper than Sonnet 4.6 ($2/$10 vs $3/$15 per MTok). Its
- * thinking cannot be switched off; extraction runs at effort "low", where
- * it skips thinking on most requests. Server-side fallback (beta) retries
- * the rare classifier refusal on Sonnet 5.
+ * Sonnet 4.6, without thinking. Sonnet 5.5 was tried (cheaper per token)
+ * but its thinking cannot be switched off: measured on real imports it wrote
+ * ~4 800 output tokens per call against ~360 here — about 5× the cost.
  */
-export const EXTRACTION_MODEL = "claude-sonnet-5-5";
-export const EXTRACTION_EFFORT = "low" as const;
-export const FALLBACK_BETA = "server-side-fallback-2026-07-01" as const;
+export const EXTRACTION_MODEL = "claude-sonnet-4-6";
 
 /** Words plus what the call cost, so the caller can meter it. */
 export interface Extraction {
@@ -200,7 +197,7 @@ function buildInstructions(options: ExtractOptions): string {
 function buildContent(
   source: ExtractSource,
   options: ExtractOptions,
-): Anthropic.Beta.BetaContentBlockParam[] {
+): Anthropic.ContentBlockParam[] {
   const instructions = buildInstructions(options);
   if (source.kind === "text") {
     return [{ type: "text", text: `${instructions}\n\nText:\n${source.text}` }];
@@ -224,25 +221,23 @@ function buildContent(
 async function requestWords(
   client: Anthropic,
   system: string,
-  content: string | Anthropic.Beta.BetaContentBlockParam[],
+  content: string | Anthropic.ContentBlockParam[],
   signal?: AbortSignal,
 ): Promise<Extraction> {
-  const response = await client.beta.messages.parse(
+  const response = await client.messages.parse(
     {
       model: EXTRACTION_MODEL,
       // Thinking counts towards max_tokens as well as the JSON.
       max_tokens: 16000,
       system,
       messages: [{ role: "user", content }],
-      output_config: { effort: EXTRACTION_EFFORT, format: betaZodOutputFormat(ExtractionSchema) },
-      betas: [FALLBACK_BETA],
-      fallbacks: "default",
+      output_config: { format: zodOutputFormat(ExtractionSchema) },
     },
     { signal },
   );
 
   if (response.stop_reason === "refusal") {
-    throw new Error(`The model declined this input (${response.stop_details?.category ?? "no category"})`);
+    throw new Error("The model declined this input");
   }
   if (!response.parsed_output) {
     // max_tokens cuts the JSON off.

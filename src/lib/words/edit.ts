@@ -106,6 +106,8 @@ export interface WordDetails {
   id: string;
   lemma: string;
   translation: string;
+  /** The user's own meaning (any language). */
+  userMeaning: string;
   definition: string;
   example: string;
   categories: string[];
@@ -125,6 +127,7 @@ export async function getWord(prisma: PrismaClient, userId: string, id: string):
     id: entry.id,
     lemma: entry.lemma,
     translation: sense?.translation ?? "",
+    userMeaning: sense?.userMeaning ?? "",
     definition: sense?.definitionTarget ?? "",
     example: sense?.examples[0]?.text ?? "",
     categories: entry.categories.map((link) => link.category.name),
@@ -143,7 +146,7 @@ export async function updateWord(
   const lemma = text(input.lemma, 60);
   if (lemma !== undefined && !/[가-힣]/.test(lemma)) throw new EditError("Write the word in Korean.");
   const translation = text(input.translation, 200);
-  if (translation !== undefined && !translation) throw new EditError("Add what the word means.");
+  const userMeaning = text(input.userMeaning, 300);
 
   await prisma.$transaction(async (tx) => {
     const entry = await tx.entry.findFirst({
@@ -164,7 +167,8 @@ export async function updateWord(
       await tx.sense.update({
         where: { id: sense.id },
         data: {
-          ...(translation !== undefined && { translation }),
+          ...(translation !== undefined && { translation: translation || null }),
+          ...(userMeaning !== undefined && { userMeaning: userMeaning || null }),
           ...(definition !== undefined && { definitionTarget: definition || null }),
         },
       });

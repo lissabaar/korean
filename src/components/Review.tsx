@@ -452,6 +452,7 @@ function Front({ item }: { item: ReviewItem }) {
   return (
     <div className="rounded-lg border border-line bg-surface px-6 py-8">
       {item.front.meaning && <p className="text-2xl font-semibold">{item.front.meaning}</p>}
+      {item.front.altMeaning && <p className="mt-1 text-base text-muted">{item.front.altMeaning}</p>}
       {item.front.definitionTarget && (
         <p className={`korean text-muted ${item.front.meaning ? "mt-3" : "text-lg text-ink"}`}>
           {item.front.definitionTarget}
@@ -486,6 +487,9 @@ function Back({ item }: { item: ReviewItem }) {
         {pos && <span className="text-xs text-muted">{pos}</span>}
       </div>
       {back.translation && !front.meaning && <p className="mt-2 font-medium">{back.translation}</p>}
+      {back.userMeaning && !front.meaning && (
+        <p className="mt-1 text-sm text-muted">Yours: {back.userMeaning}</p>
+      )}
       {back.definitionTarget && !front.definitionTarget && (
         <p className="korean mt-2 text-base sm:text-sm">{back.definitionTarget}</p>
       )}

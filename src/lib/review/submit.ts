@@ -73,12 +73,19 @@ export async function submitAnswer(
       sense: {
         include: {
           entry: {
-            include: { senses: { select: { translation: true }, orderBy: { order: "asc" } } },
+            include: {
+              senses: { select: { translation: true, userMeaning: true }, orderBy: { order: "asc" } },
+            },
           },
         },
       },
       user: {
-        select: { desiredRetention: true, hideTranslationAfterStability: true, learningGoal: true },
+        select: {
+          desiredRetention: true,
+          hideTranslationAfterStability: true,
+          learningGoal: true,
+          myMeaningFirst: true,
+        },
       },
     },
   });
@@ -96,8 +103,9 @@ export async function submitAnswer(
   const expected =
     card.direction === "RECOGNITION"
       ? exercise === "TYPING"
-        ? (acceptedMeanings([sense.translation])[0] ?? meaningText(sense))
-        : meaningText(sense)
+        ? (acceptedMeanings([meaningText(sense, card.user.myMeaningFirst), sense.translation, sense.userMeaning])[0] ??
+          meaningText(sense, card.user.myMeaningFirst))
+        : meaningText(sense, card.user.myMeaningFirst)
       : entry.lemma;
 
   let verdict: AnswerVerdict;
@@ -105,7 +113,7 @@ export async function submitAnswer(
 
   const selfGraded =
     input.knewIt !== undefined &&
-    (exercise === "CHOICE" || !canAutoGrade(card.direction, sense.translation));
+    (exercise === "CHOICE" || !canAutoGrade(card.direction, sense.translation ?? sense.userMeaning));
 
   if (selfGraded) {
     verdict = input.knewIt ? "correct" : "wrong";
@@ -116,7 +124,7 @@ export async function submitAnswer(
     // user reached for a different meaning than this card's.
     const alternatives =
       card.direction === "RECOGNITION"
-        ? acceptedMeanings(entry.senses.map((s) => s.translation))
+        ? acceptedMeanings(entry.senses.flatMap((s) => [s.translation, s.userMeaning]))
         : [];
     const graded = gradeTypedAnswer(input.answer ?? "", expected, { alternatives });
     verdict = graded.verdict;
