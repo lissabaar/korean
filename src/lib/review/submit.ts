@@ -145,8 +145,9 @@ export async function submitAnswer(
             learningStreak: outcome.learningStreak,
             graduatedAt: now,
             due: new Date(now.getTime() + FIRST_REVIEW_DELAY_MS),
+            introducedAt: card.introducedAt ?? now,
           }
-        : { learningStreak: outcome.learningStreak },
+        : { learningStreak: outcome.learningStreak, introducedAt: card.introducedAt ?? now },
     });
 
     return {

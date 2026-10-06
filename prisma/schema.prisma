@@ -340,6 +340,12 @@ model Card {
   phase          Phase     @default(LEARNING)
   learningStreak Int       @default(0)
   graduatedAt    DateTime?
+  // A new word is first shown whole ("meet the word") before any drill —
+  // you cannot pick the meaning of a word you have never seen. Set when the
+  // user presses "Start learning" (or answers it). "Skip" sets snoozedUntil:
+  // the word stays out of new-word sessions until then.
+  introducedAt   DateTime?
+  snoozedUntil   DateTime?
 
   // --- FSRS state. Difficulty/Stability/Retrievability model.
   due           DateTime  @default(now())

@@ -13,6 +13,10 @@ type Load = "loading" | "ready" | "error";
 const REQUEUE_MIN = 2;
 const REQUEUE_MAX = 5;
 
+function requeueGap(): number {
+  return REQUEUE_MIN + Math.floor(Math.random() * (REQUEUE_MAX - REQUEUE_MIN + 1));
+}
+
 /**
  * Order of the cards in a session is shuffled — learning the same words in
  * the same sequence teaches the sequence, not the words. (The exercise type
@@ -36,6 +40,8 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [stats, setStats] = useState<DeckStats | null>(null);
   const [autoPlay, setAutoPlay] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Words met in this session: the other direction of the same word needs no second intro.
+  const [introduced, setIntroduced] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     fetch(`/api/review/session?mode=${mode}`)
@@ -55,6 +61,47 @@ export default function Review({ mode }: { mode: StudyMode }) {
   }, [mode]);
 
   const current = queue[0];
+  const showIntro = Boolean(current?.intro && !introduced.has(current.senseId));
+
+  /** "Start learning": the word joins the drill a few cards later. */
+  async function startWord(item: ReviewItem) {
+    const response = await fetch("/api/review/intro", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: item.cardId, action: "start" }),
+    });
+    if (!response.ok) throw new Error((await response.json()).error ?? "Could not save that.");
+    setIntroduced((set) => new Set(set).add(item.senseId));
+    setQueue(([head, ...rest]) => {
+      const at = Math.min(requeueGap(), rest.length);
+      return [...rest.slice(0, at), head, ...rest.slice(at)];
+    });
+  }
+
+  /** "Skip": the word leaves this session and new ones for a few days; another takes its place. */
+  async function skipWord(item: ReviewItem) {
+    const response = await fetch("/api/review/intro", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cardId: item.cardId,
+        action: "skip",
+        sessionSenseIds: [...new Set(queue.map((q) => q.senseId))],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Could not save that.");
+    const replacement: ReviewItem[] = data.replacement ?? [];
+    setQueue((items) => {
+      const rest = items.filter((q) => q.senseId !== item.senseId);
+      // Spread the newcomers through the rest of the session.
+      for (const fresh of shuffle(replacement)) {
+        const at = Math.floor(Math.random() * (rest.length + 1));
+        rest.splice(at, 0, fresh);
+      }
+      return rest;
+    });
+  }
 
   /** Called once the user has seen the feedback and moves on. */
   function advance(result: AnswerResult) {
@@ -73,8 +120,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         selfGraded: typed ? head.direction === "RECOGNITION" && !head.back.translation : head.choices === null,
       };
       // Comes back a few cards later — how many varies, so the gap cannot be learned either.
-      const gap = REQUEUE_MIN + Math.floor(Math.random() * (REQUEUE_MAX - REQUEUE_MIN + 1));
-      const at = Math.min(gap, rest.length);
+      const at = Math.min(requeueGap(), rest.length);
       return [...rest.slice(0, at), again, ...rest.slice(at)];
     });
   }
@@ -152,7 +198,9 @@ export default function Review({ mode }: { mode: StudyMode }) {
       <div className="mb-5">
         <div className="mb-1.5 flex justify-between text-xs text-muted">
           <span>
-            {current.phase === "LEARNING"
+            {showIntro
+              ? "New word"
+              : current.phase === "LEARNING"
               ? `New word · right in a row: ${current.learningStreak}/${current.learningGoal}`
               : "Review"}
           </span>
@@ -166,13 +214,23 @@ export default function Review({ mode }: { mode: StudyMode }) {
         </div>
       </div>
 
-      {/* Keyed on the card and attempt, so state resets for every question. */}
-      <Question
-        key={`${current.cardId}-${done}`}
-        item={current}
-        onDone={advance}
-        autoPlay={autoPlay}
-      />
+      {showIntro ? (
+        <Intro
+          key={`intro-${current.cardId}`}
+          item={current}
+          autoPlay={autoPlay}
+          onStart={() => startWord(current)}
+          onSkip={() => skipWord(current)}
+        />
+      ) : (
+        // Keyed on the card and attempt, so state resets for every question.
+        <Question
+          key={`${current.cardId}-${done}`}
+          item={current}
+          onDone={advance}
+          autoPlay={autoPlay}
+        />
+      )}
     </Shell>
   );
 }
@@ -462,6 +520,110 @@ function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | n
   return picked
     ? `Not quite — you picked ${picked}. The answer: ${result.expected}`
     : `Not quite. The answer: ${result.expected}`;
+}
+
+// ---------------------------------------------------------------- intro
+
+/**
+ * First meeting with a new word: everything about it at once, before any
+ * drill asks for it. Nobody can pick the meaning of a word never seen.
+ */
+function Intro({
+  item,
+  autoPlay,
+  onStart,
+  onSkip,
+}: {
+  item: ReviewItem;
+  autoPlay: boolean;
+  onStart: () => Promise<void>;
+  onSkip: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<"start" | "skip" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const startRef = useRef<HTMLButtonElement>(null);
+  const { back } = item;
+  const level = levelLabel(back.level);
+  const pos = posLabel(back.partOfSpeech);
+
+  useEffect(() => {
+    startRef.current?.focus();
+    if (autoPlay) speakKorean(item.back.lemma);
+  }, [autoPlay, item.back.lemma]);
+
+  async function run(action: "start" | "skip") {
+    setBusy(action);
+    setError(null);
+    try {
+      await (action === "start" ? onStart() : onSkip());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save that.");
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="korean text-5xl leading-tight">{back.lemma}</span>
+          <SpeakButton text={back.lemma} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          {back.originalForm && (
+            <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
+              {back.originalForm}
+            </span>
+          )}
+          {level && (
+            <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">{level}</span>
+          )}
+          {pos && <span className="text-xs text-muted">{pos}</span>}
+        </div>
+        {back.translation && <p className="mt-4 text-2xl font-semibold">{back.translation}</p>}
+        {back.userMeaning && (
+          <p className={back.translation ? "mt-1 text-base text-muted" : "mt-4 text-2xl font-semibold"}>
+            {back.translation ? `Yours: ${back.userMeaning}` : back.userMeaning}
+          </p>
+        )}
+        {back.definitionTarget && <p className="korean mt-3 text-base">{back.definitionTarget}</p>}
+        {back.definitionKnown && <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>}
+        {back.example && (
+          <div className="mt-4 border-l-2 border-celadon pl-3">
+            <p className="korean text-lg leading-relaxed sm:text-base">{back.example}</p>
+            {back.exampleTranslation && <p className="mt-0.5 text-sm text-muted">{back.exampleTranslation}</p>}
+          </div>
+        )}
+        {back.contextNote && <p className="mt-3 text-sm text-muted">{back.contextNote}</p>}
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-md bg-clay-soft px-3 py-2 text-sm text-clay">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => run("skip")}
+          className="rounded-md border border-line bg-surface px-4 py-3 font-medium disabled:opacity-50"
+        >
+          {busy === "skip" ? "Skipping…" : "Skip for 3 days"}
+        </button>
+        <button
+          ref={startRef}
+          type="button"
+          disabled={busy !== null}
+          onClick={() => run("start")}
+          className="rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper disabled:opacity-50"
+        >
+          {busy === "start" ? "Starting…" : "Start learning"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- card faces

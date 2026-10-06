@@ -64,6 +64,8 @@ async function studyScope(prisma: PrismaClient, userId: string) {
   const learn = {
     ...base,
     phase: "LEARNING" as const,
+    // Skipped from the intro card: out of new-word sessions until then.
+    OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
     sense: {
       entry: {
         OR: [
@@ -150,6 +152,10 @@ export function canAutoGrade(direction: AskedDirection, translation: string | nu
 
 export interface ReviewItem {
   cardId: string;
+  /** Both directions of a word share it — the intro is shown once per sense. */
+  senseId: string;
+  /** A new word not seen yet: show it whole first ("Start learning" / "Skip"). */
+  intro: boolean;
   phase: Phase;
   direction: AskedDirection;
   exercise: ExerciseType;
@@ -234,10 +240,18 @@ export function parseStudyMode(value: string | null | undefined): StudyMode {
   return value === "learn" || value === "review" ? value : "all";
 }
 
+export interface SessionOptions {
+  /** Senses already in the client's session (a replacement must not repeat them). */
+  excludeSenseIds?: string[];
+  /** Override the number of new-word cards. */
+  newLimit?: number;
+}
+
 export async function buildSession(
   prisma: PrismaClient,
   userId: string,
   mode: StudyMode = "all",
+  options: SessionOptions = {},
 ): Promise<ReviewItem[]> {
   const now = new Date();
   const { user, learn, review } = await studyScope(prisma, userId);
@@ -250,11 +264,13 @@ export async function buildSession(
       take: REVIEWS_PER_SESSION,
     }),
     mode === "review" ? [] : prisma.card.findMany({
-      where: learn,
+      where: options.excludeSenseIds?.length
+        ? { AND: [learn, { senseId: { notIn: options.excludeSenseIds } }] }
+        : learn,
       include: cardInclude,
       // Oldest words first, and both directions of a word together.
       orderBy: [{ sense: { entry: { createdAt: "asc" } } }, { direction: "asc" }],
-      take: clampNewPerSession(user.newPerSession),
+      take: options.newLimit ?? clampNewPerSession(user.newPerSession),
     }),
   ]);
 
@@ -304,6 +320,8 @@ export async function buildSession(
 
     return {
       cardId: card.id,
+      senseId: sense.id,
+      intro: card.phase === "LEARNING" && !card.introducedAt,
       phase: card.phase,
       direction,
       exercise,
