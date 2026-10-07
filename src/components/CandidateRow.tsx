@@ -145,7 +145,7 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
                 {sense?.translation ? "The dictionary says" : "Suggested"}:{" "}
                 <strong>{sense?.translation ?? candidate.aiMeaning}</strong>
               </p>
-              {!saved && (
+              {(!saved || candidate.entryId) && !removed && (
                 <label className="mt-1 flex items-center gap-2">
                   <input
                     type="checkbox"

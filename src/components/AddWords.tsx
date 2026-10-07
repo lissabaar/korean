@@ -579,6 +579,12 @@ export default function AddWords({
    * meaning choice) to the list.
    */
   function update(next: WordCandidate) {
+    const current = candidates.find((c) => c.id === next.id);
+    if (current && next.useDictionaryMeaning !== current.useDictionaryMeaning) {
+      // Already saved (automatic mode): the choice has to reach the database.
+      void setDictionaryMeaning(current, next.useDictionaryMeaning);
+      return;
+    }
     setCandidates((list) =>
       list.map((c) =>
         c.id !== next.id
@@ -591,6 +597,30 @@ export default function AddWords({
             },
       ),
     );
+  }
+
+  /**
+   * A meaning conflict: use the dictionary's meaning instead of the user's
+   * (or go back). Before saving that is just the candidate's flag; for a word
+   * already saved (automatic mode) the user's meaning is dropped from — or
+   * put back on — the saved word, and undone on screen if that fails.
+   */
+  async function setDictionaryMeaning(candidate: Candidate, use: boolean) {
+    const flag = (value: boolean) =>
+      setCandidates((list) => list.map((c) => (c.id === candidate.id ? { ...c, useDictionaryMeaning: value } : c)));
+    flag(use);
+    if (!candidate.saved || !candidate.entryId) return;
+    try {
+      const response = await fetch(`/api/words/${candidate.entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userMeaning: use ? "" : candidate.userMeaning }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error);
+    } catch (cause) {
+      flag(!use);
+      setError(cause instanceof Error && cause.message ? cause.message : `Could not update ${candidate.lemma}.`);
+    }
   }
 
   /** "Remove" on a just-added word: delete it from the user's words again. */
@@ -754,7 +784,10 @@ export default function AddWords({
   const partsTotal = sources.reduce((sum, s) => sum + s.jobs.length, 0);
   const partsDone = sources.reduce((sum, s) => sum + s.partsDone, 0);
   const grouped = sources.length > 1;
-  const conflicts = candidates.filter((c) => c.conflict === "meaning" && c.selected).length;
+  /** Meaning conflicts still open (the user has not switched them to the dictionary's meaning). */
+  const conflicts = candidates.filter(
+    (c) => c.conflict === "meaning" && (c.selected || c.saved) && !c.useDictionaryMeaning,
+  ).length;
   const unreachableCount = candidates.filter((c) => c.status === "unreachable").length;
 
   return (
@@ -1118,11 +1151,13 @@ export default function AddWords({
               </span>
               <button
                 type="button"
-                onClick={() =>
-                  setCandidates((list) =>
-                    list.map((c) => (c.conflict === "meaning" ? { ...c, useDictionaryMeaning: true } : c)),
-                  )
-                }
+                onClick={async () => {
+                  for (const c of candidates) {
+                    if (c.conflict === "meaning" && !c.useDictionaryMeaning && !c.removed) {
+                      await setDictionaryMeaning(c, true);
+                    }
+                  }
+                }}
                 className="rounded-md border border-clay px-3 py-1 text-clay"
               >
                 Use dictionary for all
