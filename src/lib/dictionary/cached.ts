@@ -6,9 +6,15 @@
  * cache is shared by every user (dictionary data is not personal), so the
  * same word costs one request no matter how many people look it up.
  *
- *   found words     kept 90 days (dictionaries change slowly)
- *   "no such word"  kept 7 days
+ *   found words     kept for good (a word's dictionary entry does not change
+ *                   meaning; the owner asked for this)
+ *   "no such word"  kept 7 days (dictionaries grow; a typo can look like it)
  *   unreachable     never kept — that says nothing about the word
+ *
+ * Batch lookups retry a word that got no answer (a few times, with pauses),
+ * so a briefly overloaded KRDict does not push words into "check later" —
+ * bounded by attempts per word, failures in a row and a time budget, so it
+ * can never loop.
  */
 
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -22,12 +28,11 @@ import {
 } from "./krdict";
 
 const DAY = 24 * 60 * 60 * 1000;
-const FOUND_TTL = 90 * DAY;
 const EMPTY_TTL = 7 * DAY;
 
 /**
- * A cached dictionary answer, if it is still fresh (found: 90 days, "no such
- * word": 7 days).
+ * A cached dictionary answer: a found one always, a "no such word" one for 7
+ * days.
  */
 async function readCache<T>(prisma: PrismaClient, key: string): Promise<T | undefined> {
   const row = await prisma.dictionaryCache.findUnique({ where: { key } });
@@ -35,7 +40,7 @@ async function readCache<T>(prisma: PrismaClient, key: string): Promise<T | unde
   const value = row.value as unknown as T;
   const empty = Array.isArray(value) && value.length === 0;
   const age = Date.now() - row.fetchedAt.getTime();
-  return age < (empty ? EMPTY_TTL : FOUND_TTL) ? value : undefined;
+  return !empty || age < EMPTY_TTL ? value : undefined;
 }
 
 /**
@@ -78,20 +83,50 @@ export async function cachedLookupMany(
   prisma: PrismaClient,
   words: string[],
   keys: DictionaryKeys,
-  options: LookupOptions & { concurrency?: number } = {},
+  options: LookupOptions & { concurrency?: number; timeBudgetMs?: number } = {},
 ): Promise<Map<string, DictEntry[] | null>> {
   // KRDict throttles bursts: with 3 import parts in parallel, 6 lookups each
   // (18 at once) made it stop answering for minutes. 2 per part stays under.
-  const { concurrency = 2, ...lookupOptions } = options;
+  // The time budget leaves room in the 300 s function limit for the model
+  // call that precedes the lookups.
+  const { concurrency = 2, timeBudgetMs = 150_000, ...lookupOptions } = options;
   const results = new Map<string, DictEntry[] | null>();
   const queue = [...new Set(words)];
+  const started = Date.now();
 
-  // Circuit breaker: after this many failures in a row the dictionary is
-  // treated as down for the rest of the batch — the remaining words are
-  // marked unreachable at once (cache hits still served) instead of each
-  // waiting for its own timeout. "Check again" picks them up later.
+  // Three limits keep retrying bounded:
+  //   MAX_ATTEMPTS  per word, with RETRY_WAIT_MS pauses in between
+  //   BREAK_AFTER   words in a row that got no answer even after retrying —
+  //                 then the dictionary counts as down for the rest of the
+  //                 batch (cache hits still served, the rest marked
+  //                 unreachable and checked later in the background)
+  //   timeBudgetMs  for the whole batch: past it, no new requests
+  const MAX_ATTEMPTS = 3;
+  const RETRY_WAIT_MS = [1500, 4000];
   const BREAK_AFTER = 6;
   let failuresInARow = 0;
+  const outOfTime = (extra = 0) => Date.now() - started + extra > timeBudgetMs;
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  /** One word: up to MAX_ATTEMPTS tries; null when the dictionary never answered. */
+  async function lookUpWithRetries(word: string): Promise<DictEntry[] | null> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await cachedLookup(prisma, word, keys, lookupOptions);
+      } catch (error) {
+        if (!(error instanceof DictionaryUnavailableError)) throw error;
+        const wait = RETRY_WAIT_MS[attempt - 1];
+        const giveUp =
+          attempt >= MAX_ATTEMPTS ||
+          wait === undefined ||
+          failuresInARow >= BREAK_AFTER ||
+          outOfTime(wait) ||
+          lookupOptions.signal?.aborted;
+        if (giveUp) return null;
+        await sleep(wait);
+      }
+    }
+  }
 
   /**
    * One of the parallel workers: takes words from the shared queue until it is
@@ -99,19 +134,14 @@ export async function cachedLookupMany(
    */
   async function worker(): Promise<void> {
     for (let word = queue.shift(); word !== undefined; word = queue.shift()) {
-      if (failuresInARow >= BREAK_AFTER) {
+      if (failuresInARow >= BREAK_AFTER || outOfTime()) {
         const hit = await readCache<DictEntry[]>(prisma, `search:${lookupOptions.transLang ?? 1}:${word}`);
         results.set(word, hit ?? null);
         continue;
       }
-      try {
-        results.set(word, await cachedLookup(prisma, word, keys, lookupOptions));
-        failuresInARow = 0;
-      } catch (error) {
-        if (!(error instanceof DictionaryUnavailableError)) throw error;
-        failuresInARow += 1;
-        results.set(word, null);
-      }
+      const found = await lookUpWithRetries(word);
+      results.set(word, found);
+      failuresInARow = found === null ? failuresInARow + 1 : 0;
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));

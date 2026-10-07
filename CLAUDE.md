@@ -207,15 +207,16 @@ only), `review` (scheduled only), `all` — from `/review?mode=`.
 **Every KRDict call goes through the shared cache.**
 Use `cachedLookup` / `cachedLookupMany` / `cachedExamples` from
 `dictionary/cached.ts`, never `lookup()` directly: the 50 000/day key quota
-is shared by the whole service. Found entries are kept 90 days, misses 7,
+is shared by the whole service. Found entries are kept for good (owner's call: an entry does not change meaning), misses 7 days,
 unreachable never. Typed-in lookups also count against the plan's
 `dictionaryLookupsPerDay` (`consumeLookup`). AI-written examples are cached
 across users in `GeneratedExample` (by lemma + English meaning).
 
 **Unreachable dictionary.** KRDict answers in 1.5–3 s from Vercel and is
-flaky from some networks: requests time out after 8 s, `cachedLookupMany`
-trips a circuit breaker after 6 failures in a row (the rest of the batch is
-marked unreachable at once), and the preview re-asks automatically once
+flaky from some networks: requests time out after 8 s; `cachedLookupMany`
+retries a word up to 3 times (pauses 1.5 s, 4 s), trips a circuit breaker
+after 6 words in a row with no answer, and stops after a 150 s budget (the
+rest of the batch is marked unreachable at once) — retries must stay bounded, and the preview re-asks automatically once
 and offers "Check again" (`/api/ingest/recheck`, no AI). Unreachable words
 stay selected with the user's or the AI meaning — never silently dropped.
 
