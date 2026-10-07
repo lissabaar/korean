@@ -207,6 +207,8 @@ export interface DeckStats {
   learning: number;
   words: number;
   nextDue: Date | null;
+  /** Reviews coming due within the next 24 hours (not due yet). */
+  dueSoon: number;
 }
 
 const cardInclude = {
@@ -230,7 +232,8 @@ export async function getDeckStats(prisma: PrismaClient, userId: string): Promis
   const now = new Date();
   const { learn, review } = await studyScope(prisma, userId);
 
-  const [due, learning, words, next] = await Promise.all([
+  const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const [due, learning, words, next, dueSoon] = await Promise.all([
     prisma.card.count({ where: { ...review, due: { lte: now } } }),
     prisma.card.count({ where: learn }),
     prisma.entry.count({ where: { userId } }),
@@ -239,9 +242,10 @@ export async function getDeckStats(prisma: PrismaClient, userId: string): Promis
       orderBy: { due: "asc" },
       select: { due: true },
     }),
+    prisma.card.count({ where: { ...review, due: { gt: now, lte: dayAhead } } }),
   ]);
 
-  return { due, learning, words, nextDue: next?.due ?? null };
+  return { due, learning, words, nextDue: next?.due ?? null, dueSoon };
 }
 
 /** learn = new words only, review = scheduled reviews only, all = both. */

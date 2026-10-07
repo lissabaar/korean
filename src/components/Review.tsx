@@ -292,6 +292,9 @@ export default function Review({ mode }: { mode: StudyMode }) {
                 ? "Add words, or switch Learn on for more categories."
                 : "Everything is scheduled for later. Come back then, or learn new words."}
           </p>
+          {mode !== "learn" && stats?.nextDue && (
+            <NextReview at={new Date(stats.nextDue)} soon={stats.dueSoon} />
+          )}
           <Link
             href="/add"
             className="mt-5 inline-block rounded-md bg-celadon-deep px-5 py-2.5 text-sm font-medium text-paper"
@@ -388,6 +391,51 @@ export default function Review({ mode }: { mode: StudyMode }) {
 }
 
 /** Page frame (width and padding) shared by every state of the screen. */
+/**
+ * Countdown to the next review when nothing is due: "next word in 2 h 13
+ * min", how many come up within a day, and a button once the time is up.
+ */
+function NextReview({ at, soon }: { at: Date; soon: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = at.getTime() - now;
+
+  if (left <= 0) {
+    return (
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="mt-4 rounded-md bg-celadon-deep px-5 py-2.5 text-sm font-medium text-paper"
+      >
+        <i className="bi bi-arrow-repeat mr-1.5" aria-hidden />
+        Words are ready — start review
+      </button>
+    );
+  }
+
+  const seconds = Math.ceil(left / 1000);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  // Seconds only matter in the last hour; days only beyond one.
+  const parts = days > 0 ? [`${days} d`, `${hours} h`] : hours > 0 ? [`${hours} h`, `${minutes} min`] : [`${minutes} min`, `${secs} s`];
+
+  return (
+    <div className="mt-4 rounded-md bg-celadon-soft px-4 py-3">
+      <p className="text-xs text-muted">Next word to review in</p>
+      <p className="mt-0.5 text-2xl font-semibold tabular-nums text-celadon-deep">{parts.join(" ")}</p>
+      <p className="mt-1 text-xs text-muted">
+        {at.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+        {soon > 1 && ` · ${soon} words within the next 24 hours`}
+      </p>
+    </div>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   // Wider on desktop, so long examples fit on one line.
   return <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
