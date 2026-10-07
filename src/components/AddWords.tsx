@@ -99,6 +99,43 @@ function markPartDone(source: ImportSource, index: number) {
     // Private mode or storage blocked: resuming just will not skip parts.
   }
 }
+/**
+ * POST one part for analysis. "Failed to fetch" means no answer at all (the
+ * connection dropped, or a new version of the site was going live): that is
+ * tried once more after a pause. A non-JSON answer (the host's own 504/413
+ * page) becomes a readable error instead of a JSON parse error.
+ */
+async function postAnalyze(
+  body: unknown,
+  signal: AbortSignal,
+): Promise<{ response: Response; data: Record<string, unknown> & { error?: string } }> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch("/api/ingest/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
+      const data = await response.json().catch(() => ({
+        error:
+          response.status === 504
+            ? "This part took too long to analyse. Try it again."
+            : response.status === 413
+              ? "This part is too large to send."
+              : `The server answered with an error (${response.status}). Try again.`,
+      }));
+      return { response, data };
+    } catch (cause) {
+      if (signal.aborted) throw cause;
+      if (attempt >= 2) {
+        throw new Error("The connection dropped before the server answered. Check the internet and retry this part.");
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
 /** The add-mode preference lives in localStorage; this keeps React in sync with it. */
 const autoAddListeners = new Set<() => void>();
 /** Lets React re-render when the add-mode preference is changed on this page. */
@@ -292,13 +329,7 @@ export default function AddWords({
         const source = byId.get(job.sourceId)!;
         patch(source.id, () => ({ status: "analysing" }));
         try {
-          const response = await fetch("/api/ingest/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...job.payload, phrases }),
-            signal: controller.signal,
-          });
-          const data = await response.json();
+          const { response, data } = await postAnalyze({ ...job.payload, phrases }, controller.signal);
           if (data.aiQuota) {
             // Every remaining part would be refused the same way.
             if (data.aiQuota === "user") setCredits(0);
