@@ -68,6 +68,14 @@ export interface WordCandidate {
   conflict: "meaning" | "spelling" | null;
   /** Set by the user on a meaning conflict: replace their meaning with the dictionary's. */
   useDictionaryMeaning: boolean;
+  /**
+   * The user wrote a meaning, the dictionary has the word, but none of its
+   * senses matches that meaning (달달하다 — "приторный"; KRDict only knows
+   * "shiver; tremble"): the dictionary lacks this sense, so the word is kept
+   * with the AI meaning (status "ai") and `homographs` still lists what the
+   * dictionary has, for "use the dictionary entry anyway".
+   */
+  dictionaryMismatch?: boolean;
 
   /** Pre-ticked for everything the user is likely to want. */
   selected: boolean;
@@ -106,8 +114,8 @@ export interface AnalyzeOptions {
   source: ExtractSource;
   /** Whether this user's AI spend counts towards the shared daily budget. */
   unlimitedAi: boolean;
-  /** Also keep phrases and sentences, not just words. */
-  phrases?: boolean;
+  /** Also keep phrases and sentences (true), only those ("only"), or words only. */
+  phrases?: boolean | "only";
   maxWords?: number;
   signal?: AbortSignal;
 }
@@ -152,7 +160,9 @@ export async function analyzeText(
   // Recorded straight away: the money is spent even if the dictionary
   // step below fails.
   await recordAiUsage(prisma, userId, unlimitedAi, extraction.model, extraction.usage);
-  const extracted = extraction.words;
+  // "Phrases only": a single word the model returned anyway is dropped.
+  const extracted =
+    phrases === "only" ? extraction.words.filter((word) => word.kind === "phrase") : extraction.words;
 
   const transLang = EXPLANATION_LANG[user.explanationLang] ?? TRANS_LANG.EN;
   const dictionary = await cachedLookupMany(
@@ -178,7 +188,14 @@ export async function analyzeText(
   const candidates: WordCandidate[] = extracted.map((word, index) => {
     const found = dictionary.get(word.lemma);
     const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote, word.userMeaning);
-    const dictEntry = homographs[0] ?? null;
+    // A meaning the user wrote that no dictionary sense matches: the
+    // dictionary lacks it — keep the word with the AI meaning instead of
+    // teaching an unrelated sense.
+    const dictionaryMismatch =
+      Boolean(word.userMeaning.trim()) &&
+      homographs.length > 0 &&
+      !meaningMatches(homographs, `${word.gloss} ${word.userMeaning}`);
+    const dictEntry = dictionaryMismatch ? null : (homographs[0] ?? null);
     // A category the learner asked for wins over the model's per-word pick.
     const { primary, secondary } = extraction.requestedCategory
       ? { primary: extraction.requestedCategory, secondary: [] }
@@ -219,6 +236,7 @@ export async function analyzeText(
             ? "spelling"
             : null,
       useDictionaryMeaning: false,
+      ...(dictionaryMismatch && { dictionaryMismatch: true }),
       // Duplicates stay off: already being learned.
       selected:
         status === "new" ||
@@ -285,6 +303,24 @@ function senseScore(sense: DictEntry["senses"][number], strong: Set<string>, wea
     translation: overlap(`${sense.translation ?? ""} ${sense.translationRu ?? ""}`, strong, weak),
     definition: overlap(sense.translatedDefinition, strong, weak),
   };
+}
+
+/**
+ * Whether any sense of these entries shares a word with the meaning given
+ * (translation, Russian translation or English definition). Used only where
+ * the user wrote a meaning, together with the model's English gloss: word
+ * overlap alone misses synonyms ("первокурсник" vs "freshman"), the gloss
+ * is the bridge.
+ */
+export function meaningMatches(entries: DictEntry[], meaning: string): boolean {
+  const wanted = new Set(words(meaning));
+  return entries.some((entry) =>
+    entry.senses.some((sense) =>
+      words(`${sense.translation ?? ""} ${sense.translationRu ?? ""} ${sense.translatedDefinition ?? ""}`).some((w) =>
+        wanted.has(w),
+      ),
+    ),
+  );
 }
 
 /**

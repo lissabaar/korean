@@ -200,7 +200,7 @@ export default function AddWords({
 }) {
   const [mode, setMode] = useState<"ai" | "manual">(anonymous ? "manual" : "ai");
   /** Keep phrases and sentences whole, not only single words. */
-  const [phrases, setPhrases] = useState(true);
+  const [phrases, setPhrases] = useState<boolean | "only">(true);
   const [credits, setCredits] = useState(initialCredits);
   const outOfCredits = credits !== null && credits <= 0;
   const [stage, setStage] = useState<Stage>("input");
@@ -878,6 +878,7 @@ export default function AddWords({
               [
                 [false, "Words only"],
                 [true, "Words & phrases"],
+                ["only", "Phrases only"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -894,8 +895,9 @@ export default function AddWords({
               </button>
             ))}
             <span className="w-full text-xs text-muted">
-              With phrases, set expressions and sentences (from a phrase list or a screenshot) are kept
-              whole and learned as one card.
+              {phrases === "only"
+                ? "Only set expressions and sentences are kept — each learned whole, as one card. Single words are skipped."
+                : "With phrases, set expressions and sentences (from a phrase list or a screenshot) are kept whole and learned as one card."}
             </span>
           </div>
 
@@ -1197,7 +1199,9 @@ export default function AddWords({
           <div className="flex flex-col gap-5">
             {sources.map((source) => {
               const rows = candidates.filter((c) => c.sourceId === source.id);
-              const showHeader = grouped || source.error || source.suggestedCategory || forced[source.id];
+              const finishedEmpty = rows.length === 0 && source.partsDone >= source.jobs.length;
+              // A source that found nothing still gets its header, to say so.
+              const showHeader = grouped || source.error || source.suggestedCategory || forced[source.id] || finishedEmpty;
               if (!showHeader && rows.length === 0) return null;
               return (
                 <section key={source.id}>
@@ -1228,6 +1232,13 @@ export default function AddWords({
                         </span>
                       )}
                       {source.error && <span className="w-full text-xs text-clay">{source.error}</span>}
+                      {!source.error && rows.length === 0 && source.partsDone >= source.jobs.length && (
+                        <span className="w-full text-xs text-muted">
+                          {source.kind === "IMAGE"
+                            ? "No Korean words were found in this image. If the text is small or the picture busy, crop it to just the words and add it again."
+                            : "No new Korean words were found here."}
+                        </span>
+                      )}
                     </h2>
                   )}
                   {rows.length > 0 && (

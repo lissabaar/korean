@@ -182,8 +182,11 @@ export interface ExtractOptions {
   maxWords?: number;
   /** The user's own categories, offered alongside the built-in ones. */
   existingCategories?: string[];
-  /** Also return phrases and sentences to learn whole (default: words only). */
-  phrases?: boolean;
+  /**
+   * true: words and also phrases/sentences learned whole; "only": phrases
+   * and sentences only, no single words; false/absent: words only.
+   */
+  phrases?: boolean | "only";
   signal?: AbortSignal;
 }
 
@@ -200,9 +203,11 @@ function buildInstructions(options: ExtractOptions): string {
   );
 
   parts.push(
-    options.phrases
-      ? `Phrases are wanted: besides words, return useful phrases and sentences as kind "phrase". If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
-      : `Return single words only (kind "word"), no phrases.`,
+    options.phrases === "only"
+      ? `Phrases only: return only set expressions, collocations and sentences worth learning whole, all as kind "phrase" — no single words. If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
+      : options.phrases
+        ? `Phrases are wanted: besides words, return useful phrases and sentences as kind "phrase". If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
+        : `Return single words only (kind "word"), no phrases.`,
   );
 
   parts.push(

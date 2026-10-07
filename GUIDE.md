@@ -289,7 +289,7 @@ hangugo/
 │   │   ├── CategorySelect.tsx       выпадающий список категорий с «новая категория…»
 │   │   ├── Review.tsx               экран учёбы: знакомство, вопрос, ответ, обратная сторона
 │   │   ├── SpeakButton.tsx          кнопка озвучки + speakKorean()
-│   │   ├── CategoryList.tsx         экран /categories
+│   │   ├── CategoryList.tsx         экран /categories (+ поиск по всем словам)
 │   │   ├── IconPicker.tsx           выбор иконки категории
 │   │   ├── WordEditor.tsx           редактирование слова: значения для учёбы, «Add example»
 │   │   ├── ThemeToggle.tsx          переключатель светлой/тёмной темы (в меню)

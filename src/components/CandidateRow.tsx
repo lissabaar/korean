@@ -169,7 +169,26 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
           )}
           {duplicate && <p className="mt-1 text-sm text-muted">Already in your words.</p>}
 
-          {!disabled && !saved && candidate.homographs.length > 1 && (
+          {candidate.dictionaryMismatch && !candidate.dictionary && candidate.homographs[0] && (
+            <div className="mt-1.5 rounded-md bg-paper px-2.5 py-2 text-sm text-muted">
+              The dictionary has this word only as “
+              {candidate.homographs[0].senses[0]?.translation ?? candidate.homographs[0].senses[0]?.definition}
+              ”, not in your meaning — kept with the AI meaning.
+              {!saved && !removed && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({ ...candidate, dictionary: candidate.homographs[0], status: "new", dictionaryMismatch: false })
+                  }
+                  className="ml-1 underline underline-offset-4 hover:text-ink"
+                >
+                  Use the dictionary entry
+                </button>
+              )}
+            </div>
+          )}
+
+          {!disabled && !saved && !candidate.dictionaryMismatch && candidate.homographs.length > 1 && (
             <HomographPicker
               candidate={candidate}
               onPick={(dictionary) => onChange({ ...candidate, dictionary })}

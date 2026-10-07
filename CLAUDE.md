@@ -279,6 +279,24 @@ words already started first, the rest a random pick from the whole pool
 (oldest-first made an imported list come up in its own order). In the
 session a repeated card goes back to a random later position (Review.tsx).
 
+**A meaning the dictionary lacks.** When the user wrote a meaning and no
+sense of any homograph shares a word with it or with the model's gloss
+(`meaningMatches`, translation + Russian + English definition), the
+dictionary does not have that sense (달달하다 "приторный" vs KRDict's only
+"shiver"): the candidate is kept with the AI meaning (status ai,
+`dictionaryMismatch`), and the preview offers "Use the dictionary entry".
+Only with a user meaning: overlap of the user's meaning alone missed 102 of
+581 genuine matches (synonyms, Russian forms) — the gloss bridges that.
+
+**Images are read in pieces.** `imageSource` keeps the short edge at full
+resolution (≤1568 px) and cuts the long edge into tiles of ≤1.15 MP with a
+60 px overlap, max 6 per image — shrinking the whole screenshot made small
+text unreadable ("0 words").
+
+**Phrases mode** is words only / words & phrases / phrases only
+(`phrases: false | true | "only"`; "only" also drops any word the model
+returns).
+
 **Examples are sentences.** A model "sentence" with no space (the word
 itself, 부드러워) is not stored as an example (`isSentence` in commit.ts).
 "Add example" in the word editor: dictionary examples (free, with shared

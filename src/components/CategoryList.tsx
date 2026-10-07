@@ -23,7 +23,12 @@ export interface WordView {
   id: string;
   lemma: string;
   translation: string | null;
+  /** The user's own meaning, for search. */
+  userMeaning: string | null;
 }
+
+/** Lowercase, NFC (Hangul typed on a Mac is often NFD), ё → е. */
+const normaliseSearch = (text: string) => text.normalize("NFC").toLowerCase().replace(/ё/g, "е").trim();
 
 export interface CategoryView {
   id: string;
@@ -100,6 +105,24 @@ export default function CategoryList({
 
   // A word in two categories is still one word.
   const totalWords = new Set(categories.flatMap((c) => c.words.map((w) => w.id))).size;
+
+  // Search over every saved word: Korean, English meaning, own meaning.
+  const [query, setQuery] = useState("");
+  const [editingFound, setEditingFound] = useState<string | null>(null);
+  const q = normaliseSearch(query);
+  const matches = (word: WordView) =>
+    [word.lemma, word.translation, word.userMeaning].some((text) => text && normaliseSearch(text).includes(q));
+  // One row per word (a word can be in several categories), with all its category names.
+  const foundWords = q
+    ? [...new Map(categories.flatMap((c) => c.words.filter(matches)).map((w) => [w.id, w])).values()]
+    : [];
+  const found = foundWords.map((word) => ({
+    word,
+    categories: categories.filter((c) => c.words.some((w) => w.id === word.id)).map((c) => c.name),
+  }));
+  // Exact Korean matches first, then words starting with the query, then the rest.
+  const rank = (lemma: string) => (normaliseSearch(lemma) === q ? 0 : normaliseSearch(lemma).startsWith(q) ? 1 : 2);
+  found.sort((a, b) => rank(a.word.lemma) - rank(b.word.lemma) || a.word.lemma.localeCompare(b.word.lemma, "ko"));
   const learning = categories.filter((c) => c.learnActive).length;
   const reviewing = categories.filter((c) => c.reviewActive).length;
 
@@ -125,6 +148,58 @@ export default function CategoryList({
           {error}
         </p>
       )}
+
+      <div className="mb-4">
+        <label className="relative block">
+          <i className="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search your words — Korean, English or your own meaning"
+            aria-label="Search your words"
+            className="w-full rounded-md border border-line bg-surface py-2.5 pl-9 pr-3 text-base outline-none focus:border-celadon"
+          />
+        </label>
+        {q && (
+          <div className="mt-2 overflow-hidden rounded-lg border border-line bg-surface">
+            <p className="px-4 py-2 text-xs text-muted">
+              {found.length === 0
+                ? "No words match."
+                : `${found.length} ${found.length === 1 ? "word" : "words"}${found.length > 50 ? " — showing the first 50" : ""}`}
+            </p>
+            <ul>
+              {found.slice(0, 50).map(({ word, categories: names }) => (
+                <li key={word.id} className="border-t border-line/60">
+                  {editingFound === word.id ? (
+                    <WordEditor
+                      wordId={word.id}
+                      allCategoryNames={allCategoryNames}
+                      onDone={(changed) => {
+                        setEditingFound(null);
+                        if (changed) router.refresh();
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingFound(word.id)}
+                      className="flex w-full flex-wrap items-baseline gap-x-2 px-4 py-2 text-left text-sm hover:bg-celadon-soft/50"
+                    >
+                      <span className="korean text-base">{word.lemma}</span>
+                      {word.translation && <span className="text-muted">{word.translation}</span>}
+                      {word.userMeaning && word.userMeaning !== word.translation && (
+                        <span className="text-muted">· {word.userMeaning}</span>
+                      )}
+                      <span className="ml-auto text-xs text-muted">{names.join(", ")}</span>
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <Resort onDone={() => router.refresh()} />
 

@@ -42,6 +42,12 @@ const CHUNK_CHARS = 6000;
 
 /** Claude reads images up to this long edge without downscaling them itself. */
 const IMAGE_MAX_EDGE = 1568;
+/** Claude's comfortable image size; bigger images are scaled down on its side. */
+const IMAGE_MAX_PIXELS = 1_150_000;
+/** At most this many pieces per image (each piece is one model call). */
+const MAX_IMAGE_TILES = 6;
+/** Pixels each piece shares with the previous one, so text lines are not cut everywhere. */
+const TILE_OVERLAP = 60;
 
 const HANGUL = /[가-힣ᄀ-ᇿ㄰-㆏]/;
 
@@ -245,6 +251,15 @@ function chunkLines(lines: string[]): string[] {
 
 // ---------------------------------------------------------------- images
 
+/**
+ * An image as one or more analysis parts. Claude reads an image best at up
+ * to ~1.15 megapixels with a long edge of 1568 px; shrinking a whole
+ * screenshot to that made small text unreadable (a wide desktop capture or a
+ * tall phone one came back as "no words"). So the short edge is kept at full
+ * resolution (up to 1568 px) and the long edge is cut into tiles of that
+ * size, overlapping a little so no line of text is cut in half everywhere.
+ * Words found in two tiles are merged later like words from two parts.
+ */
 async function imageSource(file: File): Promise<ImportSource> {
   let bitmap: ImageBitmap;
   try {
@@ -255,30 +270,59 @@ async function imageSource(file: File): Promise<ImportSource> {
     );
   }
 
-  const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const context = canvas.getContext("2d")!;
-  // JPEG has no transparency; a transparent screenshot would turn black.
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
+  // Read before close(): a closed bitmap reports 0×0.
+  const { width, height } = bitmap;
+  const wide = width >= height;
+  const longEdge = wide ? width : height;
+  const shortEdge = wide ? height : width;
+  // Short edge at full resolution, but at most IMAGE_MAX_EDGE.
+  let scale = Math.min(1, IMAGE_MAX_EDGE / shortEdge);
+  const tileLength = (s: number) => Math.min(IMAGE_MAX_EDGE, Math.floor(IMAGE_MAX_PIXELS / (shortEdge * s)));
+  // Too many tiles (a very long scroll capture): shrink until it fits.
+  while (Math.ceil((longEdge * scale) / tileLength(scale)) > MAX_IMAGE_TILES) scale *= 0.85;
 
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode image"))), "image/jpeg", 0.85),
-  );
-  const data = await blobToBase64(blob);
+  const scaledLong = Math.round(longEdge * scale);
+  const scaledShort = Math.round(shortEdge * scale);
+  const tile = tileLength(scale);
+  const count = Math.max(1, Math.ceil(scaledLong / tile));
+  const overlap = count > 1 ? TILE_OVERLAP : 0;
+  const step = count > 1 ? (scaledLong - tile) / (count - 1) : 0;
 
   const id = nextId("s");
+  const jobs: ImportJob[] = [];
+  for (let i = 0; i < count; i++) {
+    // Tile i covers [start, start + length) of the scaled long edge.
+    const start = Math.max(0, Math.round(i * step) - (i > 0 ? overlap : 0));
+    const length = Math.min(scaledLong - start, count > 1 ? tile + overlap : scaledLong);
+    const canvas = document.createElement("canvas");
+    canvas.width = wide ? length : scaledShort;
+    canvas.height = wide ? scaledShort : length;
+    const context = canvas.getContext("2d")!;
+    // JPEG has no transparency; a transparent screenshot would turn black.
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    // Draw the whole image scaled, shifted so this tile's part is on the canvas.
+    context.drawImage(
+      bitmap,
+      wide ? -start : 0,
+      wide ? 0 : -start,
+      wide ? scaledLong : scaledShort,
+      wide ? scaledShort : scaledLong,
+    );
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode image"))), "image/jpeg", 0.85),
+    );
+    jobs.push({ id: nextId("j"), sourceId: id, payload: { image: { data: await blobToBase64(blob), mediaType: "image/jpeg" } } });
+  }
+  bitmap.close();
+
   return {
     id,
     name: file.name || "Pasted image",
     kind: "IMAGE",
     text: "",
-    summary: `Image · ${canvas.width}×${canvas.height}`,
-    jobs: [{ id: nextId("j"), sourceId: id, payload: { image: { data, mediaType: "image/jpeg" } } }],
+    summary: count > 1 ? `Image · ${width}×${height} · read in ${count} pieces` : `Image · ${width}×${height}`,
+    jobs,
   };
 }
 

@@ -75,6 +75,7 @@ export default async function CategoriesPage() {
       id: entry.id,
       lemma: entry.lemma,
       translation: entry.senses[0]?.translation ?? entry.senses[0]?.userMeaning ?? null,
+      userMeaning: entry.senses[0]?.userMeaning ?? null,
     })),
   }));
 

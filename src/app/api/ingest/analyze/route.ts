@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     /** The learner's instructions written above the text (see sourceFromText). */
     note?: string;
     topic?: string;
-    phrases?: boolean;
+    phrases?: boolean | "only";
     image?: { data?: string; mediaType?: string };
     maxWords?: number;
   };
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       userId,
       source,
       unlimitedAi: budget.unlimited,
-      phrases: body.phrases === true,
+      phrases: body.phrases === "only" ? "only" : body.phrases === true,
       maxWords: body.maxWords,
     });
     const after = await getAiBalance(prisma, userId);
