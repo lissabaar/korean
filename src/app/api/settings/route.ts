@@ -27,6 +27,7 @@ export async function PATCH(request: Request) {
     autoPlayAudio?: boolean;
     myMeaningFirst?: boolean;
     newPerSession?: number;
+    cardTextSize?: number;
   } = {};
   if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 10) {
     data.learningGoal = body.learningGoal;
@@ -36,6 +37,9 @@ export async function PATCH(request: Request) {
   if (typeof body.myMeaningFirst === "boolean") data.myMeaningFirst = body.myMeaningFirst;
   if (Number.isInteger(body.newPerSession) && body.newPerSession >= 5 && body.newPerSession <= 50) {
     data.newPerSession = body.newPerSession;
+  }
+  if (Number.isInteger(body.cardTextSize) && body.cardTextSize >= 0 && body.cardTextSize <= 2) {
+    data.cardTextSize = body.cardTextSize;
   }
   if (typeof body.showKoreanDefinition === "boolean") {
     data.showKoreanDefinition = body.showKoreanDefinition;

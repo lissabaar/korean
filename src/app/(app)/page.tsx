@@ -1,6 +1,7 @@
 /**
- * Home page ("/"): deck counters (due now, new to learn, total words) and
- * the three ways in — Learn, Review, Add words.
+ * Home page ("/"): a short "what is this site" block (<HomeIntro/>), deck
+ * counters (due now, new to learn, total words) and the three ways in —
+ * Learn, Review, Add words.
  *
  * Next.js page (server component): runs on the server for every request, may
  * read the database directly, and returns HTML. The folder path is the URL.
@@ -14,6 +15,7 @@ import { prisma } from "@/lib/db";
 import { getAiBalance } from "@/lib/ai-budget";
 import { getDeckStats } from "@/lib/review/queue";
 import BackgroundVerify from "@/components/BackgroundVerify";
+import HomeIntro from "@/components/HomeIntro";
 import StarterDeckButton from "@/components/StarterDeckButton";
 import { currentUser } from "@/lib/session";
 import { STARTER_DECK } from "@/lib/words/starter-deck";
@@ -34,8 +36,9 @@ export default async function Home() {
   const hasWork = stats.due + stats.learning > 0;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6">
       <BackgroundVerify pending={pendingCheck} />
+      <HomeIntro />
       <header className="mb-8">
         <p className="korean text-4xl text-celadon-deep">안녕하세요</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Your words</h1>

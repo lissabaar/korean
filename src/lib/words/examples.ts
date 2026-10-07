@@ -15,6 +15,7 @@ import { assertCanUseAi, AiQuotaError, recordAiUsage } from "../ai-budget";
 import { cachedExamples } from "../dictionary/cached";
 import type { DictionaryKeys } from "../dictionary/krdict";
 import { EXTRACTION_MODEL } from "../ingest/extract";
+import { EditError } from "./edit";
 
 /** One request per run is plenty for a personal deck; run again for more. */
 const MAX_WORDS_PER_RUN = 60;
@@ -197,4 +198,86 @@ export async function fillMissingExamples(
     where: { order: 0, examples: { none: {} }, entry: { userId } },
   });
   return { fromDictionary, fromAi, remaining, aiBlocked };
+}
+
+// ---------------------------------------------------------------- one word, on request
+
+/** An example offered in the word editor ("Add example"). */
+export interface ExampleSuggestion {
+  text: string;
+  /** English, when known (AI-written, or already translated for someone). */
+  translation: string | null;
+  source: "KRDICT" | "AI";
+}
+
+/** The word, its main meaning and dictionary code — or a 404-style error. */
+async function wordForExample(prisma: PrismaClient, userId: string, entryId: string) {
+  const entry = await prisma.entry.findFirst({
+    where: { id: entryId, userId },
+    select: {
+      lemma: true,
+      level: true,
+      krdictTargetCode: true,
+      senses: { orderBy: { order: "asc" }, take: 1, select: { translation: true, userMeaning: true } },
+    },
+  });
+  if (!entry) throw new EditError("No such word.", 404);
+  return entry;
+}
+
+/**
+ * Dictionary examples for one word, free: KRDict's view API through the
+ * shared cache, with English from the shared translation cache where some
+ * learner's card already needed it.
+ */
+export async function dictionaryExamples(
+  prisma: PrismaClient,
+  keys: DictionaryKeys,
+  userId: string,
+  entryId: string,
+): Promise<ExampleSuggestion[]> {
+  const entry = await wordForExample(prisma, userId, entryId);
+  const code = entry.krdictTargetCode;
+  if (!code || !/^\d+$/.test(code)) return [];
+  const texts = await cachedExamples(prisma, code, keys);
+  const known = texts.length
+    ? await prisma.exampleTranslation.findMany({ where: { text: { in: texts } } })
+    : [];
+  const english = new Map(known.map((row) => [row.text, row.translation]));
+  return texts.map((text) => ({ text, translation: english.get(text) ?? null, source: "KRDICT" }));
+}
+
+/**
+ * One example sentence written by the model for this word in its main
+ * meaning, with an English translation. Metered (ai-budget.ts); throws
+ * AiQuotaError when AI may not be used.
+ */
+export async function writeExample(
+  prisma: PrismaClient,
+  anthropic: Anthropic,
+  userId: string,
+  entryId: string,
+): Promise<ExampleSuggestion> {
+  const entry = await wordForExample(prisma, userId, entryId);
+  const { unlimited } = await assertCanUseAi(prisma, userId);
+  const sense = entry.senses[0];
+  const meaning = sense?.translation ?? sense?.userMeaning ?? "";
+  const response = await anthropic.messages.parse({
+    model: EXTRACTION_MODEL,
+    max_tokens: 1000,
+    system:
+      "You write example sentences for a Korean vocabulary app. Write one short, natural, everyday sentence (polite 해요체) that clearly shows the word's meaning, at a level a learner of that word can read, and its English translation. Use the word exactly in the meaning given.",
+    messages: [
+      { role: "user", content: `${entry.lemma} — ${meaning || "?"}${entry.level ? ` (${entry.level})` : ""}` },
+    ],
+    output_config: { format: zodOutputFormat(ExampleSchema) },
+  });
+  await recordAiUsage(prisma, userId, unlimited, response.model, response.usage);
+  const written = response.parsed_output?.examples[0];
+  if (!written?.example.trim()) throw new Error("The model wrote no example");
+  return {
+    text: written.example.normalize("NFC").trim().slice(0, 500),
+    translation: written.translation.trim().slice(0, 500) || null,
+    source: "AI",
+  };
 }

@@ -19,7 +19,7 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
 import type { AnswerResult } from "@/lib/review/submit";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
@@ -61,6 +61,19 @@ function shuffle<T>(items: T[]): T[] {
  * The study session. `mode`: "learn" (new words), "review" (due reviews) or
  * "all". The queue's head is the card on screen.
  */
+/**
+ * Text sizes on the card, by the user's "Card text size" setting
+ * (User.cardTextSize: 0 normal, 1 large, 2 extra large). Shared through a
+ * context so every part of the card reads the same setting.
+ */
+const TEXT_SIZES = [
+  { meaning: "text-2xl", second: "text-base", example: "text-lg sm:text-base", exampleTranslation: "text-sm", definition: "text-base" },
+  { meaning: "text-3xl", second: "text-lg", example: "text-xl", exampleTranslation: "text-base", definition: "text-lg" },
+  { meaning: "text-4xl", second: "text-xl", example: "text-2xl", exampleTranslation: "text-lg", definition: "text-xl" },
+] as const;
+type TextSize = (typeof TEXT_SIZES)[number];
+const TextSizeContext = createContext<TextSize>(TEXT_SIZES[1]);
+
 /** The meaning a card leads with — the same order as meaningText() on the server. */
 function leadMeaning(
   translation: string | null,
@@ -132,6 +145,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [myMeaningFirst, setMyMeaningFirst] = useState(false);
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [textSize, setTextSize] = useState(1);
 
   useEffect(() => {
     fetch(`/api/review/session?mode=${mode}`)
@@ -144,6 +158,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         setAutoPlay(Boolean(data.autoPlay));
         setMyMeaningFirst(Boolean(data.myMeaningFirst));
         setCategoryNames(data.categoryNames ?? []);
+        setTextSize(typeof data.textSize === "number" ? data.textSize : 1);
         setLoad("ready");
       })
       .catch((cause) => {
@@ -159,12 +174,19 @@ export default function Review({ mode }: { mode: StudyMode }) {
    * The editor under the card closed. After a save, every card of that word
    * in this session takes the edited data; after a delete, they leave it.
    */
-  async function finishEdit(entryId: string, changed: boolean, deleted?: boolean) {
+  async function finishEdit(entryId: string, changed: boolean, deleted?: boolean, studiedSenseIds?: string[]) {
     setEditing(null);
     if (!changed) return;
     if (deleted) {
       setQueue((items) => items.filter((item) => item.entryId !== entryId));
       return;
+    }
+    // Meanings unticked in the editor: their cards are gone, so they leave
+    // the session. Newly ticked ones start in a later session.
+    if (studiedSenseIds) {
+      setQueue((items) =>
+        items.filter((item) => item.entryId !== entryId || studiedSenseIds.includes(item.senseId)),
+      );
     }
     try {
       const response = await fetch(`/api/words/${entryId}`);
@@ -330,6 +352,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
         </div>
       </div>
 
+      <TextSizeContext.Provider value={TEXT_SIZES[textSize] ?? TEXT_SIZES[1]}>
       {showIntro ? (
         <Intro
           key={`intro-${current.cardId}`}
@@ -355,17 +378,19 @@ export default function Review({ mode }: { mode: StudyMode }) {
           <WordEditor
             wordId={editing}
             allCategoryNames={categoryNames}
-            onDone={(changed, deleted) => finishEdit(editing, changed, deleted)}
+            onDone={(changed, deleted, studiedSenseIds) => finishEdit(editing, changed, deleted, studiedSenseIds)}
           />
         </div>
       )}
+      </TextSizeContext.Provider>
     </Shell>
   );
 }
 
 /** Page frame (width and padding) shared by every state of the screen. */
 function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
+  // Wider on desktop, so long examples fit on one line.
+  return <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
 }
 
 // ---------------------------------------------------------------- question
@@ -681,6 +706,7 @@ function Intro({
   const [error, setError] = useState<string | null>(null);
   const startRef = useRef<HTMLButtonElement>(null);
   const { back } = item;
+  const size = useContext(TextSizeContext);
   const level = levelLabel(back.level);
   const pos = posLabel(back.partOfSpeech);
 
@@ -721,18 +747,18 @@ function Intro({
           )}
           {pos && <span className="text-xs text-muted">{pos}</span>}
         </div>
-        {back.translation && <p className="mt-4 text-2xl font-semibold">{back.translation}</p>}
+        {back.translation && <p className={`mt-4 font-semibold ${size.meaning}`}>{back.translation}</p>}
         {back.userMeaning && (
-          <p className={back.translation ? "mt-1 text-base text-muted" : "mt-4 text-2xl font-semibold"}>
+          <p className={back.translation ? `mt-1 text-muted ${size.second}` : `mt-4 font-semibold ${size.meaning}`}>
             {back.translation ? `Yours: ${back.userMeaning}` : back.userMeaning}
           </p>
         )}
-        {back.definitionTarget && <p className="korean mt-3 text-base">{back.definitionTarget}</p>}
+        {back.definitionTarget && <p className={`korean mt-3 ${size.definition}`}>{back.definitionTarget}</p>}
         {back.definitionKnown && <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>}
         {back.example && (
           <div className="mt-4 border-l-2 border-celadon pl-3">
-            <p className="korean text-lg leading-relaxed sm:text-base">{back.example}</p>
-            {back.exampleTranslation && <p className="mt-0.5 text-sm text-muted">{back.exampleTranslation}</p>}
+            <p className={`korean leading-relaxed ${size.example}`}>{back.example}</p>
+            {back.exampleTranslation && <p className={`mt-0.5 text-muted ${size.exampleTranslation}`}>{back.exampleTranslation}</p>}
           </div>
         )}
         {/* The model's note on how the word was used in the user's text — labelled,
@@ -777,6 +803,7 @@ function Intro({
 // ---------------------------------------------------------------- card faces
 
 function Front({ item }: { item: ReviewItem }) {
+  const size = useContext(TextSizeContext);
   if (item.front.lemma) {
     return (
       <div className="grid min-h-40 place-items-center rounded-lg bg-celadon-soft px-6 py-10">
@@ -789,8 +816,8 @@ function Front({ item }: { item: ReviewItem }) {
   }
   return (
     <div className="rounded-lg border border-line bg-surface px-6 py-8">
-      {item.front.meaning && <p className="text-2xl font-semibold">{item.front.meaning}</p>}
-      {item.front.altMeaning && <p className="mt-1 text-base text-muted">{item.front.altMeaning}</p>}
+      {item.front.meaning && <p className={`font-semibold ${size.meaning}`}>{item.front.meaning}</p>}
+      {item.front.altMeaning && <p className={`mt-1 text-muted ${size.second}`}>{item.front.altMeaning}</p>}
       {item.front.definitionTarget && (
         <p className={`korean text-muted ${item.front.meaning ? "mt-3" : "text-lg text-ink"}`}>
           {item.front.definitionTarget}
@@ -807,6 +834,7 @@ function Front({ item }: { item: ReviewItem }) {
  */
 function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
   const { back, front } = item;
+  const size = useContext(TextSizeContext);
   const level = levelLabel(back.level);
   const pos = posLabel(back.partOfSpeech);
   return (
@@ -827,21 +855,21 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
         <EditButton onClick={onEdit} className="ml-auto" />
       </div>
       <CategoryChips names={item.categories} />
-      {back.translation && !front.meaning && <p className="mt-2 font-medium">{back.translation}</p>}
+      {back.translation && !front.meaning && <p className={`mt-2 font-medium ${size.second}`}>{back.translation}</p>}
       {back.userMeaning && !front.meaning && (
         <p className="mt-1 text-sm text-muted">Yours: {back.userMeaning}</p>
       )}
       {back.definitionTarget && !front.definitionTarget && (
-        <p className="korean mt-2 text-base sm:text-sm">{back.definitionTarget}</p>
+        <p className={`korean mt-2 ${size.definition}`}>{back.definitionTarget}</p>
       )}
       {back.definitionKnown && !front.meaning && (
         <p className="mt-1 text-sm text-muted">{back.definitionKnown}</p>
       )}
       {back.example && (
         <div className="mt-3 border-l-2 border-celadon pl-3">
-          <p className="korean text-lg leading-relaxed sm:text-base">{back.example}</p>
+          <p className={`korean leading-relaxed ${size.example}`}>{back.example}</p>
           {back.exampleTranslation && (
-            <p className="mt-0.5 text-sm text-muted">{back.exampleTranslation}</p>
+            <p className={`mt-0.5 text-muted ${size.exampleTranslation}`}>{back.exampleTranslation}</p>
           )}
         </div>
       )}

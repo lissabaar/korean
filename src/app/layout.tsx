@@ -48,7 +48,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    // data-theme is set by the script below before React loads, so React
+    // must not complain that the server's <html> had none.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* The stored light/dark choice, applied before the first paint (see ThemeToggle.tsx). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("hangugo:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={`${publicSans.variable} ${gowun.variable}`}>
         {children}
       </body>

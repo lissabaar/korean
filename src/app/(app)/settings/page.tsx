@@ -39,6 +39,7 @@ export default async function SettingsPage() {
         autoPlayAudio: true,
         myMeaningFirst: true,
         newPerSession: true,
+        cardTextSize: true,
       },
     }),
     getAiBalance(prisma, user.id),
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
       autoPlayAudio={settings.autoPlayAudio}
       myMeaningFirst={settings.myMeaningFirst}
       newPerSession={settings.newPerSession}
+      cardTextSize={settings.cardTextSize}
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
       missingMeanings={missingMeanings}

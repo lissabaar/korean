@@ -39,6 +39,7 @@ export default function SettingsPanel({
   autoPlayAudio: initialAutoPlay,
   myMeaningFirst: initialMyFirst,
   newPerSession: initialNewPerSession,
+  cardTextSize: initialTextSize,
   credits,
   missingExamples,
   missingMeanings,
@@ -54,6 +55,8 @@ export default function SettingsPanel({
   autoPlayAudio: boolean;
   myMeaningFirst: boolean;
   newPerSession: number;
+  /** 0 normal, 1 large, 2 extra large — see TEXT_SIZES in Review.tsx. */
+  cardTextSize: number;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
@@ -71,6 +74,7 @@ export default function SettingsPanel({
   const [autoPlay, setAutoPlay] = useState(initialAutoPlay);
   const [myFirst, setMyFirst] = useState(initialMyFirst);
   const [perSession, setPerSession] = useState(initialNewPerSession);
+  const [textSize, setTextSize] = useState(initialTextSize);
   const [error, setError] = useState<string | null>(null);
   /** One fill at a time: while one runs, the other button waits. */
   const [task, setTask] = useState<"meanings" | "examples" | "translations" | null>(null);
@@ -140,14 +144,15 @@ export default function SettingsPanel({
   const section = "rounded-lg border border-line bg-surface p-4";
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pb-16 pt-8 sm:px-6">
-      <header className="mb-2">
+    // Two columns of sections where the screen allows; headings and errors span both.
+    <main className="mx-auto grid max-w-5xl items-start gap-4 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-2">
+      <header className="mb-2 lg:col-span-2">
         <p className="korean text-4xl text-celadon-deep">설정</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Settings</h1>
       </header>
 
       {error && (
-        <p role="alert" className="rounded-md bg-clay-soft px-3 py-2.5 text-sm text-clay">
+        <p role="alert" className="rounded-md bg-clay-soft px-3 py-2.5 text-sm text-clay lg:col-span-2">
           {error}
         </p>
       )}
@@ -276,6 +281,33 @@ export default function SettingsPanel({
               }`}
             >
               {n}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className="font-medium">Card text size</h2>
+        <p className="mt-1 text-sm text-muted">
+          Size of the meaning, the example and its translation on study cards.
+        </p>
+        <div role="radiogroup" aria-label="Card text size" className="mt-3 flex flex-wrap gap-2">
+          {(["Normal", "Large", "Extra large"] as const).map((label, value) => (
+            <button
+              key={label}
+              type="button"
+              role="radio"
+              aria-checked={textSize === value}
+              onClick={() => {
+                const before = textSize;
+                setTextSize(value);
+                save({ cardTextSize: value }, () => setTextSize(before));
+              }}
+              className={`h-11 rounded-md border px-4 ${
+                textSize === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+              } ${["text-sm", "text-base", "text-lg"][value]}`}
+            >
+              {label}
             </button>
           ))}
         </div>

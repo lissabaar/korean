@@ -696,7 +696,7 @@ export default function AddWords({
   const unreachableCount = candidates.filter((c) => c.status === "unreachable").length;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-28 pt-8 sm:px-6">
+    <main className="mx-auto max-w-5xl px-4 pb-28 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">새 단어</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Add words</h1>
@@ -1153,7 +1153,7 @@ export default function AddWords({
           {/* Fixed on mobile so the action stays reachable in a long list. */}
           <div className="fixed inset-x-0 bottom-0 border-t border-line bg-paper px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
             {!autoAdd && (
-              <div className="mx-auto mb-2 flex max-w-4xl gap-4 text-sm">
+              <div className="mx-auto mb-2 flex max-w-5xl gap-4 text-sm">
                 <button type="button" onClick={() => setAll(true)} className="text-celadon-deep underline underline-offset-4">
                   Select all
                 </button>
@@ -1162,7 +1162,7 @@ export default function AddWords({
                 </button>
               </div>
             )}
-            <div className="mx-auto flex max-w-4xl gap-3">
+            <div className="mx-auto flex max-w-5xl gap-3">
               <button
                 type="button"
                 onClick={() => {

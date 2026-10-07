@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const [settings, categories] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { autoPlayAudio: true, myMeaningFirst: true },
+        select: { autoPlayAudio: true, myMeaningFirst: true, cardTextSize: true },
       }),
       prisma.category.findMany({ where: { userId }, select: { name: true }, orderBy: { name: "asc" } }),
     ]);
@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       // categories it can put the word in.
       myMeaningFirst: settings?.myMeaningFirst ?? false,
       categoryNames: categories.map((c) => c.name),
+      textSize: settings?.cardTextSize ?? 1,
     });
   } catch (error) {
     console.error("Building review session failed:", error);

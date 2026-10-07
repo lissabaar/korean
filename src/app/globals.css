@@ -20,8 +20,15 @@
   --font-korean: var(--font-gowun), "Apple SD Gothic Neo", "Malgun Gothic", serif;
 }
 
+/*
+  Dark palette. The theme switch in the nav sets data-theme on <html>
+  ("light" or "dark", remembered in localStorage — see ThemeToggle.tsx and
+  the inline script in app/layout.tsx); without a choice the system setting
+  decides. Tailwind's colour utilities read these variables, so overriding
+  them re-colours everything.
+*/
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root:not([data-theme="light"]) {
     --color-paper: #151a17;
     --color-surface: #1c2320;
     --color-ink: #e8ece9;
@@ -32,7 +39,22 @@
     --color-celadon-deep: #a8c9b9;
     --color-clay: #c9875f;
     --color-clay-soft: #30241d;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+    --color-paper: #151a17;
+    --color-surface: #1c2320;
+    --color-ink: #e8ece9;
+    --color-muted: #96a29c;
+    --color-line: #2c3630;
+    --color-celadon: #8fb6a4;
+    --color-celadon-soft: #23302a;
+    --color-celadon-deep: #a8c9b9;
+    --color-clay: #c9875f;
+    --color-clay-soft: #30241d;
+    color-scheme: dark;
 }
 
 html {

@@ -36,6 +36,15 @@ export interface ApprovedWord {
   useDictionaryMeaning?: boolean;
 }
 
+/**
+ * Whether the "sentence" the model returned is one. For a bare word list it
+ * sometimes returns the word itself or one form of it (부드러워, 뽑았) —
+ * that is no example, so a sentence needs at least two words.
+ */
+function isSentence(text: string | undefined): boolean {
+  return /\S\s+\S/.test(text?.trim() ?? "");
+}
+
 /** The user's own meaning, unless they chose to drop it for the dictionary's. */
 function ownMeaning(word: ApprovedWord): string | null {
   const meaning = word.userMeaning?.trim().slice(0, 300);
@@ -217,8 +226,8 @@ async function persistOne(
               create: [
                 // The learner's own sentence first: it is the context they met
                 // the word in. Dictionary examples follow.
-                ...(index === 0 && word.sentence?.trim()
-                  ? [{ text: word.sentence.trim().slice(0, 500), source: "USER" as const }]
+                ...(index === 0 && isSentence(word.sentence)
+                  ? [{ text: word.sentence!.trim().slice(0, 500), source: "USER" as const }]
                   : []),
                 ...sense.examples.slice(0, 3).map((example) => ({
                   text: example,

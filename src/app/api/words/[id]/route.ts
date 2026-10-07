@@ -61,6 +61,8 @@ export async function PATCH(request: Request, { params }: Params) {
       userMeaning: text(body.userMeaning),
       definition: text(body.definition),
       example: text(body.example),
+      exampleTranslation: text(body.exampleTranslation),
+      exampleSource: ["KRDICT", "AI", "USER"].includes(body.exampleSource) ? body.exampleSource : undefined,
       categories: Array.isArray(body.categories)
         ? body.categories.filter((name: unknown): name is string => typeof name === "string")
         : undefined,

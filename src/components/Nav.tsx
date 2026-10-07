@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 
 const LINKS = [
   { href: "/", label: "Home", icon: "bi-house" },
@@ -27,7 +28,7 @@ export default function Nav({ email }: { email: string | null }) {
   const pathname = usePathname();
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-10 border-b border-line bg-paper/90 backdrop-blur">
-      <nav className="mx-auto flex max-w-5xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
+      <nav className="mx-auto flex max-w-6xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
         <Link href="/" className="korean mr-2 text-xl text-celadon-deep" aria-label="Home">
           단어
         </Link>
@@ -49,17 +50,20 @@ export default function Nav({ email }: { email: string | null }) {
             </Link>
           );
         })}
-        {email === null ? (
-          // No account yet. Sign-in links to sign-up, and either way the words
-          // added so far come along.
-          <Link
-            href="/sign-in"
-            className="ml-auto rounded-md px-2 py-1.5 text-sm font-medium text-celadon-deep"
-          >
-            <i className="bi bi-person-circle sm:mr-1.5" aria-hidden />
-            <span className="hidden sm:inline">Sign in</span>
-          </Link>
-        ) : null}
+        <div className="ml-auto flex items-center">
+          <ThemeToggle />
+          {email === null ? (
+            // No account yet. Sign-in links to sign-up, and either way the words
+            // added so far come along.
+            <Link
+              href="/sign-in"
+              className="rounded-md px-2 py-1.5 text-sm font-medium text-celadon-deep"
+            >
+              <i className="bi bi-person-circle sm:mr-1.5" aria-hidden />
+              <span className="hidden sm:inline">Sign in</span>
+            </Link>
+          ) : null}
+        </div>
       </nav>
     </header>
   );

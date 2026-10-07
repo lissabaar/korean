@@ -70,7 +70,7 @@ export async function verifyPending(
       }
 
       // The AI English meaning saved with the word picks the homograph.
-      const best = rankHomographs(entries, sense?.translation ?? "", sense?.userMeaning ?? "")[0];
+      const best = rankHomographs(entries, sense?.translation ?? "", "", sense?.userMeaning ?? "")[0];
       const first = best.senses[0];
       await prisma.$transaction([
         prisma.entry.update({

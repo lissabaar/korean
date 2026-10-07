@@ -117,7 +117,15 @@ then AI checked against the dictionary) — run after saving and from Settings.
 
 **One card tests one thing.**
 Cards hang off `Sense`, not `Entry`. A word with three senses → three sense
-rows, but only the first sense gets cards by default.
+rows; by default only the first (order 0) gets cards, and the first is the
+sense meant: `rankHomographs()` moves the best-matching sense to the front —
+the user's meaning, else the context (gloss), else the dictionary's first.
+Translation overlap decides, the English definition only when no
+translation matches (definitions match common words by chance). The word
+editor's "Meanings to learn" (`words/senses.ts`) ticks more senses: each
+gets its own cards; unticking deletes that sense's cards. Senses missing
+from the DB (words saved by verify.ts keep one) come from the dictionary
+cache and are created when ticked.
 
 **Two phases, not two difficulties.**
 `LEARNING` (streak-based, no FSRS) and `SCHEDULED` (FSRS). Never put learning
@@ -258,6 +266,16 @@ also sets introducedAt.
 words already started first, the rest a random pick from the whole pool
 (oldest-first made an imported list come up in its own order). In the
 session a repeated card goes back to a random later position (Review.tsx).
+
+**Examples are sentences.** A model "sentence" with no space (the word
+itself, 부드러워) is not stored as an example (`isSentence` in commit.ts).
+"Add example" in the word editor: dictionary examples (free, with shared
+cached translations) or one AI-written with translation (metered); saved
+with the word, a changed sentence drops its old translation.
+
+**Look.** Light/dark switch in the nav (`ThemeToggle`, data-theme on
+<html>, inline script in app/layout.tsx prevents a flash). Card text size
+is `User.cardTextSize` (0–2, default 1), applied via TEXT_SIZES in Review.tsx.
 
 **Example translations.** KRDict examples are Korean only; the example a
 card shows gets English from the model (`words/example-translations.ts`,

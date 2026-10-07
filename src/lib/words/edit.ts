@@ -145,7 +145,12 @@ export async function updateWord(
   prisma: PrismaClient,
   userId: string,
   id: string,
-  input: Partial<Omit<WordDetails, "id">>,
+  input: Partial<Omit<WordDetails, "id">> & {
+    /** English for a new example (one picked from AI comes with it). */
+    exampleTranslation?: string;
+    /** Where a new example came from; typed by the user unless said otherwise. */
+    exampleSource?: "KRDICT" | "AI" | "USER";
+  },
 ): Promise<void> {
   const text = (value: string | undefined, max: number) =>
     value === undefined ? undefined : value.normalize("NFC").replace(/\s+/g, " ").trim().slice(0, max);
@@ -182,10 +187,16 @@ export async function updateWord(
 
       const example = text(input.example, 500);
       const current = sense.examples[0];
-      if (example !== undefined) {
+      if (example !== undefined && example !== (current?.text ?? "")) {
+        // A changed sentence: the old translation no longer fits it.
+        const data = {
+          text: example,
+          source: input.exampleSource ?? "USER",
+          translation: text(input.exampleTranslation, 500) || null,
+        };
         if (!example && current) await tx.example.delete({ where: { id: current.id } });
-        else if (example && current) await tx.example.update({ where: { id: current.id }, data: { text: example, source: "USER" } });
-        else if (example) await tx.example.create({ data: { senseId: sense.id, text: example, source: "USER" } });
+        else if (current) await tx.example.update({ where: { id: current.id }, data });
+        else await tx.example.create({ data: { senseId: sense.id, ...data } });
       }
     }
 

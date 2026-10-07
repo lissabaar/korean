@@ -177,7 +177,7 @@ export async function analyzeText(
 
   const candidates: WordCandidate[] = extracted.map((word, index) => {
     const found = dictionary.get(word.lemma);
-    const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote);
+    const homographs = rankHomographs(found ?? [], word.gloss, word.contextNote, word.userMeaning);
     const dictEntry = homographs[0] ?? null;
     // A category the learner asked for wins over the model's per-word pick.
     const { primary, secondary } = extraction.requestedCategory
@@ -256,34 +256,79 @@ function words(text: string | undefined | null): string[] {
     .filter((word) => word.length > 1 && !STOPWORDS.has(word));
 }
 
+/** Points for words of `text` found among the evidence: strong 3, weak 1. */
+function overlap(text: string | undefined, strong: Set<string>, weak: Set<string>): number {
+  let points = 0;
+  for (const word of new Set(words(text))) {
+    if (strong.has(word)) points += 3;
+    else if (weak.has(word)) points += 1;
+  }
+  return points;
+}
+
 /**
- * Order homographs by how well their translations match the model's reading
- * of the context. The model never supplies the meaning itself — it only
- * says which of the dictionary's own entries was meant. Ties keep the
- * dictionary's order.
+ * How well one dictionary sense matches what is known about the meaning
+ * meant (strong: the model's gloss and the user's own meaning; weak: the
+ * context note). The sense's translation is what counts; its English
+ * definition only decides when no translation matches at all — definitions
+ * are long and match common words by chance.
  */
-export function rankHomographs(entries: DictEntry[], gloss: string, contextNote: string): DictEntry[] {
-  if (entries.length < 2) return entries;
-
-  const glossWords = new Set(words(gloss));
-  const noteWords = new Set(words(contextNote));
-
-  const score = (entry: DictEntry): number => {
-    let best = 0;
-    for (const sense of entry.senses) {
-      const senseWords = words(`${sense.translation ?? ""} ${sense.translatedDefinition ?? ""}`);
-      let points = 0;
-      for (const word of new Set(senseWords)) {
-        if (glossWords.has(word)) points += 3;
-        else if (noteWords.has(word)) points += 1;
-      }
-      best = Math.max(best, points);
-    }
-    return best;
+function senseScore(sense: DictEntry["senses"][number], strong: Set<string>, weak: Set<string>) {
+  return {
+    translation: overlap(sense.translation, strong, weak),
+    definition: overlap(sense.translatedDefinition, strong, weak),
   };
+}
+
+/**
+ * Which sense of an entry is meant: the first sense with the best-matching
+ * translation; if no translation matches, the first with the best-matching
+ * definition; with no evidence at all, the first sense (the dictionary's
+ * main one). Ties keep the dictionary's order. Exported for the repair of
+ * words saved before senses were picked.
+ */
+export function bestSenseIndex(entry: DictEntry, strong: Set<string>, weak: Set<string>): number {
+  const scores = entry.senses.map((sense) => senseScore(sense, strong, weak));
+  const pick = (key: "translation" | "definition") => {
+    const max = Math.max(0, ...scores.map((score) => score[key]));
+    return max > 0 ? scores.findIndex((score) => score[key] === max) : -1;
+  };
+  const byTranslation = pick("translation");
+  if (byTranslation >= 0) return byTranslation;
+  const byDefinition = pick("definition");
+  return byDefinition >= 0 ? byDefinition : 0;
+}
+
+/**
+ * Order homographs by how well their senses match the meaning meant, and
+ * within each entry move the matching sense to the front — the first sense
+ * is the one that gets cards (놓다 has 27 senses: "let go" first, "put;
+ * place" ninth; a list saying "놓다 — класть" means the ninth).
+ *
+ * The evidence: the model's gloss (based on the user's meaning when they
+ * wrote one, else on the context), the user's own meaning, and the context
+ * note. The model never supplies the meaning itself — it only says which of
+ * the dictionary's own senses was meant. With no evidence the dictionary's
+ * order stands (its main sense first). Ties keep the dictionary's order.
+ */
+export function rankHomographs(
+  entries: DictEntry[],
+  gloss: string,
+  contextNote: string,
+  userMeaning = "",
+): DictEntry[] {
+  const strong = new Set([...words(gloss), ...words(userMeaning)]);
+  const weak = new Set(words(contextNote));
 
   return entries
-    .map((entry, index) => ({ entry, index, points: score(entry) }))
+    .map((entry, index) => {
+      const best = bestSenseIndex(entry, strong, weak);
+      // Homographs are ranked by their best sense: translation matches first.
+      const score = entry.senses.length ? senseScore(entry.senses[best], strong, weak) : null;
+      const points = score ? score.translation * 100 + score.definition : 0;
+      const senses = best === 0 ? entry.senses : [entry.senses[best], ...entry.senses.filter((_, i) => i !== best)];
+      return { entry: { ...entry, senses }, index, points };
+    })
     .sort((a, b) => b.points - a.points || a.index - b.index)
     .map(({ entry }) => entry);
 }
