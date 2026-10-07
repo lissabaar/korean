@@ -23,18 +23,26 @@ import SpeakButton from "./SpeakButton";
 import type { DictEntry } from "@/lib/dictionary/krdict";
 
 interface Props {
-  candidate: WordCandidate;
+  candidate: WordCandidate & { saved?: boolean; entryId?: string; removed?: boolean };
   onChange: (next: WordCandidate) => void;
   /** Category names to choose from: the user's own plus the built-in set. */
   categories: string[];
+  /**
+   * "Add automatically" mode: words are saved as they come, so there is
+   * nothing to tick — saved words get a remove button instead.
+   */
+  autoMode?: boolean;
+  /** Delete the just-added word (it has an entryId). */
+  onRemove?: () => Promise<void>;
 }
 
 /**
  * One preview row. `candidate` is the word with everything known about it;
  * `onChange` reports edits; `categories` fills the category picker.
  */
-export default function CandidateRow({ candidate, onChange, categories }: Props) {
+export default function CandidateRow({ candidate, onChange, categories, autoMode = false, onRemove }: Props) {
   const [open, setOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const sense = candidate.dictionary?.senses[0];
   const aiOnly = candidate.status === "ai";
@@ -46,23 +54,20 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
   // meaning is shown under it — it is kept, never replaced.
   const english = sense?.translation ?? (aiOnly || unreachable ? candidate.aiMeaning : null);
   const own = candidate.userMeaning && !candidate.useDictionaryMeaning ? candidate.userMeaning : null;
-  const saved = Boolean((candidate as { saved?: boolean }).saved);
+  const saved = Boolean(candidate.saved);
+  const removed = Boolean(candidate.removed);
 
   return (
     <li
       className={`border-b border-line px-4 py-4 last:border-b-0 sm:px-5 ${
-        candidate.selected || saved ? "" : "opacity-55"
+        removed ? "opacity-40" : candidate.selected || saved || autoMode ? "" : "opacity-55"
       }`}
     >
       {/* Row 1: the word as the heading — it can wrap, nothing sits beside it. */}
       <div className="flex items-start gap-3">
-        {saved ? (
-          <i
-            className="bi bi-check-circle-fill mt-1.5 shrink-0 text-lg text-celadon-deep"
-            aria-label="Added"
-            title="Added"
-          />
-        ) : (
+        {/* Review mode: a checkbox to include the word. Automatic mode saves
+            everything, so no checkbox — a just-added word can be removed instead. */}
+        {!autoMode && !saved && !removed && (
           <input
             type="checkbox"
             checked={candidate.selected}
@@ -72,12 +77,33 @@ export default function CandidateRow({ candidate, onChange, categories }: Props)
           />
         )}
         <h3
-          className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${
+          className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${removed ? "line-through" : ""} ${
             candidate.kind === "phrase" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
           }`}
         >
           {candidate.lemma}
         </h3>
+        {saved && candidate.entryId && onRemove && (
+          <button
+            type="button"
+            disabled={removing}
+            onClick={async () => {
+              setRemoving(true);
+              try {
+                await onRemove();
+              } finally {
+                setRemoving(false);
+              }
+            }}
+            aria-label={`Remove ${candidate.lemma} from your words`}
+            title="Added — remove it from your words"
+            className="mt-1 shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-clay disabled:opacity-50"
+          >
+            <i className={`bi ${removing ? "bi-hourglass-split" : "bi-trash"} sm:mr-1`} aria-hidden />
+            <span className="hidden sm:inline">Remove</span>
+          </button>
+        )}
+        {removed && <span className="mt-1.5 shrink-0 text-sm text-muted">Removed</span>}
         <SpeakButton text={candidate.lemma} />
       </div>
 

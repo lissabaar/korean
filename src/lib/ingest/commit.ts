@@ -79,6 +79,11 @@ export interface CommitResult {
   alreadySaved: string[];
   /** Failed to save; the error is in the server log. */
   skipped: string[];
+  /**
+   * The new word's id for each input word, in the input's order; null where
+   * nothing was created. Lets the preview offer "remove" right after adding.
+   */
+  entryIds: (string | null)[];
 }
 
 const REGISTERS = new Set([
@@ -133,32 +138,37 @@ export async function commitWords(
 
   const skipped: string[] = [];
   const alreadySaved: string[] = [];
+  const entryIds: (string | null)[] = [];
   let created = 0;
 
   for (const word of words) {
     try {
-      if (await persistOne(prisma, userId, material.id, word)) created += 1;
+      const id = await persistOne(prisma, userId, material.id, word);
+      entryIds.push(id);
+      if (id) created += 1;
       else alreadySaved.push(word.lemma);
     } catch (error) {
       // One bad word must not cost the user the other thirty-nine.
       console.error(`Failed to save "${word.lemma}":`, error);
       skipped.push(word.lemma);
+      entryIds.push(null);
     }
   }
 
-  return { materialId: material.id, created, alreadySaved, skipped };
+  return { materialId: material.id, created, alreadySaved, skipped, entryIds };
 }
 
 /**
  * Save one word: entry, senses, examples, categories and both study cards, in
- * one transaction. Returns false when the user already has this word.
+ * one transaction. Returns the new entry's id, or null when the user already
+ * has this word.
  */
 async function persistOne(
   prisma: PrismaClient,
   userId: string,
   materialId: string,
   word: ApprovedWord,
-): Promise<boolean> {
+): Promise<string | null> {
   const dict = resolveEntry(word);
   if (!dict) throw new Error(`"${word.lemma}" has neither dictionary data nor a meaning`);
 
@@ -177,9 +187,9 @@ async function persistOne(
     },
     select: { id: true },
   });
-  if (existing) return false;
+  if (existing) return null;
 
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const names = [word.primaryCategory, ...word.secondaryCategories];
     const categoryIds: string[] = [];
 
@@ -250,11 +260,11 @@ async function persistOne(
         ],
       });
     }
+    return entry.id;
   }, {
     // Several sequential round trips: generous enough for a database in
     // another region (the default 5 s was hit with Neon in São Paulo).
     maxWait: 10_000,
     timeout: 30_000,
   });
-  return true;
 }

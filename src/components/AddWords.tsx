@@ -54,6 +54,10 @@ type Candidate = WordCandidate & {
   originalCategory: string;
   saved?: boolean;
   lockCategory?: boolean;
+  /** The saved word's id, so "Remove" can delete it right away. */
+  entryId?: string;
+  /** Removed again after being added. */
+  removed?: boolean;
 };
 
 /**
@@ -335,8 +339,12 @@ export default function AddWords({
           }
 
           if (autoAdd) {
-            const saved = await commitWords(source, fresh.filter(isAddable));
-            for (const c of fresh) if (isAddable(c)) c.saved = true;
+            const addable = fresh.filter(isAddable);
+            const saved = await commitWords(source, addable);
+            addable.forEach((c, i) => {
+              c.saved = true;
+              c.entryId = saved.entryIds[i] ?? undefined;
+            });
             markPartDone(source, source.jobs.indexOf(job));
             setAdded((a) => ({
               created: a.created + saved.created,
@@ -429,7 +437,7 @@ export default function AddWords({
    * what happened: created, already saved, failed.
    */
   async function commitWords(source: ImportSource, words: Candidate[]) {
-    const result = { created: 0, pending: 0, alreadySaved: 0, failed: [] as string[] };
+    const result = { created: 0, pending: 0, alreadySaved: 0, failed: [] as string[], entryIds: [] as (string | null)[] };
     if (words.length === 0) return result;
     const response = await fetch("/api/ingest/commit", {
       method: "POST",
@@ -447,6 +455,7 @@ export default function AddWords({
     result.pending = words.filter((w) => w.status === "unreachable").length;
     result.alreadySaved = data.alreadySaved?.length ?? 0;
     result.failed = data.skipped ?? [];
+    result.entryIds = data.entryIds ?? [];
     return result;
   }
 
@@ -544,6 +553,21 @@ export default function AddWords({
             },
       ),
     );
+  }
+
+  /** "Remove" on a just-added word: delete it from the user's words again. */
+  async function removeWord(candidate: Candidate) {
+    if (!candidate.entryId) return;
+    const response = await fetch(`/api/words/${candidate.entryId}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setError(data.error ?? `Could not remove ${candidate.lemma}.`);
+      return;
+    }
+    setCandidates((list) =>
+      list.map((c) => (c.id === candidate.id ? { ...c, saved: false, selected: false, removed: true } : c)),
+    );
+    setAdded((a) => ({ ...a, created: Math.max(0, a.created - 1) }));
   }
 
   /** Tick: all of the file's words go into its own category. Untick: back to the model's picks. */
@@ -1141,6 +1165,8 @@ export default function AddWords({
                           candidate={candidate}
                           onChange={update}
                           categories={categories}
+                          autoMode={autoAdd}
+                          onRemove={() => removeWord(candidate)}
                         />
                       ))}
                     </ul>
