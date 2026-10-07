@@ -105,10 +105,17 @@ function markPartDone(source: ImportSource, index: number) {
  * tried once more after a pause. A non-JSON answer (the host's own 504/413
  * page) becomes a readable error instead of a JSON parse error.
  */
+/** What /api/ingest/analyze answers: the analysis, or an error (with aiQuota when out of AI). */
+type AnalyzeResponse = Partial<AnalysisResult> & {
+  error?: string;
+  aiQuota?: "user" | "daily" | "anonymous";
+  aiCreditsLeft?: number | null;
+};
+
 async function postAnalyze(
   body: unknown,
   signal: AbortSignal,
-): Promise<{ response: Response; data: Record<string, unknown> & { error?: string } }> {
+): Promise<{ response: Response; data: AnalyzeResponse }> {
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await fetch("/api/ingest/analyze", {
@@ -117,7 +124,7 @@ async function postAnalyze(
         body: JSON.stringify(body),
         signal,
       });
-      const data = await response.json().catch(() => ({
+      const data: AnalyzeResponse = await response.json().catch(() => ({
         error:
           response.status === 504
             ? "This part took too long to analyse. Try it again."
@@ -333,7 +340,7 @@ export default function AddWords({
           if (data.aiQuota) {
             // Every remaining part would be refused the same way.
             if (data.aiQuota === "user") setCredits(0);
-            setError(data.error);
+            setError(data.error ?? null);
             controller.abort();
             return;
           }
