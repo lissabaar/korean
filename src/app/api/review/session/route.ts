@@ -1,6 +1,7 @@
 /**
  * GET /api/review/session?mode=learn|review|all — the cards for one study
- * session plus deck counters.
+ * session plus deck counters, and what the card's word editor needs (the
+ * user's category names, which meaning leads).
  *
  * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
  * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
@@ -31,11 +32,22 @@ export async function GET(request: Request) {
       buildSession(prisma, userId, mode),
       getDeckStats(prisma, userId),
     ]);
-    const settings = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { autoPlayAudio: true },
+    const [settings, categories] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { autoPlayAudio: true, myMeaningFirst: true },
+      }),
+      prisma.category.findMany({ where: { userId }, select: { name: true }, orderBy: { name: "asc" } }),
+    ]);
+    return NextResponse.json({
+      items,
+      stats,
+      autoPlay: settings?.autoPlayAudio ?? false,
+      // For the word editor on the card: which meaning leads, and the
+      // categories it can put the word in.
+      myMeaningFirst: settings?.myMeaningFirst ?? false,
+      categoryNames: categories.map((c) => c.name),
     });
-    return NextResponse.json({ items, stats, autoPlay: settings?.autoPlayAudio ?? false });
   } catch (error) {
     console.error("Building review session failed:", error);
     return NextResponse.json({ error: "Could not load your reviews." }, { status: 500 });

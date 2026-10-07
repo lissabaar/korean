@@ -155,6 +155,10 @@ export interface ReviewItem {
   cardId: string;
   /** Both directions of a word share it — the intro is shown once per sense. */
   senseId: string;
+  /** The word (Entry) — what the "Edit" button opens. */
+  entryId: string;
+  /** Names of the word's categories, shown on the card. */
+  categories: string[];
   /** A new word not seen yet: show it whole first ("Start learning" / "Skip"). */
   intro: boolean;
   phase: Phase;
@@ -211,7 +215,9 @@ const cardInclude = {
       // cuid ids grow with creation order, so this is the first one saved —
       // the learner's own sentence when there is one.
       examples: { take: 1, orderBy: { id: "asc" as const } },
-      entry: { include: { categories: { select: { categoryId: true } } } },
+      entry: {
+        include: { categories: { select: { categoryId: true, category: { select: { name: true } } } } },
+      },
     },
   },
 } as const;
@@ -332,6 +338,8 @@ export async function buildSession(
     return {
       cardId: card.id,
       senseId: sense.id,
+      entryId: entry.id,
+      categories: entry.categories.map((c) => c.category.name).sort(),
       intro: card.phase === "LEARNING" && !card.introducedAt,
       phase: card.phase,
       direction,

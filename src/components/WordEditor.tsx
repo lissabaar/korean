@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Edit one saved word (opened from /categories): the word, English meaning,
+ * Edit one saved word (opened from /categories, and from a card while
+ * studying): the word, English meaning,
  * own meaning, definition, example, categories; or delete it. Loads and saves
  * through /api/words/:id.
  *
@@ -14,7 +15,10 @@ import { useEffect, useState } from "react";
 import type { WordDetails } from "@/lib/words/edit";
 import CategorySelect from "./CategorySelect";
 
-/** Edit or delete one saved word. Calls onDone(true) when something changed. */
+/**
+ * Edit or delete one saved word. Calls onDone(changed, deleted): changed is
+ * false when the user just closed it; deleted is true after a delete.
+ */
 export default function WordEditor({
   wordId,
   allCategoryNames,
@@ -22,7 +26,7 @@ export default function WordEditor({
 }: {
   wordId: string;
   allCategoryNames: string[];
-  onDone: (changed: boolean) => void;
+  onDone: (changed: boolean, deleted?: boolean) => void;
 }) {
   const [word, setWord] = useState<WordDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +55,7 @@ export default function WordEditor({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "Could not save.");
-      onDone(true);
+      onDone(true, method === "DELETE");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save.");
       setBusy(false);

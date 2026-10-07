@@ -120,7 +120,7 @@ export async function getWord(prisma: PrismaClient, userId: string, id: string):
   const entry = await prisma.entry.findFirst({
     where: { id, userId },
     include: {
-      senses: { orderBy: { order: "asc" }, take: 1, include: { examples: { take: 1 } } },
+      senses: { orderBy: { order: "asc" }, take: 1, include: { examples: { take: 1, orderBy: { id: "asc" } } } },
       categories: { include: { category: { select: { name: true } } } },
     },
   });
@@ -158,7 +158,7 @@ export async function updateWord(
   await prisma.$transaction(async (tx) => {
     const entry = await tx.entry.findFirst({
       where: { id, userId },
-      include: { senses: { orderBy: { order: "asc" }, take: 1, include: { examples: { take: 1 } } } },
+      include: { senses: { orderBy: { order: "asc" }, take: 1, include: { examples: { take: 1, orderBy: { id: "asc" } } } } },
     });
     if (!entry) throw new EditError("No such word.", 404);
 

@@ -23,7 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
 import type { AnswerResult } from "@/lib/review/submit";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
+import type { WordDetails } from "@/lib/words/edit";
 import SpeakButton, { speakKorean } from "./SpeakButton";
+import WordEditor from "./WordEditor";
 
 type Load = "loading" | "ready" | "error";
 
@@ -59,6 +61,62 @@ function shuffle<T>(items: T[]): T[] {
  * The study session. `mode`: "learn" (new words), "review" (due reviews) or
  * "all". The queue's head is the card on screen.
  */
+/** The meaning a card leads with — the same order as meaningText() on the server. */
+function leadMeaning(
+  translation: string | null,
+  own: string | null,
+  definitionKnown: string | null,
+  definitionTarget: string | null,
+  myMeaningFirst: boolean,
+): string {
+  return (myMeaningFirst ? own : null) ?? translation ?? definitionKnown ?? own ?? definitionTarget ?? "";
+}
+
+/**
+ * A card after its word was edited on the spot: the new spelling, meanings,
+ * definition, example and categories, also in the options of a choice
+ * question (the server grades against the edited word from now on).
+ */
+function withEdit(item: ReviewItem, word: WordDetails, myMeaningFirst: boolean): ReviewItem {
+  const translation = word.translation.trim() || null;
+  const own = word.userMeaning.trim() || null;
+  const definition = word.definition.trim() || null;
+  const recall = item.direction === "RECALL";
+  const oldCorrect = recall
+    ? item.back.lemma
+    : leadMeaning(item.back.translation, item.back.userMeaning, item.back.definitionKnown, item.back.definitionTarget, myMeaningFirst);
+  const newCorrect = recall
+    ? word.lemma
+    : leadMeaning(translation, own, item.back.definitionKnown, definition, myMeaningFirst);
+  const main = leadMeaning(translation, own, null, null, myMeaningFirst) || null;
+  const second = myMeaningFirst ? translation : own;
+  const example = word.example.trim() || null;
+  return {
+    ...item,
+    categories: [...word.categories].sort(),
+    choices: item.choices?.map((choice) => (choice === oldCorrect ? newCorrect : choice)) ?? null,
+    hint: item.hint && recall ? [...word.lemma][0] : item.hint,
+    front: item.front.lemma
+      ? { ...item.front, lemma: word.lemma }
+      : {
+          ...item.front,
+          meaning: item.front.meaning === null ? null : main,
+          altMeaning: item.front.meaning === null ? null : second && second !== main ? second : null,
+          definitionTarget: item.front.definitionTarget === null ? null : definition,
+        },
+    back: {
+      ...item.back,
+      lemma: word.lemma,
+      translation,
+      userMeaning: own,
+      definitionTarget: definition,
+      example,
+      // The old translation only fits the old sentence.
+      exampleTranslation: example === item.back.example ? item.back.exampleTranslation : null,
+    },
+  };
+}
+
 export default function Review({ mode }: { mode: StudyMode }) {
   const [load, setLoad] = useState<Load>("loading");
   const [queue, setQueue] = useState<ReviewItem[]>([]);
@@ -70,6 +128,10 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [error, setError] = useState<string | null>(null);
   // Words met in this session: the other direction of the same word needs no second intro.
   const [introduced, setIntroduced] = useState<Set<string>>(() => new Set());
+  /** The word open in the editor under the card (its Entry id), if any. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [myMeaningFirst, setMyMeaningFirst] = useState(false);
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
 
   useEffect(() => {
     fetch(`/api/review/session?mode=${mode}`)
@@ -80,6 +142,8 @@ export default function Review({ mode }: { mode: StudyMode }) {
         setTotal(data.items.length);
         setStats(data.stats);
         setAutoPlay(Boolean(data.autoPlay));
+        setMyMeaningFirst(Boolean(data.myMeaningFirst));
+        setCategoryNames(data.categoryNames ?? []);
         setLoad("ready");
       })
       .catch((cause) => {
@@ -91,8 +155,30 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const current = queue[0];
   const showIntro = Boolean(current?.intro && !introduced.has(current.senseId));
 
+  /**
+   * The editor under the card closed. After a save, every card of that word
+   * in this session takes the edited data; after a delete, they leave it.
+   */
+  async function finishEdit(entryId: string, changed: boolean, deleted?: boolean) {
+    setEditing(null);
+    if (!changed) return;
+    if (deleted) {
+      setQueue((items) => items.filter((item) => item.entryId !== entryId));
+      return;
+    }
+    try {
+      const response = await fetch(`/api/words/${entryId}`);
+      if (!response.ok) return;
+      const word: WordDetails = await response.json();
+      setQueue((items) => items.map((item) => (item.entryId === entryId ? withEdit(item, word, myMeaningFirst) : item)));
+    } catch {
+      // Saved anyway; the card shows the old text until the next session.
+    }
+  }
+
   /** "Start learning": the word joins the drill a few cards later. */
   async function startWord(item: ReviewItem) {
+    setEditing(null);
     const response = await fetch("/api/review/intro", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -108,6 +194,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
 
   /** "Skip": the word leaves this session and new ones for a few days; another takes its place. */
   async function skipWord(item: ReviewItem) {
+    setEditing(null);
     const response = await fetch("/api/review/intro", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,6 +220,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
 
   /** Called once the user has seen the feedback and moves on. */
   function advance(result: AnswerResult) {
+    setEditing(null);
     setDone((n) => n + 1);
     if (result.correct) setCorrectCount((n) => n + 1);
     setQueue(([head, ...rest]) => {
@@ -249,6 +337,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
           autoPlay={autoPlay}
           onStart={() => startWord(current)}
           onSkip={() => skipWord(current)}
+          onEdit={() => setEditing(current.entryId)}
         />
       ) : (
         // Keyed on the card and attempt, so state resets for every question.
@@ -257,7 +346,18 @@ export default function Review({ mode }: { mode: StudyMode }) {
           item={current}
           onDone={advance}
           autoPlay={autoPlay}
+          onEdit={() => setEditing(current.entryId)}
         />
+      )}
+
+      {editing && editing === current.entryId && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-celadon bg-surface">
+          <WordEditor
+            wordId={editing}
+            allCategoryNames={categoryNames}
+            onDone={(changed, deleted) => finishEdit(editing, changed, deleted)}
+          />
+        </div>
       )}
     </Shell>
   );
@@ -274,10 +374,13 @@ function Question({
   item,
   onDone,
   autoPlay,
+  onEdit,
 }: {
   item: ReviewItem;
   onDone: (r: AnswerResult) => void;
   autoPlay: boolean;
+  /** Open the word editor (offered once the answer is shown). */
+  onEdit: () => void;
 }) {
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -390,7 +493,7 @@ function Question({
             </button>
           ) : (
             <>
-              <Back item={item} />
+              <Back item={item} onEdit={onEdit} />
               <p className="mt-5 text-sm text-muted">Did you know it?</p>
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <button
@@ -522,7 +625,7 @@ function Question({
           >
             {feedbackLine(result, item, picked)}
           </p>
-          {!item.selfGraded && <Back item={item} />}
+          {!item.selfGraded && <Back item={item} onEdit={onEdit} />}
           <button
             ref={nextRef}
             type="button"
@@ -566,11 +669,13 @@ function Intro({
   autoPlay,
   onStart,
   onSkip,
+  onEdit,
 }: {
   item: ReviewItem;
   autoPlay: boolean;
   onStart: () => Promise<void>;
   onSkip: () => Promise<void>;
+  onEdit: () => void;
 }) {
   const [busy, setBusy] = useState<"start" | "skip" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -602,7 +707,9 @@ function Intro({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="korean text-5xl leading-tight">{back.lemma}</span>
           <SpeakButton text={back.lemma} />
+          <EditButton onClick={onEdit} className="ml-auto" />
         </div>
+        <CategoryChips names={item.categories} />
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           {back.originalForm && (
             <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
@@ -698,7 +805,7 @@ function Front({ item }: { item: ReviewItem }) {
  * Korean card the meaning and Korean definition were the question, so they
  * are not repeated here.
  */
-function Back({ item }: { item: ReviewItem }) {
+function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
   const { back, front } = item;
   const level = levelLabel(back.level);
   const pos = posLabel(back.partOfSpeech);
@@ -707,6 +814,7 @@ function Back({ item }: { item: ReviewItem }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="korean text-3xl">{back.lemma}</span>
         <SpeakButton text={back.lemma} className="self-center" />
+        <EditButton onClick={onEdit} className="ml-auto self-center" />
         {back.originalForm && (
           <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
             {back.originalForm}
@@ -717,6 +825,7 @@ function Back({ item }: { item: ReviewItem }) {
         )}
         {pos && <span className="text-xs text-muted">{pos}</span>}
       </div>
+      <CategoryChips names={item.categories} />
       {back.translation && !front.meaning && <p className="mt-2 font-medium">{back.translation}</p>}
       {back.userMeaning && !front.meaning && (
         <p className="mt-1 text-sm text-muted">Yours: {back.userMeaning}</p>
@@ -736,5 +845,34 @@ function Back({ item }: { item: ReviewItem }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** "Edit" — opens the word editor under the card, to fix the word on the spot. */
+function EditButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-2 py-1 text-sm text-muted hover:text-ink ${className}`}
+    >
+      <i className="bi bi-pencil mr-1" aria-hidden />
+      Edit
+    </button>
+  );
+}
+
+/** The word's categories as small tags under the word. */
+function CategoryChips({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <p className="mt-2 flex flex-wrap gap-1.5">
+      {names.map((name) => (
+        <span key={name} className="rounded-full bg-paper px-2.5 py-0.5 text-xs text-muted">
+          <i className="bi bi-tag mr-1" aria-hidden />
+          {name}
+        </span>
+      ))}
+    </p>
   );
 }
