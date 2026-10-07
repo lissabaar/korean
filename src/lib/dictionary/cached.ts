@@ -18,9 +18,12 @@
  */
 
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { localEntry, localLookup, localLookupMany } from "./local";
 import {
   fetchExamples,
+  isApiCode,
   lookup,
+  TRANS_LANG,
   DictionaryUnavailableError,
   type DictEntry,
   type DictionaryKeys,
@@ -70,6 +73,11 @@ export async function cachedLookup(
   keys: DictionaryKeys,
   options: LookupOptions = {},
 ): Promise<DictEntry[]> {
+  // The local copy of KRDict answers English lookups without the network.
+  if ((options.transLang ?? TRANS_LANG.EN) === TRANS_LANG.EN) {
+    const local = await localLookup(prisma, word);
+    if (local) return local;
+  }
   const key = `search:${options.transLang ?? 1}:${word}`;
   const hit = await readCache<DictEntry[]>(prisma, key);
   if (hit) return hit;
@@ -90,6 +98,13 @@ export async function cachedLookupMany(
   // The time budget leaves room in the 300 s function limit for the model
   // call that precedes the lookups.
   const { concurrency = 2, timeBudgetMs = 150_000, ...lookupOptions } = options;
+
+  // The local copy of KRDict answers the whole batch in one query.
+  if ((lookupOptions.transLang ?? TRANS_LANG.EN) === TRANS_LANG.EN) {
+    const local = await localLookupMany(prisma, words);
+    if (local) return new Map(words.map((word) => [word, local.get(word.normalize("NFC").trim()) ?? []]));
+  }
+
   const results = new Map<string, DictEntry[] | null>();
   const queue = [...new Set(words)];
   const started = Date.now();
@@ -157,6 +172,13 @@ export async function cachedExamples(
   targetCode: string,
   keys: DictionaryKeys,
 ): Promise<string[]> {
+  // The local copy has the examples of every sense: the first sense's first.
+  const local = await localEntry(prisma, targetCode);
+  if (local) {
+    const examples = local.senses.flatMap((sense) => sense.examples);
+    if (examples.length || !isApiCode(targetCode)) return examples.slice(0, 3);
+  }
+  if (!isApiCode(targetCode)) return [];
   const key = `examples:${targetCode}`;
   const hit = await readCache<string[]>(prisma, key);
   if (hit) return hit;

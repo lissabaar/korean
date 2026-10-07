@@ -17,7 +17,7 @@ import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { AiQuotaError, assertCanUseAi, recordAiUsage } from "../ai-budget";
 import { cachedLookup } from "../dictionary/cached";
-import { DictionaryUnavailableError, TRANS_LANG, type DictionaryKeys } from "../dictionary/krdict";
+import { DictionaryUnavailableError, isKrdictCode, TRANS_LANG, type DictionaryKeys } from "../dictionary/krdict";
 import { rankHomographs } from "../ingest/analyze";
 import { EXTRACTION_MODEL } from "../ingest/extract";
 
@@ -71,13 +71,15 @@ export async function fillEnglishMeanings(
   // ---- 1. words that already know their dictionary entry
   for (const sense of senses) {
     const code = sense.entry.krdictTargetCode;
-    if (!code || !/^\d+$/.test(code)) {
+    if (!isKrdictCode(code)) {
       needAi.push(sense);
       continue;
     }
     try {
       const entries = await cachedLookup(prisma, sense.entry.lemma, keys, { transLang: TRANS_LANG.EN });
-      const match = entries.find((entry) => entry.targetCode === code);
+      // The sense the user's own meaning points to (Russian matches too), else the first.
+      const found = entries.find((entry) => entry.targetCode === code);
+      const match = found ? rankHomographs([found], "", "", sense.userMeaning ?? "")[0] : undefined;
       const translation = match?.senses[0]?.translation;
       if (!translation) {
         needAi.push(sense);

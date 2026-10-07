@@ -26,6 +26,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <Nav email={user.isAnonymous ? null : user.email} />
       {children}
+      {/* Required by the dictionary's licence (CC BY-SA 2.0 KR): name the source. */}
+      <footer className="mx-auto max-w-6xl px-4 pb-8 pt-4 text-xs text-muted sm:px-6">
+        Dictionary data:{" "}
+        <a href="https://krdict.korean.go.kr/" className="underline underline-offset-2" target="_blank" rel="noreferrer">
+          한국어기초사전 (Basic Korean Dictionary)
+        </a>
+        , National Institute of Korean Language,{" "}
+        <a
+          href="https://creativecommons.org/licenses/by-sa/2.0/kr/"
+          className="underline underline-offset-2"
+          target="_blank"
+          rel="noreferrer"
+        >
+          CC BY-SA 2.0 KR
+        </a>
+        .
+      </footer>
     </>
   );
 }

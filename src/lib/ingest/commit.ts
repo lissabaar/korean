@@ -239,7 +239,9 @@ async function persistOne(
                 ...(index === 0 && isSentence(word.sentence)
                   ? [{ text: word.sentence!.trim().slice(0, 500), source: "USER" as const }]
                   : []),
-                ...sense.examples.slice(0, 3).map((example) => ({
+                // The local dictionary has examples for every sense: three for
+                // the studied one, one for each other (shown if it is ticked later).
+                ...sense.examples.slice(0, index === 0 ? 3 : 1).map((example) => ({
                   text: example,
                   source: dict.source as never,
                 })),

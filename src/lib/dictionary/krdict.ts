@@ -56,8 +56,18 @@ export interface DictSense {
   definition: string;
   translation?: string;
   translatedDefinition?: string;
+  /** Russian translation — only from the local copy; helps match a learner's Russian meaning to the sense. */
+  translationRu?: string;
   examples: string[];
 }
+
+/**
+ * A KRDict code: digits, or "<digits>.<n>" for an idiom/proverb filed under
+ * its head word in the local copy (see scripts/load-krdict.mts). Only the
+ * plain form exists in the KRDict API.
+ */
+export const isKrdictCode = (code: string | null | undefined): code is string => /^\d+(\.\d+)?$/.test(code ?? "");
+export const isApiCode = (code: string | null | undefined): code is string => /^\d+$/.test(code ?? "");
 
 export interface DictEntry {
   lemma: string;

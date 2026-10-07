@@ -145,6 +145,7 @@ export async function setStudiedSenses(
               definitionTarget: sense.definition || null,
               definitionKnown: sense.translatedDefinition ?? null,
               definitionSource: "KRDICT",
+              examples: { create: sense.examples.slice(0, 3).map((text) => ({ text, source: "KRDICT" as const })) },
             },
             select: { id: true },
           });

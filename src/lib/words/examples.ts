@@ -13,7 +13,7 @@ import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { assertCanUseAi, AiQuotaError, recordAiUsage } from "../ai-budget";
 import { cachedExamples } from "../dictionary/cached";
-import type { DictionaryKeys } from "../dictionary/krdict";
+import { isKrdictCode, type DictionaryKeys } from "../dictionary/krdict";
 import { EXTRACTION_MODEL } from "../ingest/extract";
 import { EditError } from "./edit";
 
@@ -74,7 +74,7 @@ export async function fillMissingExamples(
     for (let sense = queue.shift(); sense; sense = queue.shift()) {
       const code = sense.entry.krdictTargetCode;
       let found: string[] = [];
-      if (code && /^\d+$/.test(code)) {
+      if (isKrdictCode(code)) {
         try {
           found = (await cachedExamples(prisma, code, keys)).slice(0, 2);
         } catch {
@@ -105,7 +105,7 @@ export async function fillMissingExamples(
   // be the user's own text, and user text stays out of shared tables. Words
   // without a dictionary entry do not use the shared cache at all.
   const meaningOf = (sense: (typeof senses)[number]) =>
-    sense.entry.krdictTargetCode && /^\d+$/.test(sense.entry.krdictTargetCode)
+    isKrdictCode(sense.entry.krdictTargetCode)
       ? `krdict:${sense.entry.krdictTargetCode}`
       : null;
   const cached = needAi.length
@@ -238,7 +238,7 @@ export async function dictionaryExamples(
 ): Promise<ExampleSuggestion[]> {
   const entry = await wordForExample(prisma, userId, entryId);
   const code = entry.krdictTargetCode;
-  if (!code || !/^\d+$/.test(code)) return [];
+  if (!isKrdictCode(code)) return [];
   const texts = await cachedExamples(prisma, code, keys);
   const known = texts.length
     ? await prisma.exampleTranslation.findMany({ where: { text: { in: texts } } })

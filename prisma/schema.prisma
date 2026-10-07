@@ -558,3 +558,28 @@ model ExampleTranslation {
   translation String
   createdAt   DateTime @default(now())
 }
+
+// The whole KRDict (한국어기초사전, National Institute of Korean Language,
+// CC BY-SA 2.0 KR), loaded from its official download by
+// scripts/load-krdict.mts. Dictionary lookups read this table first; the
+// KRDict API is only a fallback (for when the table is empty). Shared by all
+// users — dictionary data only.
+model KrdictEntry {
+  // KRDict's id. Idioms and proverbs are filed under their head word's id
+  // in the download (첫 → 첫 단추를 끼우다), so they get "<id>.<n>".
+  targetCode   String  @id
+  lemma        String
+  /** Homograph number (사과 1 = apple, 사과 2 = apology): the dictionary's order. */
+  homonym      Int?
+  /** 단어 (word), 관용구 (idiom), 속담 (proverb), 구 (phrase), 문법‧표현 (grammar). */
+  unit         String?
+  partOfSpeech String?
+  /** 초급 / 중급 / 고급, or 없음. */
+  level        String?
+  /** Hanja or source-language form, e.g. 學生. */
+  origin       String?
+  /** [{ definition, translation, translatedDefinition, translationRu, examples[] }] in dictionary order. */
+  senses       Json
+
+  @@index([lemma])
+}

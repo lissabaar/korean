@@ -313,7 +313,8 @@ hangugo/
 │       ├── category-icons.ts        иконки категорий (можно и в браузере)
 │       ├── guess-icon.ts            угадать иконку по названию категории
 │       ├── dictionary/
-│       │   ├── krdict.ts            запросы к KRDict/STDICT, разбор XML, таймауты
+│       │   ├── local.ts             свой экземпляр KRDict в базе (таблица KrdictEntry) — ищется первым
+│       │   ├── krdict.ts            запросы к KRDict/STDICT по сети (запасной путь), разбор XML, таймауты
 │       │   ├── cached.ts            общий кэш словаря + дневной лимит ручных поисков
 │       │   └── labels.ts            уровни и части речи по-английски
 │       ├── ingest/                  импорт: от текста к словам
@@ -348,6 +349,7 @@ hangugo/
 │   ├── schema.prisma                описание всех таблиц (см. раздел 6)
 │   └── migrations/                  история изменений базы, по папке на изменение
 ├── scripts/copy-sqljs-wasm.mjs      после npm install кладёт sql.js (для Anki) в public/
+├── scripts/load-krdict.mts          загрузка всего словаря KRDict в базу (npm run load-krdict)
 ├── public/                          файлы, которые отдаются как есть
 ├── .env / .env.example              ключи и адреса (.env не в git!)
 ├── .npmrc                           node-options=--use-system-ca (для рабочей сети)
@@ -388,7 +390,8 @@ User ─┬─ Entry (слово) ─── Sense (значение) ─┬─ E
 | `Category`, `EntryCategory` | категории и связь «слово ↔ категория», переключатели Learn/Review, замок `locked` (слова из такой категории не трогает перераспределение) |
 | `SourceMaterial` | исходный текст импорта: откуда пришли слова |
 | `AiUsage` | журнал расходов на ИИ |
-| `DictionaryCache` | общий кэш ответов словаря (общий для всех, только словарные данные) |
+| `KrdictEntry` | весь словарь KRDict (≈56 тыс. статей: английский и русский переводы, определения, примеры, ханча, уровень). Поиск слов идёт сюда, без сети |
+| `DictionaryCache` | кэш ответов KRDict по сети — нужен только если таблица `KrdictEntry` пуста |
 | `GeneratedExample`, `ExampleTranslation` | общий кэш примеров и переводов, написанных ИИ |
 | `Session`, `Account`, `Verification` | служебные таблицы Better Auth |
 

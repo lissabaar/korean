@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate && node scripts/copy-sqljs-wasm.mjs"
+    "postinstall": "prisma generate && node scripts/copy-sqljs-wasm.mjs",
+    "load-krdict": "tsx --env-file=.env scripts/load-krdict.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

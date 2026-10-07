@@ -204,6 +204,17 @@ categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
 sessions both go through it. Sessions take a mode — `learn` (new words
 only), `review` (scheduled only), `all` — from `/review?mode=`.
 
+**The dictionary lives in our database.** `KrdictEntry` holds the whole
+KRDict (official download, CC BY-SA 2.0 KR — the app footer names it),
+loaded by `npm run load-krdict -- "<folder of the JSON download>"` (replaces
+the table; idioms/proverbs filed under a head word get code "<id>.<n>").
+`cachedLookup`/`cachedLookupMany`/`cachedExamples` read it first
+(`dictionary/local.ts`) — no network, no throttling; the API below is only
+the fallback for an empty table or non-English lookups. It also has Russian
+translations: `rankHomographs` matches a learner's Russian meaning against
+them (`words()` keeps Cyrillic). Use `isKrdictCode`/`isApiCode`, never a
+digits-only regex, for target codes.
+
 **Every KRDict call goes through the shared cache.**
 Use `cachedLookup` / `cachedLookupMany` / `cachedExamples` from
 `dictionary/cached.ts`, never `lookup()` directly: the 50 000/day key quota

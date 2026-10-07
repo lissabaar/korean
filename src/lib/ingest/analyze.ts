@@ -243,7 +243,12 @@ export async function analyzeText(
   };
 }
 
-const STOPWORDS = new Set(["a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "be", "is", "it", "this", "that", "here", "used", "meaning", "word", "as", "with", "by"]);
+const STOPWORDS = new Set([
+  "a", "an", "the", "to", "of", "in", "on", "for", "and", "or", "be", "is", "it", "this", "that", "here", "used", "meaning", "word", "as", "with", "by",
+  // Russian: learners often write their meaning in Russian, and the local
+  // dictionary has Russian translations to compare it with.
+  "на", "из", "по", "для", "от", "до", "что", "как", "это", "быть", "не", "или", "кто", "чем",
+]);
 
 /**
  * Lowercase English words without filler words — used to compare the model's
@@ -252,7 +257,9 @@ const STOPWORDS = new Set(["a", "an", "the", "to", "of", "in", "on", "for", "and
 function words(text: string | undefined | null): string[] {
   return (text ?? "")
     .toLowerCase()
-    .split(/[^a-z]+/)
+    // Latin and Cyrillic words (ё folded into е, as dictionaries vary).
+    .replace(/ё/g, "е")
+    .split(/[^a-zа-я]+/)
     .filter((word) => word.length > 1 && !STOPWORDS.has(word));
 }
 
@@ -275,7 +282,7 @@ function overlap(text: string | undefined, strong: Set<string>, weak: Set<string
  */
 function senseScore(sense: DictEntry["senses"][number], strong: Set<string>, weak: Set<string>) {
   return {
-    translation: overlap(sense.translation, strong, weak),
+    translation: overlap(`${sense.translation ?? ""} ${sense.translationRu ?? ""}`, strong, weak),
     definition: overlap(sense.translatedDefinition, strong, weak),
   };
 }
