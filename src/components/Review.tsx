@@ -814,7 +814,6 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="korean text-3xl">{back.lemma}</span>
         <SpeakButton text={back.lemma} className="self-center" />
-        <EditButton onClick={onEdit} className="ml-auto self-center" />
         {back.originalForm && (
           <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">
             {back.originalForm}
@@ -824,6 +823,8 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
           <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">{level}</span>
         )}
         {pos && <span className="text-xs text-muted">{pos}</span>}
+        {/* Last in the row, so ml-auto pushes only the button to the right. */}
+        <EditButton onClick={onEdit} className="ml-auto" />
       </div>
       <CategoryChips names={item.categories} />
       {back.translation && !front.meaning && <p className="mt-2 font-medium">{back.translation}</p>}
