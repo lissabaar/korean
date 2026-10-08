@@ -371,6 +371,8 @@ npm run dev                        # start dev server
 npx prisma migrate dev --name x    # new migration
 npx prisma studio                  # browse the DB in the browser
 npm run build                      # typecheck + production build
+npm run test:scenarios             # every user scenario on the live DB with throwaway users
+                                   # (~5 cents of AI); run after larger changes
 npx auth generate                  # regenerate auth models after a better-auth upgrade
                                    # (rewrites schema.prisma with CRLF — check the diff)
 ```

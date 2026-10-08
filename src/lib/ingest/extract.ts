@@ -211,7 +211,7 @@ function buildInstructions(options: ExtractOptions): string {
   );
 
   parts.push(
-    `requestedCategory: if the learner explicitly asks to put the words into a particular category (in any language, e.g. "add all of these to the category drama", "в категорию работа"), return that category's name: when it means the same as an entry of the category list, that entry verbatim; otherwise the learner's own name for it, lowercase. Then also use it as every word's "category". If they ask for nothing like that, return an empty string and pick categories as usual.`,
+    `requestedCategory: if the learner explicitly asks to put the words into a particular category (in any language, e.g. "add all of these to the category drama", "в категорию работа"), return that category's name exactly as the learner named it, lowercase. Use an entry of the category list instead only when it is the very same category under another spelling or language (e.g. "работа" for "work"), never a broader or related one ("завтрак" stays "завтрак", not "food and drink"). Then also use it as every word's "category". If they ask for nothing like that, return an empty string and pick categories as usual.`,
   );
 
   if (options.maxWords) {

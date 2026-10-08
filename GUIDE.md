@@ -355,6 +355,7 @@ hangugo/
 │   └── migrations/                  история изменений базы, по папке на изменение
 ├── scripts/copy-sqljs-wasm.mjs      после npm install кладёт sql.js (для Anki) в public/
 ├── scripts/load-krdict.mts          загрузка всего словаря KRDict в базу (npm run load-krdict)
+├── scripts/test-scenarios.mts       проверка всех сценариев на живой базе (npm run test:scenarios, ~5 центов ИИ)
 ├── public/                          файлы, которые отдаются как есть
 ├── .env / .env.example              ключи и адреса (.env не в git!)
 ├── .npmrc                           node-options=--use-system-ca (для рабочей сети)
