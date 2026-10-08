@@ -18,7 +18,8 @@ import { userPlan } from "@/lib/plan-limits";
 import { currentUser } from "@/lib/session";
 import { countUntranslatedExamples } from "@/lib/words/example-translations";
 
-export const metadata = { title: "Settings · Korean vocabulary" };
+// Personal pages: kept out of search results (see also app/robots.ts).
+export const metadata = { title: "Settings", robots: { index: false } };
 
 /**
  * The page itself. Next.js calls this default export on the server for each

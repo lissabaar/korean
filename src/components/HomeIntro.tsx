@@ -11,6 +11,7 @@
  */
 
 import { useSyncExternalStore } from "react";
+import { SITE_POINTS as POINTS } from "@/lib/site";
 
 const STORAGE_KEY = "hangugo:intro-hidden";
 const listeners = new Set<() => void>();
@@ -40,28 +41,6 @@ function setHidden(hidden: boolean) {
   listeners.forEach((listener) => listener());
 }
 
-const POINTS = [
-  {
-    icon: "bi-clipboard-plus",
-    title: "Add from anything",
-    text: "Paste a text or a word list, drop a screenshot, subtitles, an Anki or ReWord deck — or just ask for a topic.",
-  },
-  {
-    icon: "bi-book",
-    title: "Checked by a dictionary",
-    text: "The AI finds the words and their dictionary form; the Korean learners' dictionary (KRDict) supplies meanings, levels, hanja and examples.",
-  },
-  {
-    icon: "bi-stars",
-    title: "Learn",
-    text: "Meet each new word, then short drills: pick it a few times, then type it.",
-  },
-  {
-    icon: "bi-arrow-repeat",
-    title: "Remember",
-    text: "Reviews on a spaced-repetition schedule (FSRS): every word comes back just before you would forget it.",
-  },
-];
 
 /** The intro block, or a one-line "What is this?" link once hidden. */
 export default function HomeIntro() {

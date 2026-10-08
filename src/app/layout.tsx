@@ -12,6 +12,7 @@ import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Public_Sans } from "next/font/google";
 import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "./globals.css";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -27,9 +28,27 @@ const gowun = Gowun_Batang({
   display: "swap",
 });
 
+/**
+ * Search and social metadata. Pages set only their own title ("Learn"); the
+ * template adds the site name. metadataBase turns relative URLs (the
+ * canonical link, the preview image) into absolute ones.
+ */
 export const metadata: Metadata = {
-  title: "Korean vocabulary",
-  description: "Turn Korean texts into flashcards worth reviewing.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} — learn Korean words from what you read`, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: ["Korean", "learn Korean", "Korean vocabulary", "flashcards", "spaced repetition", "Anki", "KRDict", "한국어"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — learn Korean words from what you read`,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    locale: "en_US",
+  },
+  twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },
 };
 
 export const viewport: Viewport = {

@@ -303,6 +303,15 @@ itself, 부드러워) is not stored as an example (`isSentence` in commit.ts).
 cached translations) or one AI-written with translation (metered); saved
 with the word, a changed sentence drops its old translation.
 
+**Public face and SEO.** A visitor without a session — and every crawler —
+gets the server-rendered `Landing` (h1, how it works, JSON-LD), with
+`StartAnonymous` only as its status line. `lib/site.ts` holds name/URL/
+description; root metadata has a title template, Open Graph and canonical;
+`app/robots.ts` disallows the API and personal pages (also noindex),
+`app/sitemap.ts` lists /, /sign-up, /sign-in, /privacy. No analytics or
+tracking — only strictly necessary storage, so no cookie banner;
+`/privacy` must stay true when that changes.
+
 **Look.** Light/dark switch in the nav (`ThemeToggle`, data-theme on
 <html>, inline script in app/layout.tsx prevents a flash). Card text size
 is `User.cardTextSize` (0–2, default 1), applied via TEXT_SIZES in Review.tsx.

@@ -15,7 +15,8 @@ import { prisma } from "@/lib/db";
 import { BASE_CATEGORIES } from "@/lib/ingest/categories";
 import { currentUser } from "@/lib/session";
 
-export const metadata = { title: "Add words · Korean vocabulary" };
+// Personal pages: kept out of search results (see also app/robots.ts).
+export const metadata = { title: "Add words", robots: { index: false } };
 
 /**
  * The page itself. Next.js calls this default export on the server for each

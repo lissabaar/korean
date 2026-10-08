@@ -8,7 +8,8 @@
 
 import Review from "@/components/Review";
 
-export const metadata = { title: "Learn · Korean vocabulary" };
+// Personal pages: kept out of search results (see also app/robots.ts).
+export const metadata = { title: "Learn", robots: { index: false } };
 
 /** New words only: the learning drill, from categories with Learn on. */
 export default function LearnPage() {

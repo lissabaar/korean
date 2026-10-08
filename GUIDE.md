@@ -246,6 +246,10 @@ hangugo/
 │   │   ├── layout.tsx               корневая обёртка: <html>, шрифты, глобальные стили
 │   │   ├── globals.css              Tailwind + цвета/шрифты проекта (дизайн-токены)
 │   │   ├── favicon.ico              иконка вкладки
+│   │   ├── robots.ts                /robots.txt — что можно индексировать поисковикам
+│   │   ├── sitemap.ts               /sitemap.xml — список публичных страниц
+│   │   ├── opengraph-image.tsx      картинка-превью при пересылке ссылки на сайт
+│   │   ├── privacy/page.tsx         /privacy — что храним и почему нет баннера про куки
 │   │   ├── sign-in/page.tsx         /sign-in — вход
 │   │   ├── sign-up/page.tsx         /sign-up — регистрация
 │   │   ├── (app)/                   само приложение (группа: в адрес не попадает)
@@ -293,6 +297,7 @@ hangugo/
 │   │   ├── WordEditor.tsx           редактирование слова: значения для учёбы, «Add example»
 │   │   ├── ThemeToggle.tsx          переключатель светлой/тёмной темы (в меню)
 │   │   ├── HomeIntro.tsx            короткое «что это за сайт» на главной
+│   │   ├── Landing.tsx              публичная страница для гостей и поисковиков (без сессии)
 │   │   ├── SettingsPanel.tsx        экран /settings
 │   │   ├── Nav.tsx                  верхнее меню
 │   │   ├── AuthForm.tsx             форма входа/регистрации
@@ -302,6 +307,7 @@ hangugo/
 │   │
 │   └── lib/                         ЛОГИКА (в основном сервер)
 │       ├── db.ts                    единственный клиент Prisma (база)
+│       ├── site.ts                  название, адрес, описание сайта (SEO, превью, лендинг)
 │       ├── clients.ts               клиент Anthropic + ключи словаря (секреты)
 │       ├── auth.ts                  настройка Better Auth (почта, Google, анонимы)
 │       ├── auth-client.ts           то же для браузера: signIn, signUp, signOut

@@ -10,7 +10,8 @@
 import Review from "@/components/Review";
 import { parseStudyMode } from "@/lib/review/queue";
 
-export const metadata = { title: "Review · Korean vocabulary" };
+// Personal pages: kept out of search results (see also app/robots.ts).
+export const metadata = { title: "Review", robots: { index: false } };
 
 /** Scheduled reviews only (?mode=all mixes in new words too). */
 export default async function ReviewPage({

@@ -4,12 +4,15 @@
  * "(app)" in parentheses is a Next.js route group: it groups pages under one
  * layout without adding "/app" to the URL (so (app)/add/page.tsx is /add).
  *
- * Server component. Reads the session; with none (a first-time visitor) it
- * renders <StartAnonymous/>, which creates an anonymous account in the
- * browser and reloads. Otherwise it shows the top navigation and the page.
+ * Server component. Reads the session; with none (a first-time visitor, or a
+ * search engine) it renders the public <Landing/> page, with <StartAnonymous/>
+ * as its status line — that creates an anonymous account in the browser and
+ * reloads into the app. Otherwise it shows the top navigation, the page and
+ * the dictionary credit in the footer.
  */
 
 import Nav from "@/components/Nav";
+import Landing from "@/components/Landing";
 import StartAnonymous from "@/components/StartAnonymous";
 import { currentUser } from "@/lib/session";
 
@@ -20,7 +23,9 @@ import { currentUser } from "@/lib/session";
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
-  if (!user) return <StartAnonymous />;
+  // No session yet: the public landing page (what crawlers index), while the
+  // browser starts an anonymous session and then shows the app.
+  if (!user) return <Landing status={<StartAnonymous />} />;
   return (
     <>
       <Nav email={user.isAnonymous ? null : user.email} />
@@ -40,7 +45,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         >
           CC BY-SA 2.0 KR
         </a>
-        .
+        .{" "}
+        <a href="/privacy" className="underline underline-offset-2">
+          Privacy
+        </a>
       </footer>
     </>
   );
