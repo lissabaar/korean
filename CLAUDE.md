@@ -48,7 +48,7 @@ src/lib/
     example-translations.ts English for example sentences (shared cache for dictionary ones)
     meanings.ts             fill missing English meanings
     verify.ts               re-check words saved while the dictionary was down
-  plans.ts                  plan prices and credits (DRAFT) — pricing page + billing
+  plans.ts                  plan limits (DRAFT); prices are not shown anywhere — the pricing page was removed
   ingest/
     extract.ts              model → lemmas + categories (no DB writes)
     categories.ts           fixed taxonomy, alias folding
@@ -67,7 +67,7 @@ src/lib/import/             browser-only: dropped files → analysis jobs
   reword.ts                 ReWord .reword export (zip + JSON)
 scripts/copy-sqljs-wasm.mjs postinstall: puts sql.js's wasm in public/
 src/app/(app)/              app pages: home, /learn, /review, /add, /categories,
-                            /settings, /pricing; layout starts an anonymous session
+                            /settings; layout starts an anonymous session
                             for first-time visitors
 src/app/api/review/         session (GET) and answer (POST) routes
 src/app/api/{words,categories,settings,starter-deck,dictionary}/
@@ -344,7 +344,7 @@ KRDICT_API_KEY
 STDICT_API_KEY        # optional fallback
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL       # the site's own URL (http://localhost:3000 locally)
-FREE_AI_CREDITS       # optional, default 50 per user
+FREE_AI_CREDITS       # optional, default 20 per user
 AI_DAILY_BUDGET_CREDITS # optional, default 300 across all free users
 UNLIMITED_AI_EMAILS   # comma-separated; the owner's account
 GOOGLE_CLIENT_ID      # optional; with the secret, shows "Continue with Google"

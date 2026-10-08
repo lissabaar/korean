@@ -16,7 +16,7 @@ Vercel → проект → Settings → Environment Variables. Ключи жи�
 | `BETTER_AUTH_SECRET` | тот же, что локально |
 | `BETTER_AUTH_URL` | `https://korean-drab.vercel.app`, без слэша в конце |
 | `UNLIMITED_AI_EMAILS` | почта владельца: ИИ без лимита |
-| `FREE_AI_CREDITS`, `AI_DAILY_BUDGET_CREDITS` | необязательно (по умолчанию 50 и 300) |
+| `FREE_AI_CREDITS`, `AI_DAILY_BUDGET_CREDITS` | необязательно (по умолчанию 20 и 300) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | необязательно: кнопка «Continue with Google» |
 
 **После любого изменения переменных нужен Redeploy** (Deployments → три

@@ -64,7 +64,6 @@ export default async function SettingsPage() {
       missingExamples={missingExamples}
       missingMeanings={missingMeanings}
       untranslatedExamples={untranslated}
-      planName={plan.name}
       lookups={{ used: lookups, limit: plan.dictionaryLookupsPerDay }}
     />
   );

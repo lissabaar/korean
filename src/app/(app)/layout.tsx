@@ -1,6 +1,5 @@
 /**
- * Layout for the app itself: home, Learn, Review, Add, Categories, Settings,
- * Plans.
+ * Layout for the app itself: home, Learn, Review, Add, Categories, Settings.
  *
  * "(app)" in parentheses is a Next.js route group: it groups pages under one
  * layout without adding "/app" to the URL (so (app)/add/page.tsx is /add).

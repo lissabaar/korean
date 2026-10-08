@@ -43,8 +43,8 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-/** Free credits per user. Default 50 = $0.50, roughly 10–25 analysed parts. */
-export const freeCredits = () => envInt("FREE_AI_CREDITS", 50);
+/** Free credits per user. Default 20 = $0.20, roughly 5–10 analysed parts. */
+export const freeCredits = () => envInt("FREE_AI_CREDITS", 20);
 
 /** Shared budget per UTC day for everyone who is not unlimited. */
 export const dailyBudgetCredits = () => envInt("AI_DAILY_BUDGET_CREDITS", 300);

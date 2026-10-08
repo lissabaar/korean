@@ -44,7 +44,6 @@ export default function SettingsPanel({
   missingExamples,
   missingMeanings,
   untranslatedExamples,
-  planName,
   lookups,
 }: {
   /** null = no account yet. */
@@ -63,7 +62,6 @@ export default function SettingsPanel({
   /** Examples shown on cards that have no English translation yet. */
   untranslatedExamples: number;
   missingMeanings: number;
-  planName: string;
   /** Typed-in dictionary lookups today; limit null = unlimited. */
   lookups: { used: number; limit: number | null };
 }) {
@@ -396,14 +394,10 @@ export default function SettingsPanel({
           <>
             <p className="mt-1 text-sm">{email}</p>
             <p className="mt-1 text-sm text-muted">
-              Plan: {planName}.{" "}
               {credits === null ? "Unlimited AI." : `${credits} AI credits left.`}{" "}
               Words looked up by hand today (the Dictionary button when typing a word in; imports
               don&apos;t count): {lookups.used}
-              {lookups.limit === null ? "" : ` of ${lookups.limit}`}.{" "}
-              <Link href="/pricing" className="text-celadon-deep underline underline-offset-4">
-                Plans
-              </Link>
+              {lookups.limit === null ? "" : ` of ${lookups.limit}`}.
             </p>
             <button
               type="button"

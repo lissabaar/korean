@@ -255,8 +255,7 @@ hangugo/
 │   │   │   ├── review/page.tsx      /review     — повторение
 │   │   │   ├── add/page.tsx         /add        — добавить слова
 │   │   │   ├── categories/page.tsx  /categories — категории и слова
-│   │   │   ├── settings/page.tsx    /settings   — настройки
-│   │   │   └── pricing/page.tsx     /pricing    — тарифы (заглушка)
+│   │   │   └── settings/page.tsx    /settings   — настройки
 │   │   └── api/                     API-маршруты (сервер)
 │   │       ├── auth/[...all]/       всё про вход (Better Auth)
 │   │       ├── ingest/analyze/      текст/картинка/тема → кандидаты (ИИ + словарь)
@@ -308,7 +307,7 @@ hangugo/
 │       ├── auth-client.ts           то же для браузера: signIn, signUp, signOut
 │       ├── session.ts               кто делает запрос: getUserId(), currentUser()
 │       ├── ai-budget.ts             кредиты на ИИ, журнал расходов, дневной лимит
-│       ├── plans.ts                 тарифы (черновик) — для /pricing
+│       ├── plans.ts                 лимиты тарифов (черновик); цены нигде не показываются
 │       ├── plan-limits.ts           на каком тарифе пользователь
 │       ├── category-icons.ts        иконки категорий (можно и в браузере)
 │       ├── guess-icon.ts            угадать иконку по названию категории
