@@ -13,7 +13,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { anthropic, prisma } from "@/lib/clients";
+import { translateOneExample } from "@/lib/words/example-translations";
 import { getUserId } from "@/lib/session";
 import { deleteWord, EditError, getWord, updateWord } from "@/lib/words/edit";
 
@@ -55,7 +56,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = await request.json().catch(() => ({}));
   const text = (value: unknown) => (typeof value === "string" ? value : undefined);
   try {
-    await updateWord(prisma, userId, (await params).id, {
+    const { untranslatedExampleId } = await updateWord(prisma, userId, (await params).id, {
       lemma: text(body.lemma),
       translation: text(body.translation),
       userMeaning: text(body.userMeaning),
@@ -67,6 +68,13 @@ export async function PATCH(request: Request, { params }: Params) {
         ? body.categories.filter((name: unknown): name is string => typeof name === "string")
         : undefined,
     });
+    // A new example without English: translate it now, so the card shows it
+    // at once. A failure here must not fail the save itself.
+    if (untranslatedExampleId) {
+      await translateOneExample(prisma, anthropic, userId, untranslatedExampleId).catch((error) =>
+        console.error("Translating the edited example failed:", error),
+      );
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     return failure(error);

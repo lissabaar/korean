@@ -112,6 +112,12 @@ export interface WordDetails {
   userMeaning: string;
   definition: string;
   example: string;
+  /**
+   * The example's English (read-only here: named apart from the PATCH
+   * field `exampleTranslation`, so sending the details back cannot pin an
+   * old translation on an edited sentence).
+   */
+  exampleEnglish: string;
   categories: string[];
 }
 
@@ -133,6 +139,7 @@ export async function getWord(prisma: PrismaClient, userId: string, id: string):
     userMeaning: sense?.userMeaning ?? "",
     definition: sense?.definitionTarget ?? "",
     example: sense?.examples[0]?.text ?? "",
+    exampleEnglish: sense?.examples[0]?.translation ?? "",
     categories: entry.categories.map((link) => link.category.name),
   };
 }
@@ -151,7 +158,7 @@ export async function updateWord(
     /** Where a new example came from; typed by the user unless said otherwise. */
     exampleSource?: "KRDICT" | "AI" | "USER";
   },
-): Promise<void> {
+): Promise<{ untranslatedExampleId: string | null }> {
   const text = (value: string | undefined, max: number) =>
     value === undefined ? undefined : value.normalize("NFC").replace(/\s+/g, " ").trim().slice(0, max);
 
@@ -159,6 +166,9 @@ export async function updateWord(
   if (lemma !== undefined && !/[가-힣]/.test(lemma)) throw new EditError("Write the word in Korean.");
   const translation = text(input.translation, 200);
   const userMeaning = text(input.userMeaning, 300);
+
+  // A new or changed example saved without English: the caller translates it.
+  let untranslatedExampleId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
     const entry = await tx.entry.findFirst({
@@ -195,8 +205,12 @@ export async function updateWord(
           translation: text(input.exampleTranslation, 500) || null,
         };
         if (!example && current) await tx.example.delete({ where: { id: current.id } });
-        else if (current) await tx.example.update({ where: { id: current.id }, data });
-        else await tx.example.create({ data: { senseId: sense.id, ...data } });
+        else {
+          const saved = current
+            ? await tx.example.update({ where: { id: current.id }, data, select: { id: true } })
+            : await tx.example.create({ data: { senseId: sense.id, ...data }, select: { id: true } });
+          if (!data.translation) untranslatedExampleId = saved.id;
+        }
       }
     }
 
@@ -218,6 +232,7 @@ export async function updateWord(
       });
     }
   }, TX);
+  return { untranslatedExampleId };
 }
 
 /** Delete a word; its senses, examples and cards go with it (cascade). */

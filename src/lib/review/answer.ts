@@ -30,6 +30,13 @@ export function normalise(input: string): string {
     .toLocaleLowerCase();
 }
 
+const HANGUL_SYLLABLE = /[가-힣]/;
+
+/** Hangul syllables split into their letters (jamo), the unit a typo is made in. */
+function toJamo(text: string): string {
+  return text.normalize("NFD");
+}
+
 /**
  * Levenshtein distance, capped: we only ever care whether the answer is
  * within one or two edits, so the full matrix is wasteful but the input is
@@ -92,13 +99,25 @@ export function gradeTypedAnswer(
 
   if (!allowNearMiss) return { verdict: "wrong" };
 
-  // One edit for short words, two for longer ones, then about one per seven
-  // characters for phrases. Korean words are short, so a fixed threshold
-  // would be far too forgiving on 2-syllable words and far too strict on
-  // whole sentences.
+  // A typo is one wrong letter, not a wrong syllable. Korean is compared
+  // letter by letter (jamo: 동전 = ㄷㅗㅇㅈㅓㄴ), so 동젼 for 동전 is a slip
+  // but 동근 is wrong — compared by syllable, one wrong syllable out of two
+  // used to pass. One letter for words up to three syllables, then about
+  // one per seven syllables (~17 jamo) for phrases. Other scripts (English
+  // meanings) keep the character-based budget: one edit for short words,
+  // then about one per seven characters.
   for (const candidate of candidates) {
-    const budget = candidate.length <= 3 ? 1 : Math.max(2, Math.round(candidate.length / 7));
-    if (editDistance(given, candidate) <= budget) {
+    const korean = HANGUL_SYLLABLE.test(candidate);
+    const a = korean ? toJamo(given) : given;
+    const b = korean ? toJamo(candidate) : candidate;
+    const budget = korean
+      ? candidate.replace(/ /g, "").length <= 3
+        ? 1
+        : Math.max(2, Math.round(b.length / 17))
+      : candidate.length <= 3
+        ? 1
+        : Math.max(2, Math.round(candidate.length / 7));
+    if (editDistance(a, b) <= budget) {
       return {
         verdict: "almost",
         matched: candidate,

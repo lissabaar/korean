@@ -128,6 +128,57 @@ export async function translateExamples(
   return { fromDictionary, fromAi, remaining, aiBlocked };
 }
 
+/**
+ * Translate one example right away — after it was added or changed in the
+ * word editor, so the card shows its English at once. Shared cache first
+ * (free); otherwise one short model call, metered. Returns the translation,
+ * or null when AI may not be used (the Settings button picks it up later).
+ */
+export async function translateOneExample(
+  prisma: PrismaClient,
+  anthropic: Anthropic,
+  userId: string,
+  exampleId: string,
+): Promise<string | null> {
+  const example = await prisma.example.findFirst({
+    where: { id: exampleId, sense: { entry: { userId } } },
+    select: { id: true, text: true, source: true, translation: true },
+  });
+  if (!example || example.translation) return example?.translation ?? null;
+
+  const cached = shareable(example)
+    ? await prisma.exampleTranslation.findUnique({ where: { text: example.text } })
+    : null;
+  let translation = cached?.translation ?? null;
+  if (!translation) {
+    let unlimited: boolean;
+    try {
+      unlimited = (await assertCanUseAi(prisma, userId)).unlimited;
+    } catch (error) {
+      if (error instanceof AiQuotaError) return null;
+      throw error;
+    }
+    const response = await anthropic.messages.parse({
+      model: EXTRACTION_MODEL,
+      max_tokens: 500,
+      system:
+        "Translate each numbered Korean sentence into natural, plain English for a learner of Korean. Keep the meaning and tone; do not explain or add notes. Return every number given.",
+      messages: [{ role: "user", content: `1. ${example.text}` }],
+      output_config: { format: zodOutputFormat(TranslationSchema) },
+    });
+    await recordAiUsage(prisma, userId, unlimited, response.model, response.usage);
+    translation = response.parsed_output?.translations[0]?.english.trim().slice(0, 500) || null;
+    if (!translation) return null;
+    if (shareable(example)) {
+      await prisma.exampleTranslation
+        .upsert({ where: { text: example.text }, create: { text: example.text, translation }, update: {} })
+        .catch(() => {});
+    }
+  }
+  await prisma.example.update({ where: { id: example.id }, data: { translation } });
+  return translation;
+}
+
 /** For the Settings page: how many shown examples still lack a translation. */
 export async function countUntranslatedExamples(prisma: PrismaClient, userId: string): Promise<number> {
   return (await untranslated(prisma, userId)).length;

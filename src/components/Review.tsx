@@ -124,8 +124,8 @@ function withEdit(item: ReviewItem, word: WordDetails, myMeaningFirst: boolean):
       userMeaning: own,
       definitionTarget: definition,
       example,
-      // The old translation only fits the old sentence.
-      exampleTranslation: example === item.back.example ? item.back.exampleTranslation : null,
+      // Saved with the word (translated on save when it was new).
+      exampleTranslation: word.exampleEnglish.trim() || null,
     },
   };
 }
