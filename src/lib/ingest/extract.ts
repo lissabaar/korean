@@ -204,9 +204,13 @@ function buildInstructions(options: ExtractOptions): string {
 
   parts.push(
     options.phrases === "only"
-      ? `Phrases only: return only set expressions, collocations and sentences worth learning whole, all as kind "phrase" — no single words. If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
+      ? `Phrases only: return only phrases, all as kind "phrase" — no single words. First decide what the input is.
+- A collection of phrases (a textbook "useful expressions" page, a phrase list, a screenshot of such a list, possibly with translations): keep each line as a phrase, as written.
+- Running text (an article, story, dialogue, subtitles): do NOT keep its sentences whole. Take only short pieces worth learning on their own and reusing elsewhere: set expressions, collocations, idioms, ready-made replies ("신경 쓰지 마세요"), at most about six words. Skip sentences tied to this story's names or events; cut a long sentence down to its reusable piece.`
       : options.phrases
-        ? `Phrases are wanted: besides words, return useful phrases and sentences as kind "phrase". If the input is a list of phrases or sentences, or a screenshot of them, keep each one as a phrase.`
+        ? `Phrases are wanted: besides words, return useful phrases as kind "phrase". First decide what the input is.
+- A collection of phrases (a textbook "useful expressions" page, a phrase list, flashcards, a screenshot of such a list, possibly with translations): the learner chose these lines, so keep each as a phrase, as written.
+- Running text (an article, story, dialogue, subtitles, a lesson's reading): do NOT turn its sentences into phrases. Take only short pieces worth learning on their own and reusing in other situations: set expressions, collocations, idioms, ready-made replies and greetings ("신경 쓰지 마세요", "시간이 걸리다"), at most about six words. Skip sentences that only make sense in this story (names, plot, one-off facts). Cut a long sentence down to its reusable piece rather than keeping it whole.`
         : `Return single words only (kind "word"), no phrases.`,
   );
 

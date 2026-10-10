@@ -296,6 +296,12 @@ text unreadable ("0 words").
 **Phrases mode** is words only / words & phrases / phrases only
 (`phrases: false | true | "only"`; "only" also drops any word the model
 returns).
+The prompt makes the model decide what the input is: a collection of
+phrases (textbook list, screenshot) keeps each line as written; running text
+yields only short reusable pieces (≤ ~6 words: set expressions, collocations,
+ready replies), never plot-bound sentences. An unsaved phrase in the preview
+has a pencil (`CandidateRow`): edits lemma + English, drops the dictionary
+match, saved as an AI-status entry.
 
 **Examples are sentences.** A model "sentence" with no space (the word
 itself, 부드러워) is not stored as an example (`isSentence` in commit.ts).

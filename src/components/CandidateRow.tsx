@@ -12,8 +12,13 @@
  * state, react to clicks and call the API with fetch(). It cannot touch the
  * database or secret keys.
  *
- * It holds no state of its own: every change goes up through onChange to
- * <AddWords/>, which owns the list.
+ * It keeps no word data of its own: every change goes up through onChange to
+ * <AddWords/>, which owns the list. (Only the open/closed state of the phrase
+ * editor and its draft text live here.)
+ *
+ * A phrase that has not been saved yet has a pencil: the learner can fix the
+ * Korean text and its English before saving. An edited phrase is no longer the
+ * dictionary's or the model's — it is kept as typed, with the English given.
  */
 
 import { useState } from "react";
@@ -43,6 +48,8 @@ interface Props {
 export default function CandidateRow({ candidate, onChange, categories, autoMode = false, onRemove }: Props) {
   const [open, setOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
+  // Phrase editor: closed, or open with the draft Korean and English.
+  const [draft, setDraft] = useState<{ lemma: string; english: string } | null>(null);
 
   const sense = candidate.dictionary?.senses[0];
   const aiOnly = candidate.status === "ai";
@@ -56,6 +63,31 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
   const own = candidate.userMeaning && !candidate.useDictionaryMeaning ? candidate.userMeaning : null;
   const saved = Boolean(candidate.saved);
   const removed = Boolean(candidate.removed);
+  // Only unsaved phrases are editable here; saved words use the word editor.
+  const editable = candidate.kind === "phrase" && !saved && !removed && !disabled;
+
+  /**
+   * Apply the edited phrase. Whatever the dictionary or the model said about
+   * the old text no longer applies, so the entry becomes a plain AI-status one
+   * built from the learner's text and English (resolveEntry in commit.ts).
+   */
+  function applyDraft() {
+    if (!draft) return;
+    const lemma = draft.lemma.normalize("NFC").trim();
+    if (!lemma) return;
+    onChange({
+      ...candidate,
+      lemma,
+      surface: lemma,
+      aiMeaning: draft.english.trim(),
+      dictionary: null,
+      homographs: [],
+      status: "ai",
+      conflict: null,
+      dictionaryMismatch: false,
+    });
+    setDraft(null);
+  }
 
   return (
     <li
@@ -76,13 +108,61 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
             className="mt-2 size-5 shrink-0 accent-celadon-deep"
           />
         )}
-        <h3
-          className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${removed ? "line-through" : ""} ${
-            candidate.kind === "phrase" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
-          }`}
-        >
-          {candidate.lemma}
-        </h3>
+        {draft ? (
+          // Editing: Korean text and English, applied with Done.
+          <div className="min-w-0 flex-1 space-y-2">
+            <input
+              value={draft.lemma}
+              onChange={(event) => setDraft({ ...draft, lemma: event.target.value })}
+              aria-label="Phrase in Korean"
+              autoFocus
+              className="korean w-full rounded-md border border-line bg-surface px-3 py-2 text-lg outline-none focus:border-celadon"
+            />
+            <input
+              value={draft.english}
+              onChange={(event) => setDraft({ ...draft, english: event.target.value })}
+              placeholder="English meaning"
+              aria-label="English meaning of the phrase"
+              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base outline-none focus:border-celadon"
+            />
+            <div className="flex gap-2 text-sm">
+              <button
+                type="button"
+                onClick={applyDraft}
+                disabled={!draft.lemma.trim()}
+                className="rounded-md bg-celadon-deep px-3 py-1.5 text-white disabled:opacity-50"
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraft(null)}
+                className="rounded-md px-3 py-1.5 text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <h3
+            className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${removed ? "line-through" : ""} ${
+              candidate.kind === "phrase" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
+            }`}
+          >
+            {candidate.lemma}
+          </h3>
+        )}
+        {editable && !draft && (
+          <button
+            type="button"
+            onClick={() => setDraft({ lemma: candidate.lemma, english: english ?? "" })}
+            aria-label={`Edit ${candidate.lemma}`}
+            title="Edit the phrase"
+            className="mt-1 shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:text-ink"
+          >
+            <i className="bi bi-pencil" aria-hidden />
+          </button>
+        )}
         {saved && candidate.entryId && onRemove && (
           <button
             type="button"
@@ -104,7 +184,7 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
           </button>
         )}
         {removed && <span className="mt-1.5 shrink-0 text-sm text-muted">Removed</span>}
-        <SpeakButton text={candidate.lemma} />
+        {!draft && <SpeakButton text={candidate.lemma} />}
       </div>
 
       {/* Row 2: two columns on wide screens, one on phones. */}
