@@ -71,17 +71,21 @@ type CategoryMode = "ai" | "one" | "each";
 /** Parts read at the same time. */
 const PARALLEL_PARTS = 3;
 
-/** Remembered per file, so adding the same file again resumes where it stopped. */
-function doneKey(source: ImportSource) {
-  return `hangugo:parts-done:${source.name}:${source.text.length}:${source.jobs.length}`;
+/**
+ * Remembered per file, so adding the same file again resumes where it stopped.
+ * The phrases mode is part of the key: a file read for words only has not been
+ * read for phrases yet (the same screenshot gives different results).
+ */
+function doneKey(source: ImportSource, mode: boolean | "only") {
+  return `hangugo:parts-done:${mode}:${source.name}:${source.text.length}:${source.jobs.length}`;
 }
 /**
  * Which parts of this file were already analysed and saved (from localStorage) —
  * used to resume an interrupted import.
  */
-function loadDoneParts(source: ImportSource): Set<number> {
+function loadDoneParts(source: ImportSource, mode: boolean | "only"): Set<number> {
   try {
-    return new Set(JSON.parse(localStorage.getItem(doneKey(source)) ?? "[]") as number[]);
+    return new Set(JSON.parse(localStorage.getItem(doneKey(source, mode)) ?? "[]") as number[]);
   } catch {
     return new Set();
   }
@@ -90,11 +94,11 @@ function loadDoneParts(source: ImportSource): Set<number> {
  * Remember that one part of this file is saved, so dropping the same file again
  * skips it.
  */
-function markPartDone(source: ImportSource, index: number) {
+function markPartDone(source: ImportSource, mode: boolean | "only", index: number) {
   try {
-    const done = loadDoneParts(source);
+    const done = loadDoneParts(source, mode);
     done.add(index);
-    localStorage.setItem(doneKey(source), JSON.stringify([...done]));
+    localStorage.setItem(doneKey(source, mode), JSON.stringify([...done]));
   } catch {
     // Private mode or storage blocked: resuming just will not skip parts.
   }
@@ -294,7 +298,7 @@ export default function AddWords({
     setForced(forcedStart);
 
     const initial: SourceState[] = all.map((s) => {
-      const doneBefore = autoAdd ? loadDoneParts(s) : new Set<number>();
+      const doneBefore = autoAdd ? loadDoneParts(s, phrases) : new Set<number>();
       return {
         ...s,
         status: "waiting",
@@ -312,7 +316,7 @@ export default function AddWords({
     setStage("preview");
 
     const jobs = initial.flatMap((source) => {
-      const doneBefore = autoAdd ? loadDoneParts(source) : new Set<number>();
+      const doneBefore = autoAdd ? loadDoneParts(source, phrases) : new Set<number>();
       return source.jobs.filter((_, index) => !doneBefore.has(index));
     });
     await runJobs(jobs, initial);
@@ -383,7 +387,9 @@ export default function AddWords({
               c.saved = true;
               c.entryId = saved.entryIds[i] ?? undefined;
             });
-            markPartDone(source, source.jobs.indexOf(job));
+            // A part that yielded nothing is not "done": it may have been a
+            // bad read, and skipping it forever would hide the picture.
+            if (result.candidates.length > 0) markPartDone(source, phrases, source.jobs.indexOf(job));
             setAdded((a) => ({
               created: a.created + saved.created,
               pending: a.pending + saved.pending,
@@ -1234,7 +1240,9 @@ export default function AddWords({
                       {source.error && <span className="w-full text-xs text-clay">{source.error}</span>}
                       {!source.error && rows.length === 0 && source.partsDone >= source.jobs.length && (
                         <span className="w-full text-xs text-muted">
-                          {source.kind === "IMAGE"
+                          {source.skippedParts
+                            ? "This file was already read and its words saved earlier, so it was skipped."
+                            : source.kind === "IMAGE"
                             ? "No Korean words were found in this image. If the text is small or the picture busy, crop it to just the words and add it again."
                             : "No new Korean words were found here."}
                         </span>
