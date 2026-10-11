@@ -24,7 +24,7 @@
  */
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { AnalysisResult, RecheckResult, WordCandidate } from "@/lib/ingest/analyze";
 import {
   isTopicRequest,
@@ -37,6 +37,7 @@ import {
 import CandidateRow from "./CandidateRow";
 import CategorySelect from "./CategorySelect";
 import FileDrop from "./FileDrop";
+import { SAME_PAGE_EVENT } from "./Nav";
 import ManualWord from "./ManualWord";
 
 type Stage = "input" | "preview" | "done";
@@ -644,6 +645,30 @@ export default function AddWords({
     setAdded((a) => ({ ...a, created: Math.max(0, a.created - 1) }));
   }
 
+  /**
+   * "Undo" on a removed word: save it again from the preview's copy, exactly
+   * as it was added (same meaning, category, sentence). Nothing is lost —
+   * the word was just added, so it had no learning progress yet. No AI call:
+   * this is the same commit as the first save.
+   */
+  async function restoreWord(candidate: Candidate) {
+    const source = sources.find((s) => s.id === candidate.sourceId);
+    if (!source) return;
+    try {
+      const saved = await commitWords(source, [{ ...candidate, removed: false, selected: true }]);
+      setCandidates((list) =>
+        list.map((c) =>
+          c.id === candidate.id
+            ? { ...c, saved: true, selected: true, removed: false, entryId: saved.entryIds[0] ?? undefined }
+            : c,
+        ),
+      );
+      setAdded((a) => ({ ...a, created: a.created + saved.created }));
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message ? cause.message : `Could not restore ${candidate.lemma}.`);
+    }
+  }
+
   /** Tick: all of the file's words go into its own category. Untick: back to the model's picks. */
   function putAllIn(sourceId: string, name: string, on: boolean) {
     const next = { ...forcedRef.current };
@@ -775,6 +800,7 @@ export default function AddWords({
    * stage.
    */
   function reset() {
+    stopRef.current?.abort();
     setText("");
     setFiles([]);
     setFileErrors([]);
@@ -784,6 +810,21 @@ export default function AddWords({
     setExamples(null);
     setStage("input");
   }
+
+  // The + in the nav while already on /add: start over with an empty form
+  // (stopping a running import — what was saved stays saved). The listener
+  // reads the latest reset() through a ref, so it is attached once.
+  const resetRef = useRef(reset);
+  useEffect(() => {
+    resetRef.current = reset;
+  });
+  useEffect(() => {
+    function onSamePage(event: Event) {
+      if ((event as CustomEvent<string>).detail === "/add") resetRef.current();
+    }
+    window.addEventListener(SAME_PAGE_EVENT, onSamePage);
+    return () => window.removeEventListener(SAME_PAGE_EVENT, onSamePage);
+  }, []);
 
   const chosen = candidates.filter((c) => c.selected).length;
   const count = (status: WordCandidate["status"]) => candidates.filter((c) => c.status === status).length;
@@ -875,7 +916,44 @@ export default function AddWords({
           </label>
 
           <div className="mt-4">
-            <FileDrop onFiles={addFiles} />
+            {/* The added files are listed inside the drop zone itself, so a drop
+                visibly lands where it was dropped; more can be dropped on top. */}
+            <FileDrop onFiles={addFiles} hasFiles={files.length > 0 || reading > 0}>
+              {(files.length > 0 || reading > 0 || fileErrors.length > 0) && (
+                <ul className="flex flex-col gap-2 text-left">
+                  {files.map((source) => (
+                    <li
+                      key={source.id}
+                      className="flex items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-sm"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{source.name}</span>
+                        <span className="text-xs text-muted">{source.summary}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFiles((list) => list.filter((s) => s.id !== source.id))}
+                        aria-label={`Remove ${source.name}`}
+                        className="rounded px-2 py-1 text-muted hover:text-ink"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                  {reading > 0 && (
+                    <li className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted" role="status">
+                      <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-celadon border-t-transparent" aria-hidden />
+                      Reading {reading} {reading === 1 ? "file" : "files"}…
+                    </li>
+                  )}
+                  {fileErrors.map((message, index) => (
+                    <li key={index} className="rounded-md bg-clay-soft px-3 py-2 text-sm text-clay">
+                      {message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </FileDrop>
           </div>
 
           <div role="radiogroup" aria-label="What to keep" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -977,39 +1055,6 @@ export default function AddWords({
             </span>
           </div>
 
-          {(files.length > 0 || reading > 0 || fileErrors.length > 0) && (
-            <ul className="mt-4 flex flex-col gap-2">
-              {files.map((source) => (
-                <li
-                  key={source.id}
-                  className="flex items-center gap-3 rounded-md border border-line bg-surface px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{source.name}</span>
-                    <span className="text-xs text-muted">{source.summary}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setFiles((list) => list.filter((s) => s.id !== source.id))}
-                    aria-label={`Remove ${source.name}`}
-                    className="rounded px-2 py-1 text-muted hover:text-ink"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-              {reading > 0 && (
-                <li className="px-3 py-2 text-sm text-muted">
-                  Reading {reading} {reading === 1 ? "file" : "files"}…
-                </li>
-              )}
-              {fileErrors.map((message, index) => (
-                <li key={index} className="rounded-md bg-clay-soft px-3 py-2 text-sm text-clay">
-                  {message}
-                </li>
-              ))}
-            </ul>
-          )}
 
           {outOfCredits ? (
             <p className="mt-5 rounded-md bg-clay-soft px-3 py-2.5 text-sm text-clay">
@@ -1050,9 +1095,14 @@ export default function AddWords({
           {running && (
             <div className="mb-4 rounded-md border border-line bg-surface px-4 py-3">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span>
-                  Read {partsDone} of {partsTotal} parts
-                  {autoAdd && added.created > 0 && ` · ${added.created} words added`}
+                {/* A spinner as well as the bar: the first part takes a while, and
+                    a bar at 0% alone looked like nothing was happening. */}
+                <span className="flex items-center gap-2.5" role="status">
+                  <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-celadon border-t-transparent" aria-hidden />
+                  <span>
+                    {partsDone === 0 ? "Reading…" : `Read ${partsDone} of ${partsTotal} parts`}
+                    {autoAdd && added.created > 0 && ` · ${added.created} words added`}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -1259,6 +1309,7 @@ export default function AddWords({
                           categories={categories}
                           autoMode={autoAdd}
                           onRemove={() => removeWord(candidate)}
+                          onUndoRemove={() => restoreWord(candidate)}
                         />
                       ))}
                     </ul>

@@ -14,6 +14,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 
+/** Fired on window when a nav link to the current page is clicked; detail = href. */
+export const SAME_PAGE_EVENT = "hangugo:same-page";
+
 const LINKS = [
   { href: "/", label: "Home", icon: "bi-house" },
   { href: "/learn", label: "Learn", icon: "bi-stars" },
@@ -40,6 +43,12 @@ export default function Nav({ email }: { email: string | null }) {
               href={link.href}
               aria-current={active ? "page" : undefined}
               aria-label={link.label}
+              // Clicking the page you are on does not remount it in Next.js, so
+              // the page would stay as it is (the + on a finished import did
+              // nothing). Tell the page instead; /add starts over (AddWords).
+              onClick={() => {
+                if (active) window.dispatchEvent(new CustomEvent(SAME_PAGE_EVENT, { detail: link.href }));
+              }}
               className={`rounded-md px-2 py-1.5 text-sm ${
                 active ? "bg-celadon-soft font-medium text-celadon-deep" : "text-muted hover:text-ink"
               }`}

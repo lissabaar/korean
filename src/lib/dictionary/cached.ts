@@ -23,6 +23,7 @@ import {
   fetchExamples,
   isApiCode,
   lookup,
+  realTranslation,
   TRANS_LANG,
   DictionaryUnavailableError,
   type DictEntry,
@@ -31,6 +32,17 @@ import {
 } from "./krdict";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Cached API answers stored before realTranslation() existed can still hold
+ * KRDict's "(no equivalent expression)" placeholder: strip it on the way out.
+ */
+function withoutPlaceholders(entries: DictEntry[]): DictEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    senses: entry.senses.map((sense) => ({ ...sense, translation: realTranslation(sense.translation) })),
+  }));
+}
 const EMPTY_TTL = 7 * DAY;
 
 /**
@@ -80,7 +92,7 @@ export async function cachedLookup(
   }
   const key = `search:${options.transLang ?? 1}:${word}`;
   const hit = await readCache<DictEntry[]>(prisma, key);
-  if (hit) return hit;
+  if (hit) return withoutPlaceholders(hit);
   const entries = await lookup(word, keys, options); // throws when unreachable
   await writeCache(prisma, key, entries);
   return entries;
@@ -151,7 +163,7 @@ export async function cachedLookupMany(
     for (let word = queue.shift(); word !== undefined; word = queue.shift()) {
       if (failuresInARow >= BREAK_AFTER || outOfTime()) {
         const hit = await readCache<DictEntry[]>(prisma, `search:${lookupOptions.transLang ?? 1}:${word}`);
-        results.set(word, hit ?? null);
+        results.set(word, hit ? withoutPlaceholders(hit) : null);
         continue;
       }
       const found = await lookUpWithRetries(word);

@@ -22,6 +22,7 @@ import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { DeckStats, ReviewItem, StudyMode } from "@/lib/review/queue";
 import type { AnswerResult } from "@/lib/review/submit";
+import { stepsToLearn, typedFromStreak } from "@/lib/review/steps";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
 import type { WordDetails } from "@/lib/words/edit";
 import SpeakButton, { speakKorean } from "./SpeakButton";
@@ -247,8 +248,8 @@ export default function Review({ mode }: { mode: StudyMode }) {
     if (result.correct) setCorrectCount((n) => n + 1);
     setQueue(([head, ...rest]) => {
       if (!result.requeue) return rest;
-      // Mirror pickExercise(): the last learning step is typed.
-      const typed = result.learningStreak >= head.learningGoal - 1;
+      // Mirror pickExercise(): the last learning steps are typed (steps.ts).
+      const typed = result.learningStreak >= typedFromStreak(head.learningGoal);
       const answer = head.direction === "RECALL" ? head.back.lemma : (head.back.translation ?? "");
       const again: ReviewItem = {
         ...head,
@@ -342,7 +343,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
             {showIntro
               ? "New word"
               : current.phase === "LEARNING"
-              ? `New word · right in a row: ${current.learningStreak}/${current.learningGoal}`
+              ? `New word · right in a row: ${current.learningStreak}/${stepsToLearn(current.learningGoal)}`
               : "Review"}
           </span>
           <span className="tabular-nums">{queue.length} cards left this session</span>
@@ -676,14 +677,15 @@ function Question({
                       Starts with <span className="korean">{item.hint}</span>
                     </span>
                   ) : (
-                    "Hint"
+                    // A right answer after the hint does not count (submit.ts).
+                    <span title="A right answer with the hint does not count as progress">Hint</span>
                   )}
                 </button>
               )}
             </div>
           )}
           {!recall && !result && (
-            <p className="mt-2 text-xs text-muted">Recalling the word counts, spelling slips are fine.</p>
+            <p className="mt-2 text-xs text-muted">Any of the word&apos;s meanings counts.</p>
           )}
         </form>
       )}
@@ -699,14 +701,22 @@ function Question({
             {feedbackLine(result, item, picked)}
           </p>
           {!item.selfGraded && <Back item={item} onEdit={onEdit} />}
-          <button
-            ref={nextRef}
-            type="button"
-            onClick={() => onDone(result)}
-            className="mt-5 w-full rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper"
-          >
-            Next
-          </button>
+          {/* Phones: Next sits in a bar pinned to the bottom of the screen, so
+              it is always in the same place whatever the card's height (it
+              used to move with the content and could end up off screen).
+              Wider screens: in the flow under the card, as before. The
+              spacer keeps the bar from covering the end of the card. */}
+          <div className="h-24 sm:hidden" aria-hidden />
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
+            <button
+              ref={nextRef}
+              type="button"
+              onClick={() => onDone(result)}
+              className="w-full rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -719,11 +729,20 @@ function Question({
  */
 function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | null): string {
   if (result.graduated) return "Learned — this word now moves to spaced review.";
+  if (result.hintNotCounted) {
+    return item.phase === "LEARNING"
+      ? "Right — but with the hint it does not count. Once more without it."
+      : "Right — but with the hint it counts as not remembered; it will come back soon.";
+  }
   if (result.verdict === "almost") return `${result.note ?? "Close."} Expected: ${result.expected}`;
   if (result.correct) {
     if (item.phase !== "LEARNING") return "Right.";
-    const left = item.learningGoal - result.learningStreak;
-    return left === 1 ? "Right — one more, and this time type it." : `Right — ${left} more to go.`;
+    const left = stepsToLearn(item.learningGoal) - result.learningStreak;
+    // The first typed step is next: say so, the exercise changes.
+    if (result.learningStreak === typedFromStreak(item.learningGoal)) {
+      return `Right — now type it: ${left} more to go.`;
+    }
+    return left === 1 ? "Right — one more." : `Right — ${left} more to go.`;
   }
   // The options are hidden on phones after answering, so say what was picked.
   return picked

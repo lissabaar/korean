@@ -113,7 +113,7 @@ then AI checked against the dictionary) — run after saving and from Settings.
   meaning"), not rejected. `commit.ts` `resolveEntry()` builds that entry.
 - Phrases: with "Words & phrases" on, extraction returns `kind: "phrase"`
   for expressions and sentences, learned as one card. Typed answers ignore
-  punctuation and spacing and allow about one typo per 7 characters.
+  punctuation and spacing; with `acceptTypos` on, about one typo per 7 characters.
 
 **One card tests one thing.**
 Cards hang off `Sense`, not `Entry`. A word with three senses → three sense
@@ -250,9 +250,17 @@ beginners"): `ExtractSource` kind `topic`, TOPIC_PROMPT; the dictionary still
 rejects any word it does not know. Saved as material kind GENERATED.
 
 **Learning goal.** `User.learningGoal` (2–10, default 5) right answers in a
-row graduate a word; every step is picked from options except the last,
-which is typed. `pickExercise(card, goal)` and `advanceLearning(card, ok, goal)`
-take it; the client mirrors the switch when it requeues a card.
+row, picked from options with the last one typed, plus `EXTRA_TYPED_STEPS`
+(2) more typed — `review/steps.ts` (`stepsToLearn`, `typedFromStreak`) is the
+one source for server and client. A right typed answer with the hint shown
+does not count: the learning streak stays, a review is graded AGAIN
+(`hintNotCounted`). Typos: `User.acceptTypos` (default false) — off, only an
+exact answer counts (spacing/punctuation aside).
+
+**KRDict placeholders.** KRDict writes "(no equivalent expression)" /
+"(нет эквивалента)" where it has no translation. `realTranslation()` in
+krdict.ts drops them in the API parser, the local table reader and cached
+answers; load-krdict.mts skips them. Never show one as a meaning.
 
 **Meet the word before the drill.** A LEARNING card with no
 `Card.introducedAt` is first shown whole in the session (`intro` on

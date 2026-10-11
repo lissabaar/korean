@@ -123,7 +123,7 @@ try {
       result = await submitAnswer(prisma, userId, { cardId: card.id, answer: exercise === "TYPING" ? answer : (card.direction === "RECALL" ? lemma : (card.sense.translation ?? "")) });
     }
     const after = await prisma.card.findUnique({ where: { id: card.id } });
-    check("5 right answers graduate the card", after.phase === "SCHEDULED" && result?.graduated === true, `${after.phase}`);
+    check("5 + 2 typed right answers graduate the card", after.phase === "SCHEDULED" && result?.graduated === true, `${after.phase}`);
     check("first review is ~1 day later", after.due.getTime() > Date.now() + 0.9 * 864e5);
     const logs = await prisma.reviewLog.count({ where: { cardId: card.id } });
     check("learning wrote no ReviewLog", logs === 0);
@@ -133,10 +133,19 @@ try {
   await scenario("typing grading", async () => {
     const word = await createManualWord(prisma, userId, { lemma: "동전", translation: "coin" });
     const card = await prisma.card.findFirst({ where: { userId, direction: "RECALL", sense: { entryId: word.entryId ?? word.id } } }) ?? await prisma.card.findFirst({ where: { userId, direction: "RECALL", sense: { entry: { lemma: "동전" } } } });
-    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 4, introducedAt: new Date() } }); // last step: typing
+    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 6, introducedAt: new Date() } }); // last step (goal 5 + 2 typed): typing
     const wrong = await submitAnswer(prisma, userId, { cardId: card.id, answer: "동근" });
     check("동근 for 동전 is wrong", wrong.correct === false && wrong.graduated === false, wrong.verdict);
-    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 4 } });
+    // a right answer with the hint shown keeps the streak and does not graduate
+    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 6 } });
+    const hinted = await submitAnswer(prisma, userId, { cardId: card.id, answer: "동전", usedHint: true });
+    check("hint: right but not counted", hinted.correct && hinted.hintNotCounted && !hinted.graduated && hinted.learningStreak === 6, `${hinted.learningStreak}`);
+    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 6 } });
+    // typos: wrong by default (User.acceptTypos false), "almost" when allowed
+    const strict = await submitAnswer(prisma, userId, { cardId: card.id, answer: "동젼" });
+    check("동젼 for 동전 is wrong by default", strict.correct === false, strict.verdict);
+    await prisma.user.update({ where: { id: userId }, data: { acceptTypos: true } });
+    await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 6 } });
     const slip = await submitAnswer(prisma, userId, { cardId: card.id, answer: "동젼" });
     check("동젼 for 동전 is a typo (accepted)", slip.verdict === "almost" && slip.graduated === true, slip.verdict);
   });

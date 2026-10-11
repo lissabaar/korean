@@ -41,6 +41,7 @@ export default async function SettingsPage() {
         myMeaningFirst: true,
         newPerSession: true,
         cardTextSize: true,
+        acceptTypos: true,
       },
     }),
     getAiBalance(prisma, user.id),
@@ -61,6 +62,7 @@ export default async function SettingsPage() {
       myMeaningFirst={settings.myMeaningFirst}
       newPerSession={settings.newPerSession}
       cardTextSize={settings.cardTextSize}
+      acceptTypos={settings.acceptTypos}
       credits={ai.unlimited ? null : ai.remaining}
       missingExamples={missingExamples}
       missingMeanings={missingMeanings}

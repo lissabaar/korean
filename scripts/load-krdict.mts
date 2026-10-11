@@ -60,6 +60,12 @@ function mapSense(sense: Node) {
     .sort((a, b) => (EXAMPLE_ORDER[a.type] ?? 3) - (EXAMPLE_ORDER[b.type] ?? 3))
     .slice(0, 3)
     .map((f) => f.example.normalize("NFC"));
+  // KRDict writes "(no equivalent expression)" / "(нет эквивалента)" where it
+  // has no translation — a placeholder, not a meaning: keep nothing instead.
+  const real = (value: string | undefined) =>
+    value && !/^\(\s*(no equivalent expression|нет эквивалента)\s*\)$/i.test(value.trim()) ? value : undefined;
+  if (english) english.lemma = real(english.lemma) as string;
+  if (russian) russian.lemma = real(russian.lemma) as string;
   return {
     definition: feats(sense.feat).definition ?? "",
     ...(english?.lemma && { translation: english.lemma }),

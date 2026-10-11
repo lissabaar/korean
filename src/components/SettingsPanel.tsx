@@ -40,6 +40,7 @@ export default function SettingsPanel({
   myMeaningFirst: initialMyFirst,
   newPerSession: initialNewPerSession,
   cardTextSize: initialTextSize,
+  acceptTypos: initialAcceptTypos,
   credits,
   missingExamples,
   missingMeanings,
@@ -56,6 +57,8 @@ export default function SettingsPanel({
   newPerSession: number;
   /** 0 normal, 1 large, 2 extra large — see TEXT_SIZES in Review.tsx. */
   cardTextSize: number;
+  /** Typed answers one letter off count as right (User.acceptTypos). */
+  acceptTypos: boolean;
   /** null = unlimited. */
   credits: number | null;
   missingExamples: number;
@@ -73,6 +76,7 @@ export default function SettingsPanel({
   const [myFirst, setMyFirst] = useState(initialMyFirst);
   const [perSession, setPerSession] = useState(initialNewPerSession);
   const [textSize, setTextSize] = useState(initialTextSize);
+  const [acceptTypos, setAcceptTypos] = useState(initialAcceptTypos);
   const [error, setError] = useState<string | null>(null);
   /** One fill at a time: while one runs, the other button waits. */
   const [task, setTask] = useState<"meanings" | "examples" | "translations" | null>(null);
@@ -193,14 +197,23 @@ export default function SettingsPanel({
           }}
           label="Say the Korean word out loud after each answer (🔊 buttons work either way)"
         />
+        <Toggle
+          checked={acceptTypos}
+          onChange={(value) => {
+            setAcceptTypos(value);
+            save({ acceptTypos: value }, () => setAcceptTypos(!value));
+          }}
+          label="Forgive typos: a typed answer one letter off counts as right (off: only the exact word counts)"
+        />
       </section>
 
       <section className={section}>
         <h2 className="font-medium">Learning new words</h2>
         <p className="mt-1 text-sm text-muted">
-          A new word counts as learned after this many right answers in a row — the last one typed,
-          the rest picked from options. Its first review is the next day; after that the gaps grow
-          (roughly 1, 3, 7–10, 20+ days), shorter whenever you miss it.
+          Right answers in a row a new word needs — picked from options, the last one typed — and then
+          two more typed answers before it counts as learned. A right answer with the hint does not
+          count. Its first review is the next day; after that the gaps grow (roughly 1, 3, 7–10, 20+
+          days), shorter whenever you miss it.
         </p>
         <div role="radiogroup" aria-label="Right answers in a row" className="mt-3 flex flex-wrap gap-2">
           {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (

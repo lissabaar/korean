@@ -58,6 +58,11 @@ export interface AnswerResult {
   learningStreak: number;
   /** Set for scheduled cards: when FSRS wants to see the card next. */
   nextDue?: Date;
+  /**
+   * Right, but typed with the hint shown: it did not count — the learning
+   * streak stayed, a review was graded AGAIN. The feedback line says so.
+   */
+  hintNotCounted?: boolean;
 }
 
 export class CardNotFoundError extends Error {}
@@ -89,6 +94,7 @@ export async function submitAnswer(
           hideTranslationAfterStability: true,
           learningGoal: true,
           myMeaningFirst: true,
+          acceptTypos: true,
         },
       },
     },
@@ -130,17 +136,25 @@ export async function submitAnswer(
       card.direction === "RECOGNITION"
         ? acceptedMeanings(entry.senses.flatMap((s) => [s.translation, s.userMeaning]))
         : [];
-    const graded = gradeTypedAnswer(input.answer ?? "", expected, { alternatives });
+    // Near misses count only when the user allows typos (User.acceptTypos).
+    const graded = gradeTypedAnswer(input.answer ?? "", expected, {
+      alternatives,
+      allowNearMiss: card.user.acceptTypos,
+    });
     verdict = graded.verdict;
     note = graded.hint;
   }
 
   const correct = verdict !== "wrong";
+  // The hint exists only on typed exercises; a right answer with it shown
+  // is not progress (advanceLearning / ratingFromTyped).
+  const usedHint = exercise === "TYPING" && !selfGraded && input.usedHint === true;
+  const hintNotCounted = correct && usedHint;
 
   // ---------------------------------------------------------------- learning
 
   if (card.phase === "LEARNING") {
-    const outcome = advanceLearning(card, correct, card.user.learningGoal);
+    const outcome = advanceLearning(card, correct, card.user.learningGoal, usedHint);
     await prisma.card.update({
       where: { id: card.id },
       data: outcome.graduated
@@ -162,6 +176,7 @@ export async function submitAnswer(
       requeue: !outcome.graduated,
       graduated: outcome.graduated,
       learningStreak: outcome.learningStreak,
+      hintNotCounted,
     };
   }
 
@@ -170,7 +185,7 @@ export async function submitAnswer(
   const rating: Rating =
     exercise === "CHOICE" || selfGraded
       ? ratingFromChoice(correct)
-      : ratingFromTyped(verdict, input.usedHint ?? false);
+      : ratingFromTyped(verdict, usedHint);
 
   const translationShown = showsTranslation(card, card.user.hideTranslationAfterStability);
   const next = scheduleNext(card, rating, now, card.user.desiredRetention);
@@ -219,5 +234,6 @@ export async function submitAnswer(
     graduated: false,
     learningStreak: card.learningStreak,
     nextDue: next.due,
+    hintNotCounted,
   };
 }

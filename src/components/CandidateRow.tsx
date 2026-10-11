@@ -39,13 +39,22 @@ interface Props {
   autoMode?: boolean;
   /** Delete the just-added word (it has an entryId). */
   onRemove?: () => Promise<void>;
+  /** Save a removed word again — the "Undo" next to "Removed". */
+  onUndoRemove?: () => Promise<void>;
 }
 
 /**
  * One preview row. `candidate` is the word with everything known about it;
  * `onChange` reports edits; `categories` fills the category picker.
  */
-export default function CandidateRow({ candidate, onChange, categories, autoMode = false, onRemove }: Props) {
+export default function CandidateRow({
+  candidate,
+  onChange,
+  categories,
+  autoMode = false,
+  onRemove,
+  onUndoRemove,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
   // Phrase editor: closed, or open with the draft Korean and English.
@@ -92,7 +101,7 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
   return (
     <li
       className={`border-b border-line px-4 py-4 last:border-b-0 sm:px-5 ${
-        removed ? "opacity-40" : candidate.selected || saved || autoMode ? "" : "opacity-55"
+        removed ? "" : candidate.selected || saved || autoMode ? "" : "opacity-55"
       }`}
     >
       {/* Row 1: the word as the heading — it can wrap, nothing sits beside it. */}
@@ -145,7 +154,7 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
           </div>
         ) : (
           <h3
-            className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${removed ? "line-through" : ""} ${
+            className={`korean min-w-0 flex-1 leading-tight [overflow-wrap:anywhere] ${removed ? "text-muted line-through" : ""} ${
               candidate.kind === "phrase" ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
             }`}
           >
@@ -183,12 +192,35 @@ export default function CandidateRow({ candidate, onChange, categories, autoMode
             <span className="hidden sm:inline">Remove</span>
           </button>
         )}
-        {removed && <span className="mt-1.5 shrink-0 text-sm text-muted">Removed</span>}
+        {removed && (
+          <span className="mt-1 flex shrink-0 items-center gap-2 text-sm text-muted">
+            Removed
+            {onUndoRemove && (
+              <button
+                type="button"
+                disabled={removing}
+                onClick={async () => {
+                  // Same busy flag as Remove: one save or delete at a time.
+                  setRemoving(true);
+                  try {
+                    await onUndoRemove();
+                  } finally {
+                    setRemoving(false);
+                  }
+                }}
+                className="rounded-md border border-line px-2 py-1 text-ink hover:border-celadon disabled:opacity-50"
+              >
+                <i className={`bi ${removing ? "bi-hourglass-split" : "bi-arrow-counterclockwise"} mr-1`} aria-hidden />
+                Undo
+              </button>
+            )}
+          </span>
+        )}
         {!draft && <SpeakButton text={candidate.lemma} />}
       </div>
 
       {/* Row 2: two columns on wide screens, one on phones. */}
-      <div className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+      <div className={`mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2 ${removed ? "opacity-40" : ""}`}>
         <div className="min-w-0">
           {english && <p className="font-medium [overflow-wrap:anywhere]">{english}</p>}
           {own && <p className="text-sm text-muted [overflow-wrap:anywhere]">Yours: {own}</p>}

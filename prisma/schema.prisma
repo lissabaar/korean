@@ -57,9 +57,14 @@ model User {
   // English → Korean card. Off by default: the English meaning is the cue.
   showKoreanDefinition Boolean @default(false)
 
-  // Correct answers in a row before a new word counts as learned and moves
-  // to spaced review (2–10). The last step is typed, not picked.
+  // Correct answers in a row (picked, the last one typed) before a new word
+  // counts as learned (2–10); two more typed answers follow (review/steps.ts).
   learningGoal Int @default(5)
+
+  // Accept a typed answer one letter off as right ("almost"). Off by default:
+  // the owner found real mistakes passing as typos — then only an exact
+  // answer (spacing and punctuation aside) counts.
+  acceptTypos Boolean @default(false)
 
   // Speak the Korean word after each answer (browser speech synthesis).
   autoPlayAudio Boolean @default(false)

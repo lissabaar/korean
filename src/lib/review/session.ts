@@ -19,10 +19,13 @@ import {
   type Card as FsrsCard,
   type Grade,
 } from "ts-fsrs";
+import { stepsToLearn, typedFromStreak } from "./steps";
 
 /**
- * Correct answers in a row before a new word graduates. A per-user setting
- * (User.learningGoal, 2–10); this is the default and the fallback.
+ * The user's learning goal: right answers in a row picked from options and
+ * typed (the last one typed). A per-user setting (User.learningGoal, 2–10);
+ * this is the default and the fallback. Graduation takes stepsToLearn(goal)
+ * — the goal plus extra typed answers (steps.ts).
  */
 export const DEFAULT_LEARNING_GOAL = 5;
 export const MAX_LEARNING_GOAL = 10;
@@ -61,15 +64,16 @@ export interface CardLike {
  * stable learning goal) — never random, because every rating FSRS receives
  * must mean the same thing.
  *
- * Learning: pick from options until the last step, which is typed —
- * recognising a word among four is not yet being able to produce it.
+ * Learning: pick from options, then the last 1 + EXTRA_TYPED_STEPS steps are
+ * typed (steps.ts) — recognising a word among four is not yet being able to
+ * produce it, and one typed answer was not enough for it to stick.
  */
 export function pickExercise(
   card: CardLike,
   learningGoal: number = DEFAULT_LEARNING_GOAL,
 ): ExerciseType {
   if (card.phase === "LEARNING") {
-    return card.learningStreak >= clampLearningGoal(learningGoal) - 1 ? "TYPING" : "CHOICE";
+    return card.learningStreak >= typedFromStreak(clampLearningGoal(learningGoal)) ? "TYPING" : "CHOICE";
   }
   if (card.direction === "REGISTER") return "CHOICE"; // finite set of options
   return card.reps < CHOICE_REVIEWS_BEFORE_TYPING ? "CHOICE" : "TYPING";
@@ -97,18 +101,22 @@ export interface LearningOutcome {
 
 /**
  * Advance the learning drill. Correct answers build a streak; a wrong
- * answer resets it. Once the streak is met the card graduates and is handed
- * to FSRS with a clean slate.
+ * answer resets it. A right answer typed with the hint shown keeps the streak
+ * where it was — no step back, but no step forward either: the word was not
+ * produced unaided, so it must not count towards graduating. Once the streak
+ * reaches stepsToLearn() the card graduates and is handed to FSRS with a
+ * clean slate.
  */
 export function advanceLearning(
   card: CardLike,
   wasCorrect: boolean,
   learningGoal: number = DEFAULT_LEARNING_GOAL,
+  usedHint = false,
 ): LearningOutcome {
-  const streak = wasCorrect ? card.learningStreak + 1 : 0;
+  const streak = !wasCorrect ? 0 : usedHint ? card.learningStreak : card.learningStreak + 1;
   return {
     learningStreak: streak,
-    graduated: streak >= clampLearningGoal(learningGoal),
+    graduated: streak >= stepsToLearn(clampLearningGoal(learningGoal)),
   };
 }
 
@@ -228,6 +236,10 @@ export function scheduleNext(
  * A near-miss is graded HARD rather than AGAIN: the word was recalled, the
  * spelling slipped. Grading it AGAIN would wipe out the interval over a
  * typo and teach the user to distrust the app.
+ *
+ * With the hint shown the answer is AGAIN, even if right: the word was not
+ * recalled unaided, so it must not move further out (HARD still lengthens
+ * the interval). The owner's call — progress only for what you recall alone.
  */
 export function ratingFromTyped(
   verdict: "correct" | "almost" | "wrong",
@@ -235,7 +247,7 @@ export function ratingFromTyped(
 ): Rating {
   if (verdict === "wrong") return "AGAIN";
   if (verdict === "almost") return "HARD";
-  return usedHint ? "HARD" : "GOOD";
+  return usedHint ? "AGAIN" : "GOOD";
 }
 
 /**

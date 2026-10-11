@@ -3,14 +3,16 @@
 /**
  * Drop zone / file picker for imports on /add (images, .apkg/.colpkg Anki
  * decks, CSV/TSV, .reword, text, subtitles). Only collects the files and
- * passes them up; reading them is lib/import/read.ts's job.
+ * passes them up; reading them is lib/import/read.ts's job. The parent passes
+ * the list of added files as children: it is shown inside the zone, which
+ * then shrinks to a "drop more" line under it.
  *
  * React client component ("use client"): runs in the browser, so it can hold
  * state, react to clicks and call the API with fetch(). It cannot touch the
  * database or secret keys.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ACCEPTED_FILES } from "@/lib/import/read";
 
 /**
@@ -21,9 +23,15 @@ import { ACCEPTED_FILES } from "@/lib/import/read";
 export default function FileDrop({
   onFiles,
   disabled = false,
+  hasFiles = false,
+  children,
 }: {
   onFiles: (files: File[]) => void;
   disabled?: boolean;
+  /** Files are already added: show them (children) and a compact "add more" line. */
+  hasFiles?: boolean;
+  /** The added files, rendered inside the zone. */
+  children?: ReactNode;
 }) {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,23 +78,41 @@ export default function FileDrop({
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(false);
       }}
-      className={`rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${
-        over ? "border-celadon bg-celadon-soft" : "border-line bg-surface"
+      className={`rounded-lg border-2 border-dashed px-4 text-center transition-colors ${hasFiles ? "py-3" : "py-6"} ${
+        over ? "border-celadon bg-celadon-soft" : hasFiles ? "border-celadon bg-surface" : "border-line bg-surface"
       } ${disabled ? "opacity-50" : ""}`}
     >
-      <p className="text-sm font-medium">Drop files here</p>
-      <p className="mt-1 text-xs text-muted">
-        Screenshots and photos, Anki decks (.apkg), ReWord categories (.reword), CSV, text or subtitles — as many as you like.
-        Or paste a screenshot with Ctrl+V.
-      </p>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-        className="mt-3 rounded-md border border-line px-4 py-2 text-sm"
-      >
-        Choose files
-      </button>
+      {children}
+      {hasFiles ? (
+        // Files are in: one compact line to add more.
+        <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-muted">
+          Drop more files here, paste with Ctrl+V, or
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-md border border-line px-3 py-1 text-sm text-ink"
+          >
+            Add files
+          </button>
+        </p>
+      ) : (
+        <>
+          <p className="text-sm font-medium">Drop files here</p>
+          <p className="mt-1 text-xs text-muted">
+            Screenshots and photos, Anki decks (.apkg), ReWord categories (.reword), CSV, text or subtitles — as many as you like.
+            Or paste a screenshot with Ctrl+V.
+          </p>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => inputRef.current?.click()}
+            className="mt-3 rounded-md border border-line px-4 py-2 text-sm"
+          >
+            Choose files
+          </button>
+        </>
+      )}
       <input
         ref={inputRef}
         type="file"

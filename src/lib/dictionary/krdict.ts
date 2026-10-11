@@ -102,6 +102,18 @@ const parser = new XMLParser({
 });
 
 /** Pull a value out of a parsed node regardless of nesting quirks. */
+/**
+ * KRDict fills a translation it does not have with a placeholder —
+ * "(no equivalent expression)" in English, "(нет эквивалента)" in Russian.
+ * That is not a meaning: it must never reach a card. Returns undefined for a
+ * placeholder (or nothing), the translation otherwise.
+ */
+const NO_EQUIVALENT = /^\(\s*(no equivalent expression|нет эквивалента)\s*\)$/i;
+export function realTranslation(value: string | undefined | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && !NO_EQUIVALENT.test(trimmed) ? trimmed : undefined;
+}
+
 function text(node: unknown): string | undefined {
   if (node === undefined || node === null) return undefined;
   if (typeof node === "string") return node.trim() || undefined;
@@ -177,7 +189,7 @@ function mapKrdictItem(item: XmlNode): DictEntry {
     const first = translations[0] ?? {};
     return {
       definition: text(sense.definition) ?? "",
-      translation: text(first.trans_word),
+      translation: realTranslation(text(first.trans_word)),
       translatedDefinition: text(first.trans_dfn),
       examples: asArray(sense.example)
         .map((example: XmlNode) => text(example.example) ?? text(example))

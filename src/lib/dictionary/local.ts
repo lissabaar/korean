@@ -11,7 +11,7 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
-import type { DictEntry, DictSense } from "./krdict";
+import { realTranslation, type DictEntry, type DictSense } from "./krdict";
 
 /** Whether the table has data; checked once per server process. */
 let loaded: Promise<boolean> | null = null;
@@ -43,7 +43,14 @@ function toEntry(row: Row): DictEntry {
     originalForm: row.origin ?? undefined,
     partOfSpeech: row.partOfSpeech ?? undefined,
     level: row.level && row.level !== "없음" ? row.level : undefined,
-    senses: (row.senses as DictSense[]).map((sense) => ({ ...sense, examples: sense.examples ?? [] })),
+    // realTranslation: drops KRDict's "(no equivalent expression)" placeholder,
+    // in case the table was loaded before load-krdict.mts filtered it.
+    senses: (row.senses as DictSense[]).map((sense) => ({
+      ...sense,
+      translation: realTranslation(sense.translation),
+      translationRu: realTranslation(sense.translationRu),
+      examples: sense.examples ?? [],
+    })),
   };
 }
 
