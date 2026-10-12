@@ -124,11 +124,17 @@ export async function seedStarterCategories(prisma: PrismaClient, userId: string
       // word the dictionary lacks, by spelling among entries without one).
       const existing = await tx.entry.findMany({
         where: { userId, language: "KO", lemma: { in: lemmas } },
-        select: { id: true, lemma: true, krdictTargetCode: true },
+        select: { id: true, lemma: true, krdictTargetCode: true, originalForm: true },
       });
+      // Same dictionary entry; or the same spelling and hanja (the database's
+      // unique key — e.g. a word saved without its dictionary code); or, for
+      // a word the dictionary lacks, the same spelling with no code.
       const findExisting = (lemma: string, entry: DictEntry | null) =>
         existing.find((row) =>
-          entry?.targetCode ? row.krdictTargetCode === entry.targetCode : row.lemma === lemma && !row.krdictTargetCode,
+          entry?.targetCode
+            ? row.krdictTargetCode === entry.targetCode ||
+              (Boolean(entry.originalForm) && row.lemma === entry.lemma && row.originalForm === entry.originalForm)
+            : row.lemma === lemma && !row.krdictTargetCode,
         );
 
       const material = await tx.sourceMaterial.create({
