@@ -1,7 +1,8 @@
 /**
  * POST /api/review/intro — the first meeting with a new word:
  * { cardId, action: "start" } starts learning it, "skip" puts it away for
- * 3 days and returns a replacement word for the session.
+ * 3 days, "known" sends it straight to review (first check in 3 days);
+ * skip and known return a replacement word for the session.
  *
  * Next.js route handler: an HTTP API endpoint. The folder path is the URL;
  * each exported function (GET, POST, PATCH, DELETE) handles that HTTP method.
@@ -16,8 +17,8 @@ import { getUserId } from "@/lib/session";
 import { IntroCardNotFoundError, introduceWord } from "@/lib/review/intro";
 
 /**
- * Body: { cardId, action: "start" | "skip", sessionSenseIds? }. Returns {
- * replacement } — new cards to put in the session after a skip.
+ * Body: { cardId, action: "start" | "skip" | "known", sessionSenseIds? }. Returns {
+ * replacement } — new cards to put in the session after a skip or "known".
  */
 export async function POST(request: Request) {
   let body: { cardId?: unknown; action?: unknown; sessionSenseIds?: unknown };
@@ -26,8 +27,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Expected JSON" }, { status: 400 });
   }
-  if (typeof body.cardId !== "string" || (body.action !== "start" && body.action !== "skip")) {
-    return NextResponse.json({ error: "Expected cardId and action start|skip." }, { status: 400 });
+  if (typeof body.cardId !== "string" || (body.action !== "start" && body.action !== "skip" && body.action !== "known")) {
+    return NextResponse.json({ error: "Expected cardId and action start|skip|known." }, { status: 400 });
   }
 
   const userId = await getUserId();

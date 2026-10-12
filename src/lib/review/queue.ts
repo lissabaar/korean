@@ -311,7 +311,12 @@ export async function buildSession(
     const correct = direction === "RECOGNITION" ? meaning : entry.lemma;
 
     let choices: string[] | null = null;
-    if (exercise === "CHOICE") {
+    // Learning cards always carry options, even on a typed step: a wrong
+    // typed answer resets the streak and the card comes back (in the browser,
+    // Review.tsx) as a pick-from-options step. Without options it fell back to
+    // "Did you know it?" self-grading, which made no sense for a word in
+    // progress.
+    if (exercise === "CHOICE" || card.phase === "LEARNING") {
       const relations = pool.relations.get(entry.id);
       const candidates: DistractorCandidate[] = pool.senses.map((other) => ({
         senseId: other.id,

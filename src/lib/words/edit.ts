@@ -37,6 +37,20 @@ async function uncategorisedId(tx: Tx, userId: string): Promise<string> {
   return category.id;
 }
 
+/**
+ * "uncategorised" holds only words with no other category: a word that has
+ * a real one leaves it. (It used to stay in both after a category was added
+ * in the editor.)
+ */
+async function leaveUncategorised(tx: Tx, userId: string): Promise<void> {
+  await tx.entryCategory.deleteMany({
+    where: {
+      category: { userId, name: UNCATEGORISED },
+      entry: { categories: { some: { category: { name: { not: UNCATEGORISED } } } } },
+    },
+  });
+}
+
 /** Give every word left without a category the "uncategorised" one. */
 async function rehomeLooseWords(tx: Tx, userId: string): Promise<void> {
   const loose = await tx.entry.findMany({
@@ -215,7 +229,10 @@ export async function updateWord(
     }
 
     if (input.categories) {
-      const names = [...new Set(input.categories.map(cleanName).filter(Boolean))];
+      // A word with a real category is not "uncategorised" too.
+      const given = [...new Set(input.categories.map(cleanName).filter(Boolean))];
+      const real = given.filter((name) => name !== UNCATEGORISED);
+      const names = real.length ? real : given;
       const ids: string[] = [];
       for (const name of names.length ? names : [UNCATEGORISED]) {
         const category = await tx.category.upsert({
@@ -243,5 +260,8 @@ export async function deleteWord(prisma: PrismaClient, userId: string, id: strin
 
 /** One-off repair for data saved before the invariant existed. */
 export async function repairLooseWords(prisma: PrismaClient, userId: string): Promise<void> {
-  await prisma.$transaction((tx) => rehomeLooseWords(tx, userId), TX);
+  await prisma.$transaction(async (tx) => {
+    await rehomeLooseWords(tx, userId);
+    await leaveUncategorised(tx, userId);
+  }, TX);
 }

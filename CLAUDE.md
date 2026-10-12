@@ -191,10 +191,23 @@ categories (only ones the user made or chose — categories the model created
 in the past are not offered back). Free-form "secondary" categories produced
 noise like "cutting" and are gone.
 
+**Starter categories.** `words/starter-categories.ts` lists ~380 basic
+words in 17 categories (native/Sino-Korean numbers, colors, days and months,
+counters, action/descriptive verbs, adverbs ...): lemma + English gloss, an
+`@code` pin or the category's preferred part of speech where homographs
+clash. `starter-seed.ts` adds them in one transaction of bulk inserts
+(per-word saves took seconds each): only the meant sense, locked
+categories, learning on; words the user has are linked, never duplicated.
+Runs for accounts with no words (`<StarterSeed/>` in the app layout →
+`/api/starter-categories`); no version is stored (owner's call). Korean
+형용사 are "descriptive verbs", 동사 "action verbs" — also on cards.
+
 **Every word has a category.**
 `words/edit.ts` keeps it so: deleting a category or clearing a word's
-categories puts it in "uncategorised" — an ordinary category with its own
-Learn/Review switches; it can only be deleted when empty. Renaming onto an
+categories puts it in "uncategorised", and a word that gets a real category
+leaves it (`leaveUncategorised`). It is a category row (own Learn/Review
+switches) but shown apart on /categories as "Without a category", with no
+rename/lock/delete, hidden while empty. Renaming onto an
 existing name merges the two.
 
 **Study scope = direction × categories.**
@@ -251,7 +264,8 @@ rejects any word it does not know. Saved as material kind GENERATED.
 
 **Learning goal.** `User.learningGoal` (2–10, default 5) right answers in a
 row, picked from options with the last one typed, plus `EXTRA_TYPED_STEPS`
-(2) more typed — `review/steps.ts` (`stepsToLearn`, `typedFromStreak`) is the
+(2) more typed — `review/steps.ts`; a wrong typed answer drops the streak to
+three picks before typing (`streakAfterMiss`), a wrong pick to zero — (`stepsToLearn`, `typedFromStreak`) is the
 one source for server and client. A right typed answer with the hint shown
 does not count: the learning streak stays, a review is graded AGAIN
 (`hintNotCounted`). Typos: `User.acceptTypos` (default false) — off, only an
@@ -266,7 +280,12 @@ answers; load-krdict.mts skips them. Never show one as a meaning.
 `Card.introducedAt` is first shown whole in the session (`intro` on
 ReviewItem): "Start learning" sets introducedAt for every card of the sense;
 "Skip for 3 days" sets `snoozedUntil` (studyScope's learn filter excludes
-snoozed cards) and the session gets a replacement word. Answering a card
+snoozed cards); "I know it" moves the cards to SCHEDULED, due in 3 days, no
+ReviewLog. Skip and known bring a replacement word. Learning cards always
+carry `choices` (even on typed steps): a wrong typed answer drops the card
+back to a pick step in the browser, and without options it fell into the
+"Did you know it?" self-grade fallback (meant only for tiny decks). The
+typing hint follows the input: the next syllable after the correct prefix. Answering a card
 also sets introducedAt.
 
 **Categories: AI by default, the user can pin them.**

@@ -19,7 +19,7 @@ import {
   type Card as FsrsCard,
   type Grade,
 } from "ts-fsrs";
-import { stepsToLearn, typedFromStreak } from "./steps";
+import { stepsToLearn, streakAfterMiss, typedFromStreak } from "./steps";
 
 /**
  * The user's learning goal: right answers in a row picked from options and
@@ -100,8 +100,9 @@ export interface LearningOutcome {
 }
 
 /**
- * Advance the learning drill. Correct answers build a streak; a wrong
- * answer resets it. A right answer typed with the hint shown keeps the streak
+ * Advance the learning drill. Correct answers build a streak; a wrong pick
+ * resets it, a wrong typed answer drops it back to three picks before typing
+ * (streakAfterMiss in steps.ts). A right answer typed with the hint shown keeps the streak
  * where it was — no step back, but no step forward either: the word was not
  * produced unaided, so it must not count towards graduating. Once the streak
  * reaches stepsToLearn() the card graduates and is handed to FSRS with a
@@ -113,10 +114,15 @@ export function advanceLearning(
   learningGoal: number = DEFAULT_LEARNING_GOAL,
   usedHint = false,
 ): LearningOutcome {
-  const streak = !wasCorrect ? 0 : usedHint ? card.learningStreak : card.learningStreak + 1;
+  const goal = clampLearningGoal(learningGoal);
+  const streak = !wasCorrect
+    ? streakAfterMiss(card.learningStreak, goal)
+    : usedHint
+      ? card.learningStreak
+      : card.learningStreak + 1;
   return {
     learningStreak: streak,
-    graduated: streak >= stepsToLearn(clampLearningGoal(learningGoal)),
+    graduated: streak >= stepsToLearn(goal),
   };
 }
 

@@ -144,6 +144,12 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [introduced, setIntroduced] = useState<Set<string>>(() => new Set());
   /** The word open in the editor under the card (its Entry id), if any. */
   const [editing, setEditing] = useState<string | null>(null);
+  // The editor opens under the card — below the screen on a phone, so Edit
+  // looked dead. Bring it into view when it opens.
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editing) editorRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [editing]);
   const [myMeaningFirst, setMyMeaningFirst] = useState(false);
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
   const [textSize, setTextSize] = useState(1);
@@ -215,15 +221,19 @@ export default function Review({ mode }: { mode: StudyMode }) {
     });
   }
 
-  /** "Skip": the word leaves this session and new ones for a few days; another takes its place. */
-  async function skipWord(item: ReviewItem) {
+  /**
+   * "Skip" (the word leaves this session and new ones for a few days) or "I
+   * know it" (it goes straight to review, first check in 3 days): either way
+   * another word takes its place in the session.
+   */
+  async function skipWord(item: ReviewItem, action: "skip" | "known" = "skip") {
     setEditing(null);
     const response = await fetch("/api/review/intro", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         cardId: item.cardId,
-        action: "skip",
+        action,
         sessionSenseIds: [...new Set(queue.map((q) => q.senseId))],
       }),
     });
@@ -364,6 +374,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
           autoPlay={autoPlay}
           onStart={() => startWord(current)}
           onSkip={() => skipWord(current)}
+          onKnown={() => skipWord(current, "known")}
           onEdit={() => setEditing(current.entryId)}
         />
       ) : (
@@ -378,7 +389,9 @@ export default function Review({ mode }: { mode: StudyMode }) {
       )}
 
       {editing && editing === current.entryId && (
-        <div className="mt-4 overflow-hidden rounded-lg border border-celadon bg-surface">
+        // scroll-mt clears the sticky nav; the bottom margin on phones keeps
+        // the editor's Save above the pinned Next bar.
+        <div ref={editorRef} className="mt-4 mb-24 scroll-mt-16 overflow-hidden rounded-lg border border-celadon bg-surface sm:mb-0">
           <WordEditor
             wordId={editing}
             allCategoryNames={categoryNames}
@@ -673,8 +686,18 @@ function Question({
                   className="rounded-md border border-line px-4 py-3 text-sm"
                 >
                   {usedHint ? (
+                    // Follows the typing: the next letter/syllable still to write.
                     <span>
-                      Starts with <span className="korean">{item.hint}</span>
+                      {(() => {
+                        const next = nextHint(typed, hintAnswer(item));
+                        return next === null ? (
+                          "That's all of it"
+                        ) : (
+                          <>
+                            Next: <span className={recall ? "korean" : ""}>{next}</span>
+                          </>
+                        );
+                      })()}
                     </span>
                   ) : (
                     // A right answer after the hint does not count (submit.ts).
@@ -744,6 +767,8 @@ function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | n
     }
     return left === 1 ? "Right — one more." : `Right — ${left} more to go.`;
   }
+  // Self-graded "Not yet" is an honest answer, not a mistake: no "Not quite".
+  if (item.selfGraded) return "No problem — it will come back.";
   // The options are hidden on phones after answering, so say what was picked.
   return picked
     ? `Not quite — you picked ${picked}. The answer: ${result.expected}`
@@ -761,15 +786,18 @@ function Intro({
   autoPlay,
   onStart,
   onSkip,
+  onKnown,
   onEdit,
 }: {
   item: ReviewItem;
   autoPlay: boolean;
   onStart: () => Promise<void>;
   onSkip: () => Promise<void>;
+  /** "I know it": straight to review, no drill. */
+  onKnown: () => Promise<void>;
   onEdit: () => void;
 }) {
-  const [busy, setBusy] = useState<"start" | "skip" | null>(null);
+  const [busy, setBusy] = useState<"start" | "skip" | "known" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startRef = useRef<HTMLButtonElement>(null);
   const { back } = item;
@@ -783,11 +811,11 @@ function Intro({
   }, [autoPlay, item.back.lemma]);
 
   /** Press a button: call the parent's action and show an error if it fails. */
-  async function run(action: "start" | "skip") {
+  async function run(action: "start" | "skip" | "known") {
     setBusy(action);
     setError(null);
     try {
-      await (action === "start" ? onStart() : onSkip());
+      await (action === "start" ? onStart() : action === "known" ? onKnown() : onSkip());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save that.");
       setBusy(null);
@@ -812,7 +840,7 @@ function Intro({
           {level && (
             <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">{level}</span>
           )}
-          {pos && <span className="text-xs text-muted">{pos}</span>}
+          {pos && <PosChip label={pos} />}
         </div>
         {back.translation && <p className={`mt-4 font-semibold ${size.meaning}`}>{back.translation}</p>}
         {back.userMeaning && (
@@ -863,6 +891,17 @@ function Intro({
           {busy === "start" ? "Starting…" : "Start learning"}
         </button>
       </div>
+      {/* A word already known (a beginner set has many): no drill. It is
+          checked once in review in a few days, so a wrong guess comes back. */}
+      <button
+        type="button"
+        disabled={busy !== null}
+        onClick={() => run("known")}
+        className="mt-3 w-full rounded-md px-4 py-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline disabled:opacity-50"
+      >
+        <i className="bi bi-check2-circle mr-1.5" aria-hidden />
+        {busy === "known" ? "Saving…" : "I know it — skip learning, check it in review"}
+      </button>
     </div>
   );
 }
@@ -871,6 +910,9 @@ function Intro({
 
 function Front({ item }: { item: ReviewItem }) {
   const size = useContext(TextSizeContext);
+  // With the English meaning showing, the part of speech tells "a ride"
+  // (noun) from "to ride" (verb) — English often writes both the same.
+  const pos = posLabel(item.back.partOfSpeech);
   if (item.front.lemma) {
     return (
       <div className="grid min-h-40 place-items-center rounded-lg bg-celadon-soft px-6 py-10">
@@ -883,7 +925,12 @@ function Front({ item }: { item: ReviewItem }) {
   }
   return (
     <div className="rounded-lg border border-line bg-surface px-6 py-8">
-      {item.front.meaning && <p className={`font-semibold ${size.meaning}`}>{item.front.meaning}</p>}
+      {item.front.meaning && (
+        <p className={`font-semibold ${size.meaning}`}>
+          {item.front.meaning}
+          {pos && <PosChip label={pos} className="ml-2 align-middle" />}
+        </p>
+      )}
       {item.front.altMeaning && <p className={`mt-1 text-muted ${size.second}`}>{item.front.altMeaning}</p>}
       {item.front.definitionTarget && (
         <p className={`korean text-muted ${item.front.meaning ? "mt-3" : "text-lg text-ink"}`}>
@@ -891,6 +938,46 @@ function Front({ item }: { item: ReviewItem }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The answer the hint leads to: the Korean word, or for an English answer the
+ * first meaning of the translation ("wide; broad" → "wide").
+ */
+function hintAnswer(item: ReviewItem): string {
+  if (item.direction === "RECALL") return item.back.lemma;
+  const meaning = item.back.translation ?? item.back.userMeaning ?? "";
+  return meaning.split(/[;,/]/)[0].trim();
+}
+
+/**
+ * The hint for what is typed so far: the next syllable (letter, in English)
+ * after the part of the answer already typed correctly — the first one for
+ * an empty field, the second once the first is right, and so on. A wrong
+ * character stops the match there, so the hint shows what belongs in its
+ * place. Spaces are skipped. Null when everything is typed.
+ */
+function nextHint(typed: string, answer: string): string | null {
+  const want = [...answer.normalize("NFC")];
+  const have = [...typed.normalize("NFC").trim()];
+  let w = 0;
+  for (const char of have) {
+    while (want[w] === " ") w++;
+    if (char === " ") continue;
+    if (w >= want.length || want[w].toLowerCase() !== char.toLowerCase()) break;
+    w++;
+  }
+  while (want[w] === " ") w++;
+  return w < want.length ? want[w] : null;
+}
+
+/** The part of speech as a small outlined label ("noun", "action verb"). */
+function PosChip({ label, className = "" }: { label: string; className?: string }) {
+  return (
+    <span className={`inline-block rounded-full border border-line px-2 py-0.5 text-xs font-normal text-muted ${className}`}>
+      {label}
+    </span>
   );
 }
 
@@ -917,7 +1004,7 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
         {level && (
           <span className="rounded-full bg-celadon-soft px-2.5 py-0.5 text-xs text-celadon-deep">{level}</span>
         )}
-        {pos && <span className="text-xs text-muted">{pos}</span>}
+        {pos && <PosChip label={pos} />}
         {/* Last in the row, so ml-auto pushes only the button to the right. */}
         <EditButton onClick={onEdit} className="ml-auto" />
       </div>

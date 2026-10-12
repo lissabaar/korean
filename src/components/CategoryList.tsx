@@ -19,6 +19,9 @@ import type { ResortBatchResult, ResortPlan } from "@/lib/words/resort";
 import IconPicker from "./IconPicker";
 import WordEditor from "./WordEditor";
 
+/** Same as UNCATEGORISED in lib/words/edit.ts (a server module, not imported here). */
+const UNCATEGORISED_NAME = "uncategorised";
+
 export interface WordView {
   id: string;
   lemma: string;
@@ -211,20 +214,47 @@ export default function CategoryList({
       )}
 
       <ul className="grid items-start gap-2 lg:grid-cols-2">
-        {categories.map((category) => (
-          <CategoryRow
-            key={category.id}
-            category={category}
-            allCategoryNames={allCategoryNames}
-            onPatch={(change) => patch(category.id, change)}
-            onRename={(name) =>
-              structural(() => send(`/api/categories/${category.id}`, "PATCH", { name }))
-            }
-            onDelete={() => structural(() => send(`/api/categories/${category.id}`, "DELETE"))}
-            onWordChanged={() => router.refresh()}
-          />
-        ))}
+        {categories
+          .filter((category) => category.name !== UNCATEGORISED_NAME)
+          .map((category) => (
+            <CategoryRow
+              key={category.id}
+              category={category}
+              allCategoryNames={allCategoryNames}
+              onPatch={(change) => patch(category.id, change)}
+              onRename={(name) =>
+                structural(() => send(`/api/categories/${category.id}`, "PATCH", { name }))
+              }
+              onDelete={() => structural(() => send(`/api/categories/${category.id}`, "DELETE"))}
+              onWordChanged={() => router.refresh()}
+            />
+          ))}
       </ul>
+
+      {/* "uncategorised" is not a category of its own but the words that have
+          none: shown apart, under the list, without rename/lock/delete. A
+          word given a category leaves it (words/edit.ts). */}
+      {categories
+        // Hidden while empty: nothing to see.
+        .filter((category) => category.name === UNCATEGORISED_NAME && category.words.length > 0)
+        .map((category) => (
+          <div key={category.id} className="mt-4">
+            <p className="mb-2 text-xs text-muted">
+              Words without a category — give one a category and it moves out of here.
+            </p>
+            <ul>
+              <CategoryRow
+                category={category}
+                allCategoryNames={allCategoryNames}
+                onPatch={(change) => patch(category.id, change)}
+                onRename={() => {}}
+                onDelete={() => {}}
+                onWordChanged={() => router.refresh()}
+                special
+              />
+            </ul>
+          </div>
+        ))}
 
       <form
         onSubmit={(event) => {
@@ -270,6 +300,7 @@ function CategoryRow({
   onRename,
   onDelete,
   onWordChanged,
+  special = false,
 }: {
   category: CategoryView;
   allCategoryNames: string[];
@@ -277,6 +308,8 @@ function CategoryRow({
   onRename: (name: string) => void;
   onDelete: () => void;
   onWordChanged: () => void;
+  /** "Without a category": no icon picker, lock, rename or delete; dashed outline. */
+  special?: boolean;
 }) {
   const [panel, setPanel] = useState<"none" | "icon" | "rename" | "delete">("none");
   const [draft, setDraft] = useState(category.name);
@@ -286,11 +319,12 @@ function CategoryRow({
   const closePanel = useCallback(() => setPanel("none"), []);
 
   return (
-    <li className="overflow-hidden rounded-lg border border-line bg-surface">
+    <li className={`overflow-hidden rounded-lg border bg-surface ${special ? "border-dashed border-line" : "border-line"}`}>
       {/* Row 1: icon, full name, actions. Row 2 on phones: the switches. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <button
           type="button"
+          disabled={special}
           onClick={() => toggle("icon")}
           // While open, this button closes the picker itself; keep its press
           // from also counting as an "outside" tap (which would reopen it).
@@ -304,7 +338,7 @@ function CategoryRow({
         </button>
         <div className={`min-w-0 flex-1 basis-40 ${off ? "opacity-60" : ""}`}>
           <p className="font-medium break-words">
-            {category.name}
+            {special ? "Without a category" : category.name}
             {category.locked && (
               <i className="bi bi-lock-fill ml-1.5 text-xs text-celadon-deep" title="Locked" aria-label="Locked" />
             )}
@@ -313,7 +347,7 @@ function CategoryRow({
             {category.words.length} {category.words.length === 1 ? "word" : "words"}
           </p>
         </div>
-        <div className="flex items-center gap-1 text-muted">
+        <div className={`flex items-center gap-1 text-muted ${special ? "hidden" : ""}`}>
           <button
             type="button"
             onClick={() => onPatch({ locked: !category.locked })}

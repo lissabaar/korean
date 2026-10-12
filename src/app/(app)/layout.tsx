@@ -14,7 +14,10 @@
 import Nav from "@/components/Nav";
 import Landing from "@/components/Landing";
 import StartAnonymous from "@/components/StartAnonymous";
+import StarterSeed from "@/components/StarterSeed";
+import { prisma } from "@/lib/clients";
 import { currentUser } from "@/lib/session";
+import { needsStarterCategories } from "@/lib/words/starter-seed";
 
 /**
  * Everything in this group works without signing up. A first-time visitor
@@ -26,8 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // No session yet: the public landing page (what crawlers index), while the
   // browser starts an anonymous session and then shows the app.
   if (!user) return <Landing status={<StartAnonymous />} />;
+  // An account with no words yet (new, or anonymous) gets the ready-made
+  // categories: the browser asks for them in the background (StarterSeed).
+  const needsStarter = await needsStarterCategories(prisma, user.id);
   return (
     <>
+      {needsStarter && <StarterSeed />}
       <Nav email={user.isAnonymous ? null : user.email} />
       {children}
       {/* Required by the dictionary's licence (CC BY-SA 2.0 KR): name the source. */}
