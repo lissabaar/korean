@@ -70,27 +70,6 @@ export default async function Home() {
         <Action href="/add" icon="bi-plus-lg" title="Add words" note="text, files or by hand" />
       </div>
 
-      {/* Progress and the rules behind it; practising mastered words once there are some. */}
-      <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-        <Link href="/stats" className="text-celadon-deep underline underline-offset-4">
-          <i className="bi bi-bar-chart mr-1.5" aria-hidden />
-          Statistics
-        </Link>
-        {stats.mastered > 0 && (
-          <Link href="/review?mode=mastered" className="text-celadon-deep underline underline-offset-4">
-            <i className="bi bi-trophy mr-1.5" aria-hidden />
-            Practice mastered words
-          </Link>
-        )}
-        <Link href="/hanja" className="text-celadon-deep underline underline-offset-4">
-          <span className="korean mr-1.5" aria-hidden>漢</span>
-          Hanja syllables
-        </Link>
-        <Link href="/how-it-works" className="text-celadon-deep underline underline-offset-4">
-          <i className="bi bi-info-circle mr-1.5" aria-hidden />
-          How learning works
-        </Link>
-      </p>
 
       {stats.words === 0 && (
         <div className="mt-6 rounded-lg border border-line bg-surface p-5">

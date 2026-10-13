@@ -12,7 +12,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import ThemeToggle from "./ThemeToggle";
 
 /** Fired on window when a nav link to the current page is clicked; detail = href. */
 export const SAME_PAGE_EVENT = "hangugo:same-page";
@@ -23,6 +22,9 @@ const LINKS = [
   { href: "/review", label: "Review", icon: "bi-arrow-repeat" },
   { href: "/add", label: "Add", icon: "bi-plus-lg" },
   { href: "/categories", label: "Categories", icon: "bi-grid" },
+  { href: "/stats", label: "Statistics", icon: "bi-bar-chart" },
+  { href: "/hanja", label: "Hanja", icon: "bi-translate" },
+  { href: "/how-it-works", label: "How it works", icon: "bi-info-circle" },
   { href: "/settings", label: "Settings", icon: "bi-gear" },
 ];
 
@@ -49,18 +51,17 @@ export default function Nav({ email }: { email: string | null }) {
               onClick={() => {
                 if (active) window.dispatchEvent(new CustomEvent(SAME_PAGE_EVENT, { detail: link.href }));
               }}
-              className={`rounded-md px-2 py-1.5 text-sm ${
+              className={`rounded-md px-1.5 py-1.5 text-sm sm:px-2 ${
                 active ? "bg-celadon-soft font-medium text-celadon-deep" : "text-muted hover:text-ink"
               }`}
             >
-              <i className={`bi ${link.icon} md:mr-1.5`} aria-hidden />
-              {/* Icons only below md: six labels do not fit on a phone. */}
-              <span className="hidden md:inline">{link.label}</span>
+              <i className={`bi ${link.icon} lg:mr-1.5`} aria-hidden />
+              {/* Icons only below lg: nine labels do not fit on a phone or tablet. */}
+              <span className="hidden lg:inline">{link.label}</span>
             </Link>
           );
         })}
         <div className="ml-auto flex items-center">
-          <ThemeToggle />
           {email === null ? (
             // No account yet. Sign-in links to sign-up, and either way the words
             // added so far come along.

@@ -377,7 +377,8 @@ description; root metadata has a title template, Open Graph and canonical;
 tracking — only strictly necessary storage, so no cookie banner;
 `/privacy` must stay true when that changes.
 
-**Look.** Light/dark switch in the nav (`ThemeToggle`, data-theme on
+**Look.** Light/dark/system choice in Settings (`ThemeChoice` in ThemeToggle.tsx — moved
+out of the nav to make room for Statistics, Hanja, How it works; data-theme on
 <html>, inline script in app/layout.tsx prevents a flash). Card text size
 is `User.cardTextSize` (0–2, default 1), applied via TEXT_SIZES in Review.tsx
 — also to the answer field and the choice options.

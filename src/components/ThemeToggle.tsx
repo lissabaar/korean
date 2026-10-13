@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * Light / dark switch in the top navigation.
+ * Light / dark theme: the choice on the Settings page (ThemeChoice). It used
+ * to be a sun/moon button in the top navigation (ThemeToggle, kept for
+ * reuse); the nav needed the room for more pages.
  *
  * React client component ("use client"): runs in the browser, so it can hold
  * state, react to clicks and call the API with fetch(). It cannot touch the
@@ -39,15 +41,56 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Apply and remember a theme. */
-function setTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+/** Apply and remember a theme; null = follow the system setting again. */
+function setTheme(theme: Theme | null) {
+  if (theme) document.documentElement.dataset.theme = theme;
+  else delete document.documentElement.dataset.theme;
   try {
-    localStorage.setItem(STORAGE_KEY, theme);
+    if (theme) localStorage.setItem(STORAGE_KEY, theme);
+    else localStorage.removeItem(STORAGE_KEY);
   } catch {
     // Storage blocked: the switch still works until the page is reloaded.
   }
   listeners.forEach((listener) => listener());
+}
+
+/** The stored choice: "light", "dark", or "system" when there is none. */
+function storedChoice(): Theme | "system" {
+  const chosen = document.documentElement.dataset.theme;
+  return chosen === "light" || chosen === "dark" ? chosen : "system";
+}
+
+/**
+ * Settings: Light / Dark / System (follow the phone or computer). Saved in
+ * this browser only (localStorage), like the nav button was.
+ */
+export function ThemeChoice() {
+  const choice = useSyncExternalStore(subscribe, storedChoice, () => "system" as const);
+  return (
+    <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-2">
+      {(
+        [
+          ["light", "Light", "bi-sun"],
+          ["dark", "Dark", "bi-moon-stars"],
+          ["system", "As on this device", "bi-circle-half"],
+        ] as const
+      ).map(([value, label, icon]) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={choice === value}
+          onClick={() => setTheme(value === "system" ? null : value)}
+          className={`rounded-md border px-3 py-2 text-sm ${
+            choice === value ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+          }`}
+        >
+          <i className={`bi ${icon} mr-1.5`} aria-hidden />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** Sun/moon button that flips between light and dark. */

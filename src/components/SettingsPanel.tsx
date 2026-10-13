@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signOut } from "@/lib/auth-client";
 import { MASTERED_AFTER_OPTIONS, MASTERY_STREAK } from "@/lib/review/mastery";
+import { ThemeChoice } from "./ThemeToggle";
 
 interface FillResult {
   fromDictionary: number;
@@ -333,6 +334,14 @@ export default function SettingsPanel({
               {n}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className="font-medium">Theme</h2>
+        <p className="mt-1 text-sm text-muted">Light or dark, or the same as this phone or computer. Saved in this browser.</p>
+        <div className="mt-3">
+          <ThemeChoice />
         </div>
       </section>
 

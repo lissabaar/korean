@@ -305,7 +305,7 @@ hangugo/
 │   │   ├── CategoryList.tsx         экран /categories (+ поиск по всем словам)
 │   │   ├── IconPicker.tsx           выбор иконки категории
 │   │   ├── WordEditor.tsx           редактирование слова: значения для учёбы, «Add example»
-│   │   ├── ThemeToggle.tsx          переключатель светлой/тёмной темы (в меню)
+│   │   ├── ThemeToggle.tsx          выбор темы: светлая/тёмная/как на устройстве (в настройках)
 │   │   ├── HomeIntro.tsx            короткое «что это за сайт» на главной
 │   │   ├── Landing.tsx              публичная страница для гостей и поисковиков (без сессии)
 │   │   ├── SettingsPanel.tsx        экран /settings
