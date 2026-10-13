@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate && node scripts/copy-sqljs-wasm.mjs",
     "load-krdict": "tsx --env-file=.env scripts/load-krdict.mts",
+    "load-hanja": "tsx --env-file=.env scripts/load-hanja.mts",
     "test:scenarios": "tsx --env-file=.env scripts/test-scenarios.mts"
   },
   "dependencies": {

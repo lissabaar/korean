@@ -12,6 +12,11 @@ https://krdict.korean.go.kr/download/downloadPopup, распаковать и в
 `npm run load-krdict -- "путь к папке с json"` (несколько минут, таблица
 заменяется целиком).
 
+Так же со справочником ханча (таблица `HanjaChar`, уже загружен): обновить —
+скачать https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip, достать из
+архива `Unihan_Readings.txt` и выполнить
+`npm run load-hanja -- "путь к Unihan_Readings.txt"` (меньше минуты).
+
 ## 1. Что установить
 
 | Что | Где | Зачем |

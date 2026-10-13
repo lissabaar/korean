@@ -143,6 +143,12 @@ counts words by their RECALL card; `/how-it-works` explains all of it with
 numbers read from the code and the user's settings — update its text when
 the logic changes.
 
+**FSRS without short-term steps.** `scheduleNext` passes
+`enable_short_term: false`: with it on, the first review of a just-learned
+word was due 10 minutes later (FSRS's own learning steps — a second drill).
+Gaps are in days (≈3, 14, 57 …); AGAIN is capped to the next day (FSRS
+alone would wait ~7 days). The /how-it-works and Settings texts quote these.
+
 **Exercise type is deterministic.**
 `pickExercise()` in `review/session.ts` is a pure function of card state.
 Never randomise it — FSRS needs consistent difficulty per card.
@@ -213,6 +219,17 @@ categories, learning on; words the user has are linked, never duplicated.
 Runs for accounts with no words (`<StarterSeed/>` in the app layout →
 `/api/starter-categories`); no version is stored (owner's call). Korean
 형용사 are "descriptive verbs", 동사 "action verbs" — also on cards.
+
+**Hanja.** `lib/hanja.ts`: `alignHanja(lemma, Entry.originalForm)` maps
+each syllable to its character (KRDict origin; first of "A/B" variants;
+around Latin loan parts it aligns from both ends); `HanjaChar` (Unihan
+kHangul + kDefinition, `npm run load-hanja`, Unicode License — /hanja names
+the source) gives readings and meanings. Review items carry `back.hanja`:
+on word cards (intro and answer side, never the question) hanja syllables
+are tappable (`HanjaWord`). `/hanja` groups the user's characters by
+syllable, "More words" from the local KRDict table (`/api/hanja`), and a
+Practice tab of flip cards. Native words have no originalForm, so nothing
+of theirs is tappable. No AI.
 
 **Every word has a category.**
 `words/edit.ts` keeps it so: deleting a category or clearing a word's
@@ -435,12 +452,8 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 ## What's not built yet
 
-- Hanja syllables module (owner's request, 2026-10-14): cards for Sino-Korean
-  syllables (소 小 "small") with meanings and example words (hers first),
-  and tappable syllables on cards of hanja-derived words. Source idea:
-  `Entry.originalForm` from KRDict gives the hanja per word; Unicode Unihan
-  (kHangul, kDefinition) gives readings and English meanings — no AI needed
-  for the common characters. Schema has `SHARES_HANJA` reserved.
+- Hanja practice is plain flip cards (no schedule); `SHARES_HANJA`
+  relations are still unused.
 - Billing: no plans shown anywhere; see PAYMENTS.md
 - Anonymous users that never sign up are never cleaned up (and now get the
   starter categories, ~380 words each)

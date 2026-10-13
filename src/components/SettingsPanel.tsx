@@ -217,8 +217,8 @@ export default function SettingsPanel({
         <p className="mt-1 text-sm text-muted">
           Right answers in a row a new word needs — picked from options, the last one typed — and then
           two more typed answers before it counts as learned. A right answer with the hint does not
-          count. Its first review is the next day; after that the gaps grow (roughly 1, 3, 7–10, 20+
-          days), shorter whenever you miss it.
+          count. Its first review is the next day; after that the gaps grow (roughly 3, 14, 57 days
+          and on), and a missed word comes back the next day.
         </p>
         <div role="radiogroup" aria-label="Right answers in a row" className="mt-3 flex flex-wrap gap-2">
           {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (

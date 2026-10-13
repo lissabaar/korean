@@ -600,3 +600,16 @@ model KrdictEntry {
 
   @@index([lemma])
 }
+
+// Hanja (Chinese characters behind Sino-Korean words) with their Korean
+// readings and English meanings, from the Unicode Unihan database
+// (Unihan_Readings.txt: kHangul, kDefinition; Unicode License v3 — the
+// /hanja page names the source). Loaded whole by scripts/load-hanja.mts.
+// Shared, read-only: no user data.
+model HanjaChar {
+  char       String  @id
+  // Korean readings, comma-separated in Unihan's order ("락,낙,악,요" for 樂).
+  hangul     String
+  // English meaning from Unihan; null when Unihan has none.
+  definition String?
+}

@@ -82,6 +82,10 @@ export default async function Home() {
             Practice mastered words
           </Link>
         )}
+        <Link href="/hanja" className="text-celadon-deep underline underline-offset-4">
+          <span className="korean mr-1.5" aria-hidden>漢</span>
+          Hanja syllables
+        </Link>
         <Link href="/how-it-works" className="text-celadon-deep underline underline-offset-4">
           <i className="bi bi-info-circle mr-1.5" aria-hidden />
           How learning works

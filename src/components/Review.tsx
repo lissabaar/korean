@@ -124,6 +124,8 @@ function withEdit(item: ReviewItem, word: WordDetails, myMeaningFirst: boolean):
     back: {
       ...item.back,
       lemma: word.lemma,
+      // A new spelling no longer matches the hanja looked up for the old one.
+      hanja: word.lemma === item.back.lemma ? item.back.hanja : null,
       translation,
       userMeaning: own,
       // Hidden by the setting before the edit (and still has English): stays hidden.
@@ -336,6 +338,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
           <p className="mt-1 text-sm text-muted">
             {done} answers, {correctCount} right.
           </p>
+          <UpNext />
           <div className="mt-5 flex gap-3">
             <Link
               href="/"
@@ -842,7 +845,7 @@ function Intro({
     <div>
       <div className="rounded-lg border border-line bg-surface p-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="korean text-5xl leading-tight">{back.lemma}</span>
+          <HanjaWord lemma={back.lemma} hanja={back.hanja} className="korean text-5xl leading-tight" />
           <SpeakButton text={back.lemma} />
           <EditButton onClick={onEdit} className="ml-auto" />
         </div>
@@ -988,6 +991,90 @@ function nextHint(typed: string, answer: string): string | null {
   return w < want.length ? want[w] : null;
 }
 
+/**
+ * On "Session done": what comes next, with fresh counters (the ones loaded at
+ * the start are stale after the session) — reviews due now, else the
+ * countdown to the next one, as on the empty screen.
+ */
+function UpNext() {
+  const [deck, setDeck] = useState<DeckStats | null>(null);
+  useEffect(() => {
+    fetch("/api/review/deck")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: DeckStats | null) => setDeck(data))
+      .catch(() => setDeck(null));
+  }, []);
+  if (!deck) return null;
+  if (deck.due > 0) {
+    return (
+      <p className="mt-3 text-sm">
+        {deck.due} more {deck.due === 1 ? "review is" : "reviews are"} due now —{" "}
+        <a href="/review" className="text-celadon-deep underline underline-offset-4">
+          review them
+        </a>
+      </p>
+    );
+  }
+  return deck.nextDue ? <NextReview at={new Date(deck.nextDue)} soon={deck.dueSoon} /> : null;
+}
+
+/**
+ * The word with its hanja-derived syllables tappable: tapping 공 in 공원
+ * shows 公 — its reading and meaning — and a link to every word built on it
+ * (/hanja). Native syllables (and native words: `hanja` null) are plain
+ * text. Meant for a flex-wrap row: the opened panel takes a line of its own.
+ */
+function HanjaWord({
+  lemma,
+  hanja,
+  className,
+}: {
+  lemma: string;
+  hanja: ReviewItem["back"]["hanja"];
+  className: string;
+}) {
+  const [open, setOpen] = useState<number | null>(null);
+  if (!hanja) return <span className={className}>{lemma}</span>;
+  // Walk the written word; each Hangul syllable takes the next aligned item.
+  let next = 0;
+  const parts = [...lemma].map((char, index) => {
+    if (!/[가-힣]/.test(char)) return <span key={index}>{char}</span>;
+    const at = next++;
+    const item = hanja[at];
+    if (!item?.char) return <span key={index}>{char}</span>;
+    return (
+      <button
+        key={index}
+        type="button"
+        onClick={() => setOpen(open === at ? null : at)}
+        aria-expanded={open === at}
+        title={`${item.char} — ${item.meaning ?? "hanja"}`}
+        className={`underline decoration-dotted decoration-2 underline-offset-[0.2em] ${
+          open === at ? "text-celadon-deep decoration-celadon" : "decoration-line hover:decoration-celadon"
+        }`}
+      >
+        {char}
+      </button>
+    );
+  });
+  const shown = open === null ? null : hanja[open];
+  return (
+    <>
+      <span className={className}>{parts}</span>
+      {shown?.char && (
+        <div className="basis-full rounded-md bg-celadon-soft px-3 py-2 text-sm">
+          <span className="korean mr-2 text-2xl text-celadon-deep">{shown.char}</span>
+          <span className="korean mr-2 text-base">{shown.syllable}</span>
+          {shown.meaning ?? "Meaning not in the hanja list."}
+          <Link href={`/hanja?char=${encodeURIComponent(shown.char)}`} className="ml-2 whitespace-nowrap text-celadon-deep underline underline-offset-4">
+            Words with {shown.char} →
+          </Link>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** The part of speech as a small outlined label ("noun", "action verb"). */
 function PosChip({ label, className = "" }: { label: string; className?: string }) {
   return (
@@ -1010,7 +1097,7 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
   return (
     <div className="mt-4 rounded-lg border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="korean text-3xl">{back.lemma}</span>
+        <HanjaWord lemma={back.lemma} hanja={back.hanja} className="korean text-3xl" />
         <SpeakButton text={back.lemma} className="self-center" />
         {back.originalForm && (
           <span className="korean text-lg text-muted" title="Hanja — the Chinese characters behind the word">

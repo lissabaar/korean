@@ -266,6 +266,7 @@ hangugo/
 │   │   │   ├── review/page.tsx      /review     — повторение (?mode=mastered — тренировка выученных)
 │   │   │   ├── stats/page.tsx       /stats      — статистика: этапы слов и последние 14 дней
 │   │   │   ├── how-it-works/page.tsx /how-it-works — как устроено запоминание (числа из кода и настроек)
+│   │   │   ├── hanja/page.tsx       /hanja      — слоги из ханча в твоих словах: иероглиф, значение, слова, карточки
 │   │   │   ├── add/page.tsx         /add        — добавить слова
 │   │   │   ├── categories/page.tsx  /categories — категории и слова
 │   │   │   └── settings/page.tsx    /settings   — настройки
@@ -314,7 +315,8 @@ hangugo/
 │   │   ├── BackgroundVerify.tsx     тихая досверка слов со словарём (на главной)
 │   │   ├── StarterDeckButton.tsx    кнопка «стартовые слова»
 │   │   ├── StarterSeed.tsx          невидимый: новому аккаунту без слов добавляет готовые категории
-│   │   └── StatsView.tsx            статистика в браузере (дни — по часовому поясу пользователя)
+│   │   ├── StatsView.tsx            статистика в браузере (дни — по часовому поясу пользователя)
+│   │   └── HanjaBrowser.tsx         страница ханча: поиск, группы по слогам, «ещё слова», тренировка
 │   │
 │   └── lib/                         ЛОГИКА (в основном сервер)
 │       ├── db.ts                    единственный клиент Prisma (база)
@@ -325,6 +327,7 @@ hangugo/
 │       ├── session.ts               кто делает запрос: getUserId(), currentUser()
 │       ├── ai-budget.ts             кредиты на ИИ, журнал расходов, дневной лимит
 │       ├── stats.ts                 числа для /stats (GET /api/stats?tz=…)
+│       ├── hanja.ts                 какой слог слова из какого иероглифа, значения, слова с иероглифом
 │       ├── plans.ts                 лимиты тарифов (черновик); цены нигде не показываются
 │       ├── plan-limits.ts           на каком тарифе пользователь
 │       ├── category-icons.ts        иконки категорий (можно и в браузере)
@@ -372,6 +375,7 @@ hangugo/
 │   └── migrations/                  история изменений базы, по папке на изменение
 ├── scripts/copy-sqljs-wasm.mjs      после npm install кладёт sql.js (для Anki) в public/
 ├── scripts/load-krdict.mts          загрузка всего словаря KRDict в базу (npm run load-krdict)
+├── scripts/load-hanja.mts           загрузка справочника ханча из Unicode Unihan (npm run load-hanja)
 ├── scripts/test-scenarios.mts       проверка всех сценариев на живой базе (npm run test:scenarios, ~5 центов ИИ)
 ├── public/                          файлы, которые отдаются как есть
 ├── .env / .env.example              ключи и адреса (.env не в git!)

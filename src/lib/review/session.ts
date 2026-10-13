@@ -203,6 +203,13 @@ function toFsrsCard(state: SchedulerState): FsrsCard {
  * `desiredRetention` is the user's target recall probability. Lower means
  * longer gaps and more forgetting; higher means more reviews. 0.9 is the
  * usual default and there is rarely a reason to move it.
+ *
+ * FSRS's short-term steps are off: with them on, the first review of a
+ * just-learned word was scheduled 10 minutes later (FSRS's own learning
+ * steps), so it came straight back — learning a second time what our
+ * drill had just taught. Off, the gaps are in days (≈3, 14, 57 ...). A miss
+ * then comes back the next day: without short-term steps FSRS would wait a
+ * week, too long for a word just forgotten.
  */
 export function scheduleNext(
   state: SchedulerState | null,
@@ -210,13 +217,15 @@ export function scheduleNext(
   now: Date,
   desiredRetention = 0.9,
 ): ScheduledResult {
-  const scheduler = fsrs({ request_retention: desiredRetention });
+  const scheduler = fsrs({ request_retention: desiredRetention, enable_short_term: false });
   const card = state ? toFsrsCard(state) : createEmptyCard(now);
 
   const { card: next, log } = scheduler.next(card, now, RATING_MAP[rating]);
+  const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const due = rating === "AGAIN" && next.due > nextDay ? nextDay : next.due;
 
   return {
-    due: next.due,
+    due,
     stability: next.stability,
     difficulty: next.difficulty,
     elapsedDays: next.elapsed_days,

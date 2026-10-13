@@ -18,7 +18,7 @@ const { commitWords } = await import("../src/lib/ingest/commit.ts");
 const { buildSession, getDeckStats } = await import("../src/lib/review/queue.ts");
 const { introduceWord } = await import("../src/lib/review/intro.ts");
 const { submitAnswer } = await import("../src/lib/review/submit.ts");
-const { pickExercise } = await import("../src/lib/review/session.ts");
+const { pickExercise, scheduleNext } = await import("../src/lib/review/session.ts");
 const edit = await import("../src/lib/words/edit.ts");
 const { listSenses, setStudiedSenses } = await import("../src/lib/words/senses.ts");
 const { dictionaryExamples, writeExample, fillMissingExamples } = await import("../src/lib/words/examples.ts");
@@ -130,6 +130,13 @@ try {
     check("learned word: the other direction goes to review, not new", card.direction !== "RECALL" || (sibling?.phase === "SCHEDULED" && sibling.due.getTime() === after.due.getTime()), `${card.direction} ${sibling?.phase}`);
     const logs = await prisma.reviewLog.count({ where: { cardId: card.id } });
     check("learning wrote no ReviewLog", logs === 0);
+
+    // FSRS short-term steps are off: a first right review is days away, a miss next day
+    const t0 = new Date();
+    const fresh = scheduleNext(null, "GOOD", t0);
+    check("first right review: next gap in days, not minutes", fresh.due.getTime() - t0.getTime() >= 2 * 864e5, fresh.due.toISOString());
+    const missed = scheduleNext({ ...fresh, lastReview: t0 }, "AGAIN", new Date(fresh.due));
+    check("a miss comes back within a day", missed.due.getTime() - fresh.due.getTime() <= 864e5 + 1000, missed.due.toISOString());
 
     // mastery: 3 right reviews in a row, the last >= 56 days after the one before
     await prisma.card.update({ where: { id: card.id }, data: { reviewStreak: 2, lastReview: new Date(Date.now() - 60 * 864e5), due: new Date() } });

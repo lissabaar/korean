@@ -83,8 +83,8 @@ export default async function HowItWorksPage() {
         <p>
           The first review is <b>the next day</b>. After that the gaps are set by FSRS, a spaced-repetition
           scheduler that aims for a {retention}% chance you still remember the word when it comes up. Each
-          right answer makes the next gap longer — roughly 1, 3, 7–10, 20+ days and on — a miss makes it
-          shorter again.
+          right answer makes the next gap longer — roughly 1, 3, 14, 57 days and on — and a miss brings the
+          word back the next day.
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>The first {CHOICE_REVIEWS_BEFORE_TYPING} reviews of a word are picked from options, then typed.</li>

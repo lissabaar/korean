@@ -8,6 +8,7 @@
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { buildChoices, buildDistractors, type DistractorCandidate } from "./distractors";
+import { alignHanja, hanjaInfo } from "../hanja";
 import {
   clampLearningGoal,
   pickExercise,
@@ -200,6 +201,11 @@ export interface ReviewItem {
     /** English translation of the example, when it has one (AI-written ones do). */
     exampleTranslation: string | null;
     contextNote: string | null;
+    /**
+     * The word's syllables with the hanja each comes from (lib/hanja.ts) —
+     * the card makes those syllables tappable. Null for native words.
+     */
+    hanja: { syllable: string; char: string | null; meaning: string | null; reading: string | null }[] | null;
   };
   /** First syllable of the expected answer, offered as a hint when typing. */
   hint: string | null;
@@ -311,6 +317,12 @@ export async function buildSession(
   if (cards.length === 0) return [];
 
   const pool = await loadDistractorPool(prisma, userId);
+  // Hanja behind each word's syllables, looked up once for the session.
+  const aligned = new Map(cards.map((card) => [card.id, alignHanja(card.sense.entry.lemma, card.sense.entry.originalForm)]));
+  const chars = await hanjaInfo(
+    prisma,
+    [...aligned.values()].flatMap((items) => items?.map((item) => item.char).filter((c): c is string => Boolean(c)) ?? []),
+  );
 
   return cards.map((card) => {
     const { sense } = card;
@@ -404,6 +416,16 @@ export async function buildSession(
         example: sense.examples[0]?.text ?? null,
         exampleTranslation: sense.examples[0]?.translation ?? null,
         contextNote: sense.contextNote,
+        hanja:
+          aligned.get(card.id)?.map((item) => {
+            const info = item.char ? chars.get(item.char) : undefined;
+            return {
+              syllable: item.syllable,
+              char: item.char,
+              meaning: info?.definition ?? null,
+              reading: info?.hangul.join(", ") ?? null,
+            };
+          }) ?? null,
       },
       hint: exercise === "TYPING" && typedAnswer ? [...typedAnswer][0] : null,
     };
