@@ -125,6 +125,9 @@ try {
     const after = await prisma.card.findUnique({ where: { id: card.id } });
     check("5 + 2 typed right answers graduate the card", after.phase === "SCHEDULED" && result?.graduated === true, `${after.phase}`);
     check("first review is ~1 day later", after.due.getTime() > Date.now() + 0.9 * 864e5);
+    // the Korean → English card of a learned word skips the drill (siblings.ts)
+    const sibling = await prisma.card.findFirst({ where: { senseId: card.senseId, direction: "RECOGNITION" } });
+    check("learned word: the other direction goes to review, not new", card.direction !== "RECALL" || (sibling?.phase === "SCHEDULED" && sibling.due.getTime() === after.due.getTime()), `${card.direction} ${sibling?.phase}`);
     const logs = await prisma.reviewLog.count({ where: { cardId: card.id } });
     check("learning wrote no ReviewLog", logs === 0);
   });

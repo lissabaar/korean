@@ -214,7 +214,10 @@ existing name merges the two.
 `studyScope()` in `review/queue.ts`: RECALL (English → Korean) always,
 RECOGNITION only if `User.askRecognition`. A word is learned if any of its
 categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
-sessions both go through it. Sessions take a mode — `learn` (new words
+sessions both go through it. When RECALL graduates, the sense's RECOGNITION
+card goes straight to SCHEDULED with the same due date
+(`review/siblings.ts`, also run for all words when askRecognition is
+switched on) — otherwise every learned word came back as new. Sessions take a mode — `learn` (new words
 only), `review` (scheduled only), `all` — from `/review?mode=`.
 
 **The dictionary lives in our database.** `KrdictEntry` holds the whole

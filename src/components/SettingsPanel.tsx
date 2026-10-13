@@ -187,7 +187,7 @@ export default function SettingsPanel({
             setAskRecognition(value);
             save({ askRecognition: value }, () => setAskRecognition(!value));
           }}
-          label="Also ask the other way: Korean word → English meaning"
+          label="Also ask the other way: Korean word → English meaning (words you have already learned skip straight to review)"
         />
         <Toggle
           checked={autoPlay}

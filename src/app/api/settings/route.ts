@@ -7,12 +7,15 @@
  * Runs on the server only, so it may use secret keys and the database.
  *
  * Only known fields with valid values are accepted; anything else in the
- * request is ignored.
+ * request is ignored. Switching "Also ask the other way" on sends the
+ * Korean → English card of every already-learned word straight to review
+ * (lib/review/siblings.ts) — otherwise they all came up as new words.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
+import { promoteRecognitionOfLearned } from "@/lib/review/siblings";
 
 /** Study settings. Only known boolean fields are accepted. */
 export async function PATCH(request: Request) {
@@ -50,5 +53,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
   }
   await prisma.user.update({ where: { id: userId }, data });
+  if (data.askRecognition === true) await promoteRecognitionOfLearned(prisma, userId);
   return NextResponse.json({ ok: true });
 }

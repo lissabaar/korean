@@ -14,6 +14,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { gradeTypedAnswer, normalise, type AnswerVerdict } from "./answer";
 import { acceptedMeanings, canAutoGrade, meaningText } from "./queue";
+import { promoteRecognitionOfLearned } from "./siblings";
 import {
   advanceLearning,
   pickExercise,
@@ -167,6 +168,11 @@ export async function submitAnswer(
           }
         : { learningStreak: outcome.learningStreak, introducedAt: card.introducedAt ?? now },
     });
+    // Learned English → Korean: the Korean → English card skips the drill
+    // and goes to review with it (siblings.ts).
+    if (outcome.graduated && card.direction === "RECALL") {
+      await promoteRecognitionOfLearned(prisma, userId, card.senseId);
+    }
 
     return {
       correct,
