@@ -37,6 +37,7 @@ export default async function SettingsPage() {
         askRecognition: true,
         showKoreanDefinition: true,
         learningGoal: true,
+        masteredAfterDays: true,
         autoPlayAudio: true,
         myMeaningFirst: true,
         newPerSession: true,
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
       askRecognition={settings.askRecognition}
       showKoreanDefinition={settings.showKoreanDefinition}
       learningGoal={settings.learningGoal}
+      masteredAfterDays={settings.masteredAfterDays}
       autoPlayAudio={settings.autoPlayAudio}
       myMeaningFirst={settings.myMeaningFirst}
       newPerSession={settings.newPerSession}

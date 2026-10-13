@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signOut } from "@/lib/auth-client";
+import { MASTERED_AFTER_OPTIONS, MASTERY_STREAK } from "@/lib/review/mastery";
 
 interface FillResult {
   fromDictionary: number;
@@ -36,6 +37,7 @@ export default function SettingsPanel({
   askRecognition: initialAsk,
   showKoreanDefinition: initialKorean,
   learningGoal: initialGoal,
+  masteredAfterDays: initialMasteredAfter,
   autoPlayAudio: initialAutoPlay,
   myMeaningFirst: initialMyFirst,
   newPerSession: initialNewPerSession,
@@ -52,6 +54,8 @@ export default function SettingsPanel({
   askRecognition: boolean;
   showKoreanDefinition: boolean;
   learningGoal: number;
+  /** Days the last of the mastering reviews must come after the one before (mastery.ts). */
+  masteredAfterDays: number;
   autoPlayAudio: boolean;
   myMeaningFirst: boolean;
   newPerSession: number;
@@ -72,6 +76,7 @@ export default function SettingsPanel({
   const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [showKorean, setShowKorean] = useState(initialKorean);
   const [goal, setGoal] = useState(initialGoal);
+  const [masteredAfter, setMasteredAfter] = useState(initialMasteredAfter);
   const [autoPlay, setAutoPlay] = useState(initialAutoPlay);
   const [myFirst, setMyFirst] = useState(initialMyFirst);
   const [perSession, setPerSession] = useState(initialNewPerSession);
@@ -232,6 +237,40 @@ export default function SettingsPanel({
               }`}
             >
               {n}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-sm">
+          <Link href="/how-it-works" className="text-celadon-deep underline underline-offset-4">
+            How learning works
+          </Link>
+        </p>
+      </section>
+
+      <section className={section}>
+        <h2 className="font-medium">Mastered words</h2>
+        <p className="mt-1 text-sm text-muted">
+          A word counts as mastered — and stops coming up in review — after {MASTERY_STREAK} right
+          reviews in a row, the last one at least this many days after the review before it. You
+          can still practise mastered words; a miss sends the word back to review.
+        </p>
+        <div role="radiogroup" aria-label="Days before the last review" className="mt-3 flex flex-wrap gap-2">
+          {MASTERED_AFTER_OPTIONS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={masteredAfter === n}
+              onClick={() => {
+                const before = masteredAfter;
+                setMasteredAfter(n);
+                save({ masteredAfterDays: n }, () => setMasteredAfter(before));
+              }}
+              className={`rounded-md border px-3 py-2 text-sm ${
+                masteredAfter === n ? "border-celadon-deep bg-celadon-deep text-paper" : "border-line"
+              }`}
+            >
+              {n} days
             </button>
           ))}
         </div>

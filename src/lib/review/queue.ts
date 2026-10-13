@@ -88,7 +88,10 @@ async function studyScope(prisma: PrismaClient, userId: string) {
       },
     },
   };
-  return { user, learn, review };
+  // Mastered words (mastery.ts): out of review; only "Practice mastered
+  // words" asks them. Same category switches as review.
+  const mastered = { ...review, phase: "MASTERED" as const };
+  return { user, learn, review, mastered };
 }
 
 interface SenseText {
@@ -206,6 +209,8 @@ export interface DeckStats {
   due: number;
   learning: number;
   words: number;
+  /** Mastered cards in scope: what "Practice mastered words" can ask. */
+  mastered: number;
   nextDue: Date | null;
   /** Reviews coming due within the next 24 hours (not due yet). */
   dueSoon: number;
@@ -230,10 +235,10 @@ const cardInclude = {
  */
 export async function getDeckStats(prisma: PrismaClient, userId: string): Promise<DeckStats> {
   const now = new Date();
-  const { learn, review } = await studyScope(prisma, userId);
+  const { learn, review, mastered: masteredScope } = await studyScope(prisma, userId);
 
   const dayAhead = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const [due, learning, words, next, dueSoon] = await Promise.all([
+  const [due, learning, words, next, dueSoon, mastered] = await Promise.all([
     prisma.card.count({ where: { ...review, due: { lte: now } } }),
     prisma.card.count({ where: learn }),
     prisma.entry.count({ where: { userId } }),
@@ -243,17 +248,24 @@ export async function getDeckStats(prisma: PrismaClient, userId: string): Promis
       select: { due: true },
     }),
     prisma.card.count({ where: { ...review, due: { gt: now, lte: dayAhead } } }),
+    prisma.card.count({ where: masteredScope }),
   ]);
 
-  return { due, learning, words, nextDue: next?.due ?? null, dueSoon };
+  return { due, learning, words, nextDue: next?.due ?? null, dueSoon, mastered };
 }
 
-/** learn = new words only, review = scheduled reviews only, all = both. */
-export type StudyMode = "learn" | "review" | "all";
+/**
+ * learn = new words only, review = scheduled reviews only, all = both,
+ * mastered = practice words already mastered (a random pick, off schedule).
+ */
+export type StudyMode = "learn" | "review" | "all" | "mastered";
+
+/** Cards in one "Practice mastered words" session. */
+export const MASTERED_PER_SESSION = 20;
 
 /** The ?mode= query value as a StudyMode; anything unknown means "all". */
 export function parseStudyMode(value: string | null | undefined): StudyMode {
-  return value === "learn" || value === "review" ? value : "all";
+  return value === "learn" || value === "review" || value === "mastered" ? value : "all";
 }
 
 export interface SessionOptions {
@@ -275,16 +287,16 @@ export async function buildSession(
   options: SessionOptions = {},
 ): Promise<ReviewItem[]> {
   const now = new Date();
-  const { user, learn, review } = await studyScope(prisma, userId);
+  const { user, learn, review, mastered } = await studyScope(prisma, userId);
 
   const [scheduled, learning] = await Promise.all([
-    mode === "learn" ? [] : prisma.card.findMany({
+    mode === "learn" ? [] : mode === "mastered" ? pickLearningCards(prisma, mastered, MASTERED_PER_SESSION) : prisma.card.findMany({
       where: { ...review, due: { lte: now } },
       include: cardInclude,
       orderBy: { due: "asc" },
       take: REVIEWS_PER_SESSION,
     }),
-    mode === "review"
+    mode === "review" || mode === "mastered"
       ? []
       : pickLearningCards(
           prisma,

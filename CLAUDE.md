@@ -131,6 +131,18 @@ cache and are created when ticked.
 `LEARNING` (streak-based, no FSRS) and `SCHEDULED` (FSRS). Never put learning
 drill results into the FSRS scheduler — it reads them as performance data.
 
+**Mastered.** Third phase `MASTERED` (`review/mastery.ts`, automatic only —
+owner's call, no manual button): `MASTERY_STREAK` (3) right reviews in a row
+(`Card.reviewStreak`, AGAIN resets — a hinted answer is AGAIN), the last one
+at least `User.masteredAfterDays` (default 56, Bahrick 1993; 14–365) after
+the previous review (`lastReview`, else `graduatedAt`). Mastered cards leave
+review; `/review?mode=mastered` practises a random 20: a right answer changes
+nothing and writes no ReviewLog (off schedule), a miss sends the card back to
+SCHEDULED as an FSRS lapse. `/stats` (`lib/stats.ts`, browser time zone)
+counts words by their RECALL card; `/how-it-works` explains all of it with
+numbers read from the code and the user's settings — update its text when
+the logic changes.
+
 **Exercise type is deterministic.**
 `pickExercise()` in `review/session.ts` is a pure function of card state.
 Never randomise it — FSRS needs consistent difficulty per card.

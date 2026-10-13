@@ -66,6 +66,10 @@ model User {
   // answer (spacing and punctuation aside) counts.
   acceptTypos Boolean @default(false)
 
+  // A word is mastered after 3 right reviews in a row, the last one at least
+  // this many days after the review before it (14–365; review/mastery.ts).
+  masteredAfterDays Int @default(56)
+
   // Speak the Korean word after each answer (browser speech synthesis).
   autoPlayAudio Boolean @default(false)
 
@@ -378,6 +382,11 @@ model Card {
   // afterwards can be told apart from genuine forgetting.
   translationHiddenAt DateTime?
 
+  // Right answers in a row in review (SCHEDULED); a miss resets it. With
+  // the gap since the previous review it decides MASTERED (review/mastery.ts).
+  reviewStreak Int       @default(0)
+  masteredAt   DateTime?
+
   suspended Boolean @default(false)
 
   logs ReviewLog[]
@@ -399,6 +408,9 @@ enum Direction {
 enum Phase {
   LEARNING
   SCHEDULED
+  // Learned for good (review/mastery.ts): out of the review queue. Only
+  // "Practice mastered words" asks it; a miss there sends it back to SCHEDULED.
+  MASTERED
 }
 
 // How the card is asked. Chosen deterministically from reps, never at

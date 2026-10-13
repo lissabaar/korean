@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { promoteRecognitionOfLearned } from "@/lib/review/siblings";
+import { MAX_MASTERED_AFTER_DAYS, MIN_MASTERED_AFTER_DAYS } from "@/lib/review/mastery";
 
 /** Study settings. Only known boolean fields are accepted. */
 export async function PATCH(request: Request) {
@@ -27,12 +28,20 @@ export async function PATCH(request: Request) {
     askRecognition?: boolean;
     showKoreanDefinition?: boolean;
     learningGoal?: number;
+    masteredAfterDays?: number;
     autoPlayAudio?: boolean;
     myMeaningFirst?: boolean;
     newPerSession?: number;
     cardTextSize?: number;
     acceptTypos?: boolean;
   } = {};
+  if (
+    Number.isInteger(body.masteredAfterDays) &&
+    body.masteredAfterDays >= MIN_MASTERED_AFTER_DAYS &&
+    body.masteredAfterDays <= MAX_MASTERED_AFTER_DAYS
+  ) {
+    data.masteredAfterDays = body.masteredAfterDays;
+  }
   if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 10) {
     data.learningGoal = body.learningGoal;
   }

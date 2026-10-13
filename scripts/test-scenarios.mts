@@ -130,6 +130,29 @@ try {
     check("learned word: the other direction goes to review, not new", card.direction !== "RECALL" || (sibling?.phase === "SCHEDULED" && sibling.due.getTime() === after.due.getTime()), `${card.direction} ${sibling?.phase}`);
     const logs = await prisma.reviewLog.count({ where: { cardId: card.id } });
     check("learning wrote no ReviewLog", logs === 0);
+
+    // mastery: 3 right reviews in a row, the last >= 56 days after the one before
+    await prisma.card.update({ where: { id: card.id }, data: { reviewStreak: 2, lastReview: new Date(Date.now() - 60 * 864e5), due: new Date() } });
+    const third = await submitAnswer(prisma, userId, { cardId: card.id, answer: lemma });
+    const masteredCard = await prisma.card.findUnique({ where: { id: card.id } });
+    check("3rd right review after 60 days: mastered", third.mastered === true && masteredCard.phase === "MASTERED" && masteredCard.masteredAt, `${masteredCard.phase} streak ${masteredCard.reviewStreak}`);
+    const due = await buildSession(prisma, userId, "review");
+    check("mastered word is out of review", !due.some((i: any) => i.cardId === card.id));
+    const practice = await buildSession(prisma, userId, "mastered");
+    check("practice mode offers it", practice.some((i: any) => i.cardId === card.id), `${practice.length} cards`);
+    const right = await submitAnswer(prisma, userId, { cardId: card.id, answer: lemma });
+    const stillMastered = await prisma.card.findUnique({ where: { id: card.id } });
+    check("practice: right answer changes nothing", right.correct && stillMastered.phase === "MASTERED");
+    const miss = await submitAnswer(prisma, userId, { cardId: card.id, answer: "틀린답" });
+    const back = await prisma.card.findUnique({ where: { id: card.id } });
+    check("practice: a miss sends it back to review", miss.unmastered === true && back.phase === "SCHEDULED" && back.reviewStreak === 0 && !back.masteredAt, back.phase);
+    // a short gap does not master
+    await prisma.card.update({ where: { id: card.id }, data: { reviewStreak: 2, lastReview: new Date(Date.now() - 10 * 864e5), due: new Date() } });
+    const early = await submitAnswer(prisma, userId, { cardId: card.id, answer: lemma });
+    check("3rd right review after 10 days: not mastered yet", !early.mastered, `${early.mastered}`);
+    const { getStats } = await import("../src/lib/stats.ts");
+    const stats = await getStats(prisma, userId, 180);
+    check("stats: totals and today's row", stats.totals.words > 0 && stats.days.length === 14 && stats.days[0].reviews >= 3, JSON.stringify(stats.days[0]));
   });
 
   // ------------------------------------------------------------ 5. typing: wrong syllable is wrong

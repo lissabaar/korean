@@ -46,7 +46,8 @@ export function clampLearningGoal(value: number | null | undefined): number {
  */
 export const CHOICE_REVIEWS_BEFORE_TYPING = 2;
 
-export type Phase = "LEARNING" | "SCHEDULED";
+/** MASTERED: learned for good, out of review (mastery.ts); exercises as SCHEDULED. */
+export type Phase = "LEARNING" | "SCHEDULED" | "MASTERED";
 export type ExerciseType = "CHOICE" | "TYPING";
 export type Direction = "RECOGNITION" | "RECALL" | "REGISTER";
 

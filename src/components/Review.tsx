@@ -298,16 +298,22 @@ export default function Review({ mode }: { mode: StudyMode }) {
         <div className="rounded-lg border border-line bg-surface p-6">
           <p className="korean text-3xl text-celadon-deep">쉬는 시간</p>
           <p className="mt-2 font-medium">
-            {mode === "learn" ? "No new words to learn." : "Nothing to review right now."}
+            {mode === "learn"
+              ? "No new words to learn."
+              : mode === "mastered"
+                ? "No mastered words yet."
+                : "Nothing to review right now."}
           </p>
           <p className="mt-1 text-sm text-muted">
             {stats && stats.words === 0
               ? "Add some words first — they show up here to learn."
               : mode === "learn"
                 ? "Add words, or switch Learn on for more categories."
-                : "Everything is scheduled for later. Come back then, or learn new words."}
+                : mode === "mastered"
+                  ? "A word is mastered after three right reviews in a row, the last one weeks after the one before — see How learning works."
+                  : "Everything is scheduled for later. Come back then, or learn new words."}
           </p>
-          {mode !== "learn" && stats?.nextDue && (
+          {mode !== "learn" && mode !== "mastered" && stats?.nextDue && (
             <NextReview at={new Date(stats.nextDue)} soon={stats.dueSoon} />
           )}
           <Link
@@ -356,6 +362,8 @@ export default function Review({ mode }: { mode: StudyMode }) {
           <span>
             {showIntro
               ? "New word"
+              : current.phase === "MASTERED"
+              ? "Mastered word · practice"
               : current.phase === "LEARNING"
               ? `New word · right in a row: ${current.learningStreak}/${stepsToLearn(current.learningGoal)}`
               : "Review"}
@@ -758,6 +766,8 @@ function Question({
  */
 function feedbackLine(result: AnswerResult, item: ReviewItem, picked: string | null): string {
   if (result.graduated) return "Learned — this word now moves to spaced review.";
+  if (result.mastered) return "Mastered — this word leaves review. Practise it any time under Mastered words.";
+  if (result.unmastered) return `Not quite — the answer: ${result.expected}. This word goes back to review.`;
   if (result.hintNotCounted) {
     return item.phase === "LEARNING"
       ? "Right — but with the hint it does not count. Once more without it."

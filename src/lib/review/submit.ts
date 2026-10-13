@@ -15,6 +15,7 @@ import type { PrismaClient } from "@prisma/client";
 import { gradeTypedAnswer, normalise, type AnswerVerdict } from "./answer";
 import { acceptedMeanings, canAutoGrade, meaningText } from "./queue";
 import { promoteRecognitionOfLearned } from "./siblings";
+import { afterReview, gapDays } from "./mastery";
 import {
   advanceLearning,
   pickExercise,
@@ -64,6 +65,10 @@ export interface AnswerResult {
    * streak stayed, a review was graded AGAIN. The feedback line says so.
    */
   hintNotCounted?: boolean;
+  /** This review made the word mastered: it leaves review (mastery.ts). */
+  mastered?: boolean;
+  /** Practising a mastered word, answered wrong: it is back in review. */
+  unmastered?: boolean;
 }
 
 export class CardNotFoundError extends Error {}
@@ -96,6 +101,7 @@ export async function submitAnswer(
           learningGoal: true,
           myMeaningFirst: true,
           acceptTypos: true,
+          masteredAfterDays: true,
         },
       },
     },
@@ -193,6 +199,23 @@ export async function submitAnswer(
       ? ratingFromChoice(correct)
       : ratingFromTyped(verdict, usedHint);
 
+  // Practising a mastered word ("Practice mastered words"): a right answer
+  // changes nothing — it is off schedule, so FSRS is not told. A miss means
+  // the word is not mastered after all: back to review, scheduled as a lapse.
+  const practice = card.phase === "MASTERED";
+  if (practice && rating !== "AGAIN") {
+    return { correct, verdict, expected, note, requeue: false, graduated: false, learningStreak: card.learningStreak, hintNotCounted };
+  }
+  // Right answers in a row and the gap before this one decide mastery.
+  const mastery = practice
+    ? { reviewStreak: 0, mastered: false }
+    : afterReview(
+        card.reviewStreak,
+        rating !== "AGAIN",
+        gapDays(card.lastReview, card.graduatedAt, now),
+        card.user.masteredAfterDays,
+      );
+
   const translationShown = showsTranslation(card, card.user.hideTranslationAfterStability);
   const next = scheduleNext(card, rating, now, card.user.desiredRetention);
 
@@ -212,6 +235,12 @@ export async function submitAnswer(
         lastReview: next.lastReview,
         translationHiddenAt:
           !translationShown && !card.translationHiddenAt ? now : card.translationHiddenAt,
+        reviewStreak: mastery.reviewStreak,
+        ...(mastery.mastered
+          ? { phase: "MASTERED" as const, masteredAt: now }
+          : practice
+            ? { phase: "SCHEDULED" as const, masteredAt: null }
+            : {}),
       },
     }),
     prisma.reviewLog.create({
@@ -241,5 +270,7 @@ export async function submitAnswer(
     learningStreak: card.learningStreak,
     nextDue: next.due,
     hintNotCounted,
+    mastered: mastery.mastered,
+    unmastered: practice,
   };
 }
