@@ -1021,8 +1021,12 @@ function UpNext() {
 /**
  * The word with its hanja-derived syllables tappable: tapping 공 in 공원
  * shows 公 — its reading and meaning — and a link to every word built on it
- * (/hanja). Native syllables (and native words: `hanja` null) are plain
- * text. Meant for a flex-wrap row: the opened panel takes a line of its own.
+ * (/hanja). Hanja syllables carry a dotted underline in the accent colour
+ * from the start (it was the faint border colour: invisible in dark mode).
+ * The character opens in a small card floating under the word, so the row
+ * around it (speak button, level, Edit) does not move; ✕, a tap elsewhere or
+ * the same syllable again closes it. Native syllables (and native words:
+ * `hanja` null) are plain text.
  */
 function HanjaWord({
   lemma,
@@ -1034,6 +1038,17 @@ function HanjaWord({
   className: string;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  const boxRef = useRef<HTMLSpanElement>(null);
+  // A tap anywhere outside the word and its card closes the card.
+  useEffect(() => {
+    if (open === null) return;
+    const close = (event: PointerEvent) => {
+      if (!boxRef.current?.contains(event.target as Node)) setOpen(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+
   if (!hanja) return <span className={className}>{lemma}</span>;
   // Walk the written word; each Hangul syllable takes the next aligned item.
   let next = 0;
@@ -1048,9 +1063,9 @@ function HanjaWord({
         type="button"
         onClick={() => setOpen(open === at ? null : at)}
         aria-expanded={open === at}
-        title={`${item.char} — ${item.meaning ?? "hanja"}`}
-        className={`underline decoration-dotted decoration-2 underline-offset-[0.2em] ${
-          open === at ? "text-celadon-deep decoration-celadon" : "decoration-line hover:decoration-celadon"
+        aria-label={`${char}: hanja ${item.char}`}
+        className={`underline decoration-dotted decoration-2 underline-offset-[0.18em] decoration-celadon ${
+          open === at ? "rounded bg-celadon-soft text-celadon-deep" : ""
         }`}
       >
         {char}
@@ -1059,19 +1074,42 @@ function HanjaWord({
   });
   const shown = open === null ? null : hanja[open];
   return (
-    <>
+    <span ref={boxRef} className="relative inline-block">
       <span className={className}>{parts}</span>
       {shown?.char && (
-        <div className="basis-full rounded-md bg-celadon-soft px-3 py-2 text-sm">
-          <span className="korean mr-2 text-2xl text-celadon-deep">{shown.char}</span>
-          <span className="korean mr-2 text-base">{shown.syllable}</span>
-          {shown.meaning ?? "Meaning not in the hanja list."}
-          <Link href={`/hanja?char=${encodeURIComponent(shown.char)}`} className="ml-2 whitespace-nowrap text-celadon-deep underline underline-offset-4">
-            Words with {shown.char} →
-          </Link>
-        </div>
+        <span
+          role="dialog"
+          aria-label={`Hanja ${shown.char}`}
+          className="absolute left-0 top-full z-20 mt-2 block w-72 max-w-[calc(100vw-3rem)] rounded-lg border border-line bg-surface p-3 text-left text-sm font-normal shadow-lg"
+        >
+          <span className="flex items-start gap-3">
+            <span className="korean text-4xl leading-none text-celadon-deep">{shown.char}</span>
+            <span className="min-w-0 flex-1">
+              <span className="korean block text-base">{shown.syllable}</span>
+              <span className="block text-ink">{shown.meaning ?? "Meaning not in the hanja list."}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setOpen(null)}
+              aria-label="Close"
+              className="-mr-1 -mt-1 rounded p-1 text-muted hover:text-ink"
+            >
+              <i className="bi bi-x-lg" aria-hidden />
+            </button>
+          </span>
+          {/* A new tab: leaving would end the study session in progress. */}
+          <a
+            href={`/hanja?char=${encodeURIComponent(shown.char)}`}
+            target="_blank"
+            rel="noopener"
+            className="mt-2 inline-block text-celadon-deep underline underline-offset-4"
+          >
+            All words with {shown.char}
+            <i className="bi bi-box-arrow-up-right ml-1.5 text-xs" aria-hidden />
+          </a>
+        </span>
       )}
-    </>
+    </span>
   );
 }
 
