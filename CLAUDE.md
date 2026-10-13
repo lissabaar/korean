@@ -350,7 +350,8 @@ tracking — only strictly necessary storage, so no cookie banner;
 
 **Look.** Light/dark switch in the nav (`ThemeToggle`, data-theme on
 <html>, inline script in app/layout.tsx prevents a flash). Card text size
-is `User.cardTextSize` (0–2, default 1), applied via TEXT_SIZES in Review.tsx.
+is `User.cardTextSize` (0–2, default 1), applied via TEXT_SIZES in Review.tsx
+— also to the answer field and the choice options.
 
 **Example translations.** KRDict examples are Korean only; the example a
 card shows gets English from the model (`words/example-translations.ts`,
@@ -367,7 +368,8 @@ are stored with source AI and an English translation. In the view API's XML
 **The English meaning is the cue.**
 English → Korean cards show the English meaning; the Korean definition joins
 it only with `User.showKoreanDefinition` (or when there is no English, or
-once the translation is hidden for a settled word).
+once the translation is hidden for a settled word) — on the question, the
+answer side and the intro card alike (`back.definitionTarget` is null when off).
 
 **Cards don't repeat themselves.**
 The answer side shows only what the question side did not (an English →

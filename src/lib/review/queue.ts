@@ -383,7 +383,11 @@ export async function buildSession(
         partOfSpeech: entry.partOfSpeech,
         translation: translationShown ? sense.translation : null,
         userMeaning: sense.userMeaning,
-        definitionTarget: sense.definitionTarget,
+        // The Korean definition follows the same setting on the answer side
+        // and the intro card (it used to show there always): only with
+        // showKoreanDefinition, or when it is the only meaning there is.
+        definitionTarget:
+          user.showKoreanDefinition || !translationShown || !sense.translation ? sense.definitionTarget : null,
         definitionKnown: translationShown ? sense.definitionKnown : null,
         example: sense.examples[0]?.text ?? null,
         exampleTranslation: sense.examples[0]?.translation ?? null,

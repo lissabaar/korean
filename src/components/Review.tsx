@@ -67,10 +67,13 @@ function shuffle<T>(items: T[]): T[] {
  * (User.cardTextSize: 0 normal, 1 large, 2 extra large). Shared through a
  * context so every part of the card reads the same setting.
  */
+// input / inputEn: the answer field (Korean / English) and the options of a
+// choice question follow the card's text size too — large card text with a
+// small field to type in looked off.
 const TEXT_SIZES = [
-  { meaning: "text-2xl", second: "text-base", example: "text-lg sm:text-base", exampleTranslation: "text-sm", definition: "text-base" },
-  { meaning: "text-3xl", second: "text-lg", example: "text-xl", exampleTranslation: "text-base", definition: "text-lg" },
-  { meaning: "text-4xl", second: "text-xl", example: "text-2xl", exampleTranslation: "text-lg", definition: "text-xl" },
+  { meaning: "text-2xl", second: "text-base", example: "text-lg sm:text-base", exampleTranslation: "text-sm", definition: "text-base", input: "text-2xl", inputEn: "text-lg", option: "text-xl", optionEn: "text-base" },
+  { meaning: "text-3xl", second: "text-lg", example: "text-xl", exampleTranslation: "text-base", definition: "text-lg", input: "text-3xl", inputEn: "text-xl", option: "text-2xl", optionEn: "text-lg" },
+  { meaning: "text-4xl", second: "text-xl", example: "text-2xl", exampleTranslation: "text-lg", definition: "text-xl", input: "text-4xl", inputEn: "text-2xl", option: "text-3xl", optionEn: "text-xl" },
 ] as const;
 type TextSize = (typeof TEXT_SIZES)[number];
 const TextSizeContext = createContext<TextSize>(TEXT_SIZES[1]);
@@ -123,7 +126,8 @@ function withEdit(item: ReviewItem, word: WordDetails, myMeaningFirst: boolean):
       lemma: word.lemma,
       translation,
       userMeaning: own,
-      definitionTarget: definition,
+      // Hidden by the setting before the edit (and still has English): stays hidden.
+      definitionTarget: item.back.definitionTarget === null && translation ? null : definition,
       example,
       // Saved with the word (translated on save when it was new).
       exampleTranslation: word.exampleEnglish.trim() || null,
@@ -470,6 +474,8 @@ function Question({
   onEdit: () => void;
 }) {
   const [result, setResult] = useState<AnswerResult | null>(null);
+  // The card text size (Settings) also sizes the answer field and options.
+  const size = useContext(TextSizeContext);
   const [picked, setPicked] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [usedHint, setUsedHint] = useState(false);
@@ -628,7 +634,7 @@ function Question({
                   className={`flex w-full items-baseline gap-3 rounded-md border px-4 py-3 text-left ${tone}`}
                 >
                   <span className="text-xs text-muted tabular-nums">{index + 1}</span>
-                  <span className={recall ? "korean text-xl" : ""}>{option}</span>
+                  <span className={recall ? `korean ${size.option}` : size.optionEn}>{option}</span>
                 </button>
               </li>
             );
@@ -665,7 +671,7 @@ function Question({
               spellCheck={false}
               data-gramm="false"
               className={`rounded-md border border-line bg-surface px-4 py-3 outline-none focus:border-celadon ${
-                recall ? "korean text-2xl" : "text-lg"
+                recall ? `korean ${size.input}` : size.inputEn
               }`}
             />
           </label>
