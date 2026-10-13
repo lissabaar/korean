@@ -435,17 +435,19 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 ## What's not built yet
 
-- Starter deck content is a 10-word draft — replace with a real,
-  dictionary-checked deck
-- Billing: plans exist only as a placeholder page; see PAYMENTS.md
-- KRDict's 50 000 requests/day are shared by all users — cache lookups
-  before growth
-- Anonymous users that never sign up are never cleaned up
+- Hanja syllables module (owner's request, 2026-10-14): cards for Sino-Korean
+  syllables (소 小 "small") with meanings and example words (hers first),
+  and tappable syllables on cards of hanja-derived words. Source idea:
+  `Entry.originalForm` from KRDict gives the hanja per word; Unicode Unihan
+  (kHangul, kDefinition) gives readings and English meanings — no AI needed
+  for the common characters. Schema has `SHARES_HANJA` reserved.
+- Billing: no plans shown anywhere; see PAYMENTS.md
+- Anonymous users that never sign up are never cleaned up (and now get the
+  starter categories, ~380 words each)
 - Email verification: off (needs a mail provider such as Resend + a domain)
-
-- Example sentences — KRDict's search API has none; needs its view API
-  (`/api/view`, by `target_code`)
-- Hanja module (schema has `SHARES_HANJA` relation type reserved)
+- The old 10-word starter deck (`starter-deck.ts`, "No words yet?" button)
+  is superseded by the starter categories — new accounts are seeded before
+  it can show; remove it when convenient
 - Synonym grouping for review (backlog)
 - Spanish support (schema supports it, UI doesn't)
 
