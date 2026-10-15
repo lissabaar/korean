@@ -35,7 +35,6 @@ interface FillResult {
  */
 export default function SettingsPanel({
   email,
-  askRecognition: initialAsk,
   showKoreanDefinition: initialKorean,
   learningGoal: initialGoal,
   masteredAfterDays: initialMasteredAfter,
@@ -52,7 +51,6 @@ export default function SettingsPanel({
 }: {
   /** null = no account yet. */
   email: string | null;
-  askRecognition: boolean;
   showKoreanDefinition: boolean;
   learningGoal: number;
   /** Days the last of the mastering reviews must come after the one before (mastery.ts). */
@@ -74,7 +72,6 @@ export default function SettingsPanel({
   lookups: { used: number; limit: number | null };
 }) {
   const router = useRouter();
-  const [askRecognition, setAskRecognition] = useState(initialAsk);
   const [showKorean, setShowKorean] = useState(initialKorean);
   const [goal, setGoal] = useState(initialGoal);
   const [masteredAfter, setMasteredAfter] = useState(initialMasteredAfter);
@@ -186,14 +183,6 @@ export default function SettingsPanel({
             save({ showKoreanDefinition: value }, () => setShowKorean(!value));
           }}
           label="Show the Korean definition under the English meaning"
-        />
-        <Toggle
-          checked={askRecognition}
-          onChange={(value) => {
-            setAskRecognition(value);
-            save({ askRecognition: value }, () => setAskRecognition(!value));
-          }}
-          label="Also ask the other way: Korean word → English meaning (words you have already learned skip straight to review)"
         />
         <Toggle
           checked={autoPlay}

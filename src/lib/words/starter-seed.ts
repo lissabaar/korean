@@ -61,6 +61,11 @@ function starterTranslation(translation: string | undefined, gloss: string): str
   return romanised ? gloss : translation;
 }
 
+/** "one" + "native Korean" → "one (native Korean)"; unchanged without a note. */
+export function withNote(meaning: string, note: string | undefined): string {
+  return note && !meaning.includes(`(${note})`) ? `${meaning} (${note})` : meaning;
+}
+
 export interface SeedResult {
   /** New words saved. */
   added: number;
@@ -81,14 +86,14 @@ export async function seedStarterCategories(prisma: PrismaClient, userId: string
   if (!dictionary) throw new Error("The local dictionary (KrdictEntry) is not loaded.");
 
   // One word per dictionary entry, with every starter category it belongs to.
-  const words = new Map<string, { word: StarterWord; entry: DictEntry | null; categories: string[] }>();
+  const words = new Map<string, { word: StarterWord; entry: DictEntry | null; categories: string[]; note?: string }>();
   for (const category of STARTER_CATEGORIES) {
     for (const word of category.words) {
       const entry = resolveStarterWord(dictionary.get(word.lemma) ?? [], word, category);
       const key = entry?.targetCode ?? `ai:${word.lemma}`;
       const known = words.get(key);
       if (known) known.categories.push(category.name);
-      else words.set(key, { word, entry, categories: [category.name] });
+      else words.set(key, { word, entry, categories: [category.name], note: category.meaningNote });
     }
   }
 
@@ -148,7 +153,7 @@ export async function seedStarterCategories(prisma: PrismaClient, userId: string
       const links: Prisma.EntryCategoryCreateManyInput[] = [];
       let linked = 0;
 
-      for (const { word, entry, categories } of words.values()) {
+      for (const { word, entry, categories, note } of words.values()) {
         const ids = categories.map((name) => categoryId.get(name)).filter((id): id is string => Boolean(id));
         const known = findExisting(word.lemma, entry);
         if (known) {
@@ -182,7 +187,7 @@ export async function seedStarterCategories(prisma: PrismaClient, userId: string
           order: 0,
           definitionTarget: sense?.definition || null,
           definitionKnown: sense?.translatedDefinition ?? null,
-          translation: sense ? starterTranslation(sense.translation, word.gloss) : word.gloss,
+          translation: withNote(sense ? starterTranslation(sense.translation, word.gloss) : word.gloss, note),
           definitionSource: entry ? "KRDICT" : "AI",
         });
         for (const text of sense?.examples.slice(0, 3) ?? []) examples.push({ senseId, text, source: "KRDICT" });

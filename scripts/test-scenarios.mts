@@ -180,6 +180,10 @@ try {
     await prisma.user.update({ where: { id: userId }, data: { acceptTypos: true } });
     await prisma.card.update({ where: { id: card.id }, data: { learningStreak: 6 } });
     const slip = await submitAnswer(prisma, userId, { cardId: card.id, answer: "동젼" });
+    // only one substituted letter is a typo: two letters, or a missing one, are wrong
+    const { gradeTypedAnswer } = await import("../src/lib/review/answer.ts");
+    check("유정하다 for 요청하다 (two letters) is wrong even with typos on", gradeTypedAnswer("유정하다", "요청하다", { allowNearMiss: true }).verdict === "wrong");
+    check("요청하 for 요청하다 (missing letter) is wrong", gradeTypedAnswer("요청하", "요청하다", { allowNearMiss: true }).verdict === "wrong");
     check("동젼 for 동전 is a typo (accepted)", slip.verdict === "almost" && slip.graduated === true, slip.verdict);
   });
 
@@ -238,8 +242,9 @@ try {
     await prisma.card.updateMany({ where: { userId, phase: "SCHEDULED" }, data: { due: new Date(Date.now() - 1000) } });
     const items = await buildSession(prisma, userId, "review");
     check("due cards come up in review", items.length > 0 && items.every((i: any) => i.phase === "SCHEDULED"));
+    const logsBefore = await prisma.reviewLog.count({ where: { cardId: items[0].cardId } });
     const r = await submitAnswer(prisma, userId, { cardId: items[0].cardId, answer: items[0].choices?.[0] ?? "x" });
-    check("review answer schedules FSRS + log", Boolean(r.nextDue) && (await prisma.reviewLog.count({ where: { cardId: items[0].cardId } })) === 1);
+    check("review answer schedules FSRS + log", Boolean(r.nextDue) && (await prisma.reviewLog.count({ where: { cardId: items[0].cardId } })) === logsBefore + 1);
     const stats = await getDeckStats(prisma, userId);
     check("deck stats", stats.words > 0, JSON.stringify(stats));
     const v = await verifyPending(prisma, dictionaryKeys, userId);

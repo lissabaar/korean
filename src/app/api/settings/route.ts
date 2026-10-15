@@ -7,15 +7,12 @@
  * Runs on the server only, so it may use secret keys and the database.
  *
  * Only known fields with valid values are accepted; anything else in the
- * request is ignored. Switching "Also ask the other way" on sends the
- * Korean → English card of every already-learned word straight to review
- * (lib/review/siblings.ts) — otherwise they all came up as new words.
+ * request is ignored.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
-import { promoteRecognitionOfLearned } from "@/lib/review/siblings";
 import { MAX_MASTERED_AFTER_DAYS, MIN_MASTERED_AFTER_DAYS } from "@/lib/review/mastery";
 
 /** Study settings. Only known boolean fields are accepted. */
@@ -25,7 +22,6 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const data: {
-    askRecognition?: boolean;
     showKoreanDefinition?: boolean;
     learningGoal?: number;
     masteredAfterDays?: number;
@@ -45,7 +41,6 @@ export async function PATCH(request: Request) {
   if (Number.isInteger(body.learningGoal) && body.learningGoal >= 2 && body.learningGoal <= 10) {
     data.learningGoal = body.learningGoal;
   }
-  if (typeof body.askRecognition === "boolean") data.askRecognition = body.askRecognition;
   if (typeof body.autoPlayAudio === "boolean") data.autoPlayAudio = body.autoPlayAudio;
   if (typeof body.acceptTypos === "boolean") data.acceptTypos = body.acceptTypos;
   if (typeof body.myMeaningFirst === "boolean") data.myMeaningFirst = body.myMeaningFirst;
@@ -62,6 +57,5 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
   }
   await prisma.user.update({ where: { id: userId }, data });
-  if (data.askRecognition === true) await promoteRecognitionOfLearned(prisma, userId);
   return NextResponse.json({ ok: true });
 }

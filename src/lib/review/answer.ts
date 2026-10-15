@@ -37,28 +37,6 @@ function toJamo(text: string): string {
   return text.normalize("NFD");
 }
 
-/**
- * Levenshtein distance, capped: we only ever care whether the answer is
- * within one or two edits, so the full matrix is wasteful but the input is
- * a single word and clarity wins over micro-optimisation here.
- */
-function editDistance(a: string, b: string): number {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const d: number[][] = Array.from({ length: rows }, () => new Array(cols).fill(0));
-
-  for (let i = 0; i < rows; i++) d[i][0] = i;
-  for (let j = 0; j < cols; j++) d[0][j] = j;
-
-  for (let i = 1; i < rows; i++) {
-    for (let j = 1; j < cols; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-    }
-  }
-  return d[rows - 1][cols - 1];
-}
-
 export interface GradeOptions {
   /**
    * Treat near-misses as "almost" rather than wrong. Typos in a language
@@ -83,7 +61,8 @@ export function gradeTypedAnswer(
   expected: string,
   options: GradeOptions = {},
 ): GradedAnswer {
-  const { allowNearMiss = true, alternatives = [] } = options;
+  // Off unless asked for: a typo forgiven by default is a mistake let through.
+  const { allowNearMiss = false, alternatives = [] } = options;
 
   const given = normalise(typed);
   if (!given) return { verdict: "wrong" };
@@ -99,25 +78,17 @@ export function gradeTypedAnswer(
 
   if (!allowNearMiss) return { verdict: "wrong" };
 
-  // A typo is one wrong letter, not a wrong syllable. Korean is compared
-  // letter by letter (jamo: 동전 = ㄷㅗㅇㅈㅓㄴ), so 동젼 for 동전 is a slip
-  // but 동근 is wrong — compared by syllable, one wrong syllable out of two
-  // used to pass. One letter for words up to three syllables, then about
-  // one per seven syllables (~17 jamo) for phrases. Other scripts (English
-  // meanings) keep the character-based budget: one edit for short words,
-  // then about one per seven characters.
+  // A typo is exactly one wrong letter in its place — nothing more (owner's
+  // rule): two wrong letters are a mistake (유정하다 for 요청하다: ㅠ/ㅛ and
+  // ㅈ/ㅊ), and so is a missing or extra letter (요청하 for 요청하다). Korean
+  // is compared letter by letter (jamo: 동전 = ㄷㅗㅇㅈㅓㄴ), so 동젼 for 동전
+  // is a slip but 동근 is not (ㄱ for ㅈ and ㅡ for ㅓ). Spacing is ignored.
   for (const candidate of candidates) {
     const korean = HANGUL_SYLLABLE.test(candidate);
-    const a = korean ? toJamo(given) : given;
-    const b = korean ? toJamo(candidate) : candidate;
-    const budget = korean
-      ? candidate.replace(/ /g, "").length <= 3
-        ? 1
-        : Math.max(2, Math.round(b.length / 17))
-      : candidate.length <= 3
-        ? 1
-        : Math.max(2, Math.round(candidate.length / 7));
-    if (editDistance(a, b) <= budget) {
+    const a = [...(korean ? toJamo(given) : given).replace(/ /g, "")];
+    const b = [...(korean ? toJamo(candidate) : candidate).replace(/ /g, "")];
+    const substitutions = a.length === b.length ? a.filter((char, i) => char !== b[i]).length : Infinity;
+    if (substitutions === 1) {
       return {
         verdict: "almost",
         matched: candidate,

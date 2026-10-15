@@ -34,7 +34,6 @@ export default async function SettingsPage() {
     prisma.user.findUniqueOrThrow({
       where: { id: user.id },
       select: {
-        askRecognition: true,
         showKoreanDefinition: true,
         learningGoal: true,
         masteredAfterDays: true,
@@ -56,7 +55,6 @@ export default async function SettingsPage() {
   return (
     <SettingsPanel
       email={user.isAnonymous ? null : user.email}
-      askRecognition={settings.askRecognition}
       showKoreanDefinition={settings.showKoreanDefinition}
       learningGoal={settings.learningGoal}
       masteredAfterDays={settings.masteredAfterDays}

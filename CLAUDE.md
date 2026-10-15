@@ -113,7 +113,9 @@ then AI checked against the dictionary) — run after saving and from Settings.
   meaning"), not rejected. `commit.ts` `resolveEntry()` builds that entry.
 - Phrases: with "Words & phrases" on, extraction returns `kind: "phrase"`
   for expressions and sentences, learned as one card. Typed answers ignore
-  punctuation and spacing; with `acceptTypos` on, about one typo per 7 characters.
+  punctuation and spacing; with `acceptTypos` on, exactly one substituted
+  letter (jamo for Korean) is a typo — two letters, or a missing/extra one,
+  are wrong (owner's rule).
 
 **One card tests one thing.**
 Cards hang off `Sense`, not `Entry`. A word with three senses → three sense
@@ -239,15 +241,16 @@ switches) but shown apart on /categories as "Without a category", with no
 rename/lock/delete, hidden while empty. Renaming onto an
 existing name merges the two.
 
-**Study scope = direction × categories.**
-`studyScope()` in `review/queue.ts`: RECALL (English → Korean) always,
-RECOGNITION only if `User.askRecognition`. A word is learned if any of its
-categories has `learnActive`, reviewed if any has `reviewActive`. Stats and
-sessions both go through it. When RECALL graduates, the sense's RECOGNITION
-card goes straight to SCHEDULED with the same due date
-(`review/siblings.ts`, also run for all words when askRecognition is
-switched on) — otherwise every learned word came back as new. Sessions take a mode — `learn` (new words
-only), `review` (scheduled only), `all` — from `/review?mode=`.
+**Study scope = categories; RECALL only.**
+`studyScope()` in `review/queue.ts`: only RECALL (English → Korean) is
+asked. The Korean → English option (`User.askRecognition`) was removed from
+the app (owner, 2026-10-16: unused); RECOGNITION cards are still created and
+`review/siblings.ts` still moves them to review when RECALL graduates, but
+nothing asks them. A word is learned if any of its categories has
+`learnActive`, reviewed if any has `reviewActive`. Stats and sessions both
+go through it. Sessions take a mode — `learn`, `review`, `all`, `mastered` —
+from `/review?mode=`. Starter number meanings carry "(native Korean)" /
+"(Sino-Korean)" (`meaningNote`), or "one" could be 하나 or 일.
 
 **The dictionary lives in our database.** `KrdictEntry` holds the whole
 KRDict (official download, CC BY-SA 2.0 KR — the app footer names it),

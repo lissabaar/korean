@@ -44,12 +44,19 @@ export interface StarterCategory {
    * part of speech are tried first; others only if there is none.
    */
   partOfSpeech?: string;
+  /**
+   * Added to every meaning in brackets: "one (native Korean)" vs "one
+   * (Sino-Korean)" — without it a card asking for "one" could mean 하나 or 일.
+   */
+  meaningNote?: string;
   words: StarterWord[];
 }
 
 /**
  * "하나 one, 개 item @22784" → StarterWord[]: compact to write, easy to read.
- * An "@code" at the end pins the KRDict entry.
+ * An "@code" at the end pins the KRDict entry. Items are split on commas, so
+ * a gloss must not contain one ("paper, tickets" once made "tickets" a word);
+ * an item whose lemma has no Hangul is a slip like that and throws.
  */
 function list(text: string): StarterWord[] {
   return text
@@ -60,8 +67,10 @@ function list(text: string): StarterWord[] {
       const pin = item.match(/\s@(\d+)$/);
       const rest = pin ? item.slice(0, pin.index) : item;
       const space = rest.indexOf(" ");
+      const lemma = rest.slice(0, space);
+      if (!/[가-힣]/.test(lemma)) throw new Error(`Starter list: "${item}" is not a Korean word (a comma inside a gloss?)`);
       return {
-        lemma: rest.slice(0, space),
+        lemma,
         gloss: rest.slice(space + 1).trim(),
         ...(pin && { code: pin[1] }),
       };
@@ -87,6 +96,7 @@ export const STARTER_CATEGORIES: StarterCategory[] = [
     name: "native korean numbers",
     icon: "123",
     partOfSpeech: "수사",
+    meaningNote: "native Korean",
     words: list(`하나 one, 둘 two, 셋 three, 넷 four, 다섯 five, 여섯 six, 일곱 seven, 여덟 eight,
       아홉 nine, 열 ten, 스물 twenty, 서른 thirty, 마흔 forty, 쉰 fifty, 예순 sixty, 일흔 seventy,
       여든 eighty, 아흔 ninety`),
@@ -96,6 +106,7 @@ export const STARTER_CATEGORIES: StarterCategory[] = [
     name: "sino-korean numbers",
     icon: "calculator",
     partOfSpeech: "수사",
+    meaningNote: "Sino-Korean",
     words: list(`영 zero, 공 zero, 일 one, 이 two, 삼 three, 사 four, 오 five, 육 six, 칠 seven,
       팔 eight, 구 nine, 십 ten, 이십 twenty, 삼십 thirty, 사십 forty, 오십 fifty, 육십 sixty,
       칠십 seventy, 팔십 eighty, 구십 ninety, 백 hundred, 천 thousand, 만 ten thousand,
@@ -125,8 +136,8 @@ export const STARTER_CATEGORIES: StarterCategory[] = [
     partOfSpeech: "의존 명사",
     words: list(`개 counter for things @22784, 명 counter for people, 마리 counter for animals,
       권 counter for books, 잔 counter for cups and glasses, 병 counter for bottles,
-      장 counter for flat things (paper, tickets), 대 counter for vehicles and machines @40639,
-      살 counter for age (years old), 번 counter for times, 켤레 counter for pairs (shoes, socks),
+      장 counter for flat things (paper or tickets), 대 counter for vehicles and machines @40639,
+      살 counter for age (years old), 번 counter for times, 켤레 counter for pairs (shoes or socks),
       벌 counter for clothes @59087, 송이 counter for flowers and bunches, 그릇 counter for bowls,
       층 counter for floors, 인분 counter for portions`),
   },

@@ -39,8 +39,10 @@ type AskedDirection = "RECOGNITION" | "RECALL";
  * Which cards the user is studying right now. Two filters on top of the
  * plain "not suspended":
  *
- *   direction — RECALL (meaning → Korean) always; RECOGNITION only when the
- *               user turned it on, since recall is the skill that lags.
+ *   direction — RECALL (meaning → Korean) only. The Korean → English
+ *               direction (RECOGNITION) was an option and was removed
+ *               (owner's call, 2026-10-16: unused); its cards still exist
+ *               in the database but are never asked.
  *   category  — a word takes part in learning if any of its categories has
  *               learnActive, in review if any has reviewActive. A word with
  *               no category at all always takes part, so deleting a
@@ -50,7 +52,6 @@ async function studyScope(prisma: PrismaClient, userId: string) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
-      askRecognition: true,
       showKoreanDefinition: true,
       learningGoal: true,
       myMeaningFirst: true,
@@ -58,9 +59,7 @@ async function studyScope(prisma: PrismaClient, userId: string) {
       hideTranslationAfterStability: true,
     },
   });
-  const directions: AskedDirection[] = user.askRecognition
-    ? ["RECALL", "RECOGNITION"]
-    : ["RECALL"];
+  const directions: AskedDirection[] = ["RECALL"];
   const base = { userId, suspended: false, direction: { in: directions } };
 
   const learn = {

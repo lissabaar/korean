@@ -400,6 +400,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
           onDone={advance}
           autoPlay={autoPlay}
           onEdit={() => setEditing(current.entryId)}
+          editing={editing === current.entryId}
         />
       )}
 
@@ -477,12 +478,18 @@ function Question({
   onDone,
   autoPlay,
   onEdit,
+  editing = false,
 }: {
   item: ReviewItem;
   onDone: (r: AnswerResult) => void;
   autoPlay: boolean;
   /** Open the word editor (offered once the answer is shown). */
   onEdit: () => void;
+  /**
+   * The word editor is open under the card: Next is hidden until it closes —
+   * pressing it instead of Save (the pinned bar is right there) lost the edit.
+   */
+  editing?: boolean;
 }) {
   const [result, setResult] = useState<AnswerResult | null>(null);
   // The card text size (Settings) also sizes the answer field and options.
@@ -551,8 +558,10 @@ function Question({
   }, [item.choices, result, choose]);
 
   useEffect(() => {
-    if (result) nextRef.current?.focus();
-    else if (item.exercise === "TYPING" && !item.selfGraded) inputRef.current?.focus();
+    // preventScroll: on iPhone a plain focus() scrolled the page to the field
+    // (and the old scroll-back made it jump twice) every time a card opened.
+    if (result) nextRef.current?.focus({ preventScroll: true });
+    else if (item.exercise === "TYPING" && !item.selfGraded) inputRef.current?.focus({ preventScroll: true });
   }, [result, item.exercise, item.selfGraded]);
 
   const recall = item.direction === "RECALL";
@@ -667,9 +676,6 @@ function Question({
             </span>
             <input
               ref={inputRef}
-              // iOS scrolls the focused field above the keyboard and pushes
-              // the question off screen; bring the question back into view.
-              onFocus={() => setTimeout(() => frontRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 300)}
               value={typed}
               onChange={(event) => setTyped(event.target.value)}
               disabled={Boolean(result) || busy}
@@ -746,8 +752,13 @@ function Question({
               used to move with the content and could end up off screen).
               Wider screens: in the flow under the card, as before. The
               spacer keeps the bar from covering the end of the card. */}
-          <div className="h-24 sm:hidden" aria-hidden />
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
+          <div className="h-28 sm:hidden" aria-hidden />
+          <div
+            hidden={editing}
+            // Extra room under the button: Safari's bottom toolbar on iPhone
+            // overlapped it with only the safe-area inset.
+            className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper px-4 pt-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0"
+          >
             <button
               ref={nextRef}
               type="button"

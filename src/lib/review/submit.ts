@@ -146,7 +146,7 @@ export async function submitAnswer(
     // Near misses count only when the user allows typos (User.acceptTypos).
     const graded = gradeTypedAnswer(input.answer ?? "", expected, {
       alternatives,
-      allowNearMiss: card.user.acceptTypos,
+      allowNearMiss: card.user.acceptTypos === true,
     });
     verdict = graded.verdict;
     note = graded.hint;

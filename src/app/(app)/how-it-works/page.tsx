@@ -89,10 +89,6 @@ export default async function HowItWorksPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>The first {CHOICE_REVIEWS_BEFORE_TYPING} reviews of a word are picked from options, then typed.</li>
           <li>A right answer with the hint counts as not remembered.</li>
-          <li>
-            Korean → English cards (if “Also ask the other way” is on) skip the drill for a word you already
-            learned English → Korean: they go straight to review.
-          </li>
         </ul>
       </Stage>
 
