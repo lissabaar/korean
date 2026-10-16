@@ -146,11 +146,11 @@ export default function SettingsPanel({
   const fillExamples = () => runFill("examples", missingExamples, setFilled);
   const translateExamples = () => runFill("translations", untranslatedExamples, setTranslated);
 
-  const section = "rounded-lg border border-line bg-surface p-4";
+  const section = "rounded-2xl border border-line bg-surface p-4";
 
   return (
     // Two columns of sections where the screen allows; headings and errors span both.
-    <main className="mx-auto grid max-w-5xl items-start gap-4 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-2">
+    <main className="mx-auto grid max-w-6xl items-start gap-4 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-2">
       <header className="mb-2 lg:col-span-2">
         <p className="korean text-4xl text-celadon-deep">설정</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Settings</h1>

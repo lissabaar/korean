@@ -68,7 +68,7 @@ export default function StatsView() {
       {active.length === 0 ? (
         <p className="mt-2 text-sm text-muted">Nothing yet — learn or review a few words and come back.</p>
       ) : (
-        <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-surface">
+        <div className="mt-2 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full min-w-[32rem] text-sm">
             <thead className="text-left text-xs text-muted">
               <tr>
@@ -105,7 +105,7 @@ export default function StatsView() {
 /** One counter tile. */
 function Tile({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="rounded-lg border border-line bg-surface px-4 py-3">
+    <div className="rounded-2xl border border-line bg-surface px-4 py-3">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className={`mt-1 text-2xl font-bold tabular-nums ${accent ? "text-celadon-deep" : ""}`}>{value}</dd>
     </div>

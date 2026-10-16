@@ -18,7 +18,7 @@ export default function PrivacyPage() {
   const h2 = "mt-8 text-lg font-semibold";
   const p = "mt-2 text-muted";
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16 pt-10 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6">
       <Link href="/" className="korean text-xl text-celadon-deep">
         단어
       </Link>

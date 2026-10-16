@@ -380,6 +380,13 @@ description; root metadata has a title template, Open Graph and canonical;
 tracking — only strictly necessary storage, so no cookie banner;
 `/privacy` must stay true when that changes.
 
+**Layout.** Every app page is `<main className="mx-auto max-w-6xl px-4 … sm:px-6">`
+— the nav's width (owner: one wide width for all pages); only the sign-in /
+sign-up forms stay narrow. Cards and panels are `rounded-2xl` with a hairline
+`border-line`; the home page is a bento grid (one 2×2 "do this now" tile,
+small counter tiles). Motion only as feedback (`feedback-right` /
+`feedback-wrong` in globals.css), and the reduce-motion rule switches it off.
+
 **Look.** Light/dark/system choice in Settings (`ThemeChoice` in ThemeToggle.tsx — moved
 out of the nav to make room for Statistics, Hanja, How it works; data-theme on
 <html>, inline script in app/layout.tsx prevents a flash). Card text size

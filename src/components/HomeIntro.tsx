@@ -61,7 +61,7 @@ export default function HomeIntro() {
   }
 
   return (
-    <section className="mb-8 rounded-lg border border-line bg-surface p-5 sm:p-6">
+    <section className="mb-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="korean text-2xl text-celadon-deep">한국어 단어장</p>

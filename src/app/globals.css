@@ -21,7 +21,7 @@
 }
 
 /*
-  Dark palette. The theme switch in the nav sets data-theme on <html>
+  Dark palette. The theme choice in Settings sets data-theme on <html>
   ("light" or "dark", remembered in localStorage — see ThemeToggle.tsx and
   the inline script in app/layout.tsx); without a choice the system setting
   decides. Tailwind's colour utilities read these variables, so overriding
@@ -77,6 +77,24 @@ body {
   letter-spacing: -0.01em;
   word-break: keep-all;
 }
+
+/*
+  Answer feedback (Review.tsx): a right answer pops in, a wrong one gives a
+  small shake — motion that tells you something, not decoration. Turned off
+  with the system's "reduce motion" (the rule below).
+*/
+@keyframes feedback-pop {
+  0% { transform: scale(0.96); opacity: 0; }
+  60% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes feedback-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+.feedback-right { animation: feedback-pop 220ms ease-out; }
+.feedback-wrong { animation: feedback-shake 320ms ease-in-out; }
 
 :focus-visible {
   outline: 2px solid var(--color-celadon-deep);

@@ -838,7 +838,7 @@ export default function AddWords({
   const unreachableCount = candidates.filter((c) => c.status === "unreachable").length;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-28 pt-8 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-28 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">새 단어</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Add words</h1>
@@ -878,7 +878,7 @@ export default function AddWords({
       {stage === "input" && mode === "manual" && <ManualWord categories={categories} />}
 
       {stage === "input" && mode === "ai" && anonymous && (
-        <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="font-medium">Finding words with AI needs a free account</p>
           <p className="mt-1 text-sm text-muted">
             Paste texts, drop screenshots, Anki decks or tables — the AI picks out the words and
@@ -1300,7 +1300,7 @@ export default function AddWords({
                     </h2>
                   )}
                   {rows.length > 0 && (
-                    <ul className="overflow-hidden rounded-lg border border-line bg-surface">
+                    <ul className="overflow-hidden rounded-2xl border border-line bg-surface">
                       {rows.map((candidate) => (
                         <CandidateRow
                           key={candidate.id}
@@ -1376,7 +1376,7 @@ export default function AddWords({
       )}
 
       {stage === "done" && summary && (
-        <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="korean text-3xl text-celadon-deep">완료</p>
           <p className="mt-2 font-medium">
             {summary.created} {summary.created === 1 ? "word" : "words"} added.

@@ -36,7 +36,7 @@ export default async function HowItWorksPage() {
   const retention = Math.round((settings?.desiredRetention ?? 0.9) * 100);
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">공부하는 법</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">How learning works</h1>
@@ -124,7 +124,7 @@ export default async function HowItWorksPage() {
 /** One numbered stage of the explanation. */
 function Stage({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-6 rounded-lg border border-line bg-surface p-5 text-sm leading-relaxed">
+    <section className="mt-6 rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed">
       <h2 className="flex items-baseline gap-2 text-base font-medium">
         <span className="grid size-6 shrink-0 place-items-center rounded-full bg-celadon-soft text-xs text-celadon-deep">
           {n}

@@ -78,7 +78,7 @@ export default function FileDrop({
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(false);
       }}
-      className={`rounded-lg border-2 border-dashed px-4 text-center transition-colors ${hasFiles ? "py-3" : "py-6"} ${
+      className={`rounded-2xl border-2 border-dashed px-4 text-center transition-colors ${hasFiles ? "py-3" : "py-6"} ${
         over ? "border-celadon bg-celadon-soft" : hasFiles ? "border-celadon bg-surface" : "border-line bg-surface"
       } ${disabled ? "opacity-50" : ""}`}
     >

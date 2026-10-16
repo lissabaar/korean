@@ -297,7 +297,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
   if (total === 0) {
     return (
       <Shell>
-        <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="korean text-3xl text-celadon-deep">쉬는 시간</p>
           <p className="mt-2 font-medium">
             {mode === "learn"
@@ -332,7 +332,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
   if (!current) {
     return (
       <Shell>
-        <div className="rounded-lg border border-line bg-surface p-6">
+        <div className="rounded-2xl border border-line bg-surface p-6">
           <p className="korean text-3xl text-celadon-deep">수고했어요</p>
           <p className="mt-2 font-medium">Session done.</p>
           <p className="mt-1 text-sm text-muted">
@@ -407,7 +407,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       {editing && editing === current.entryId && (
         // scroll-mt clears the sticky nav; the bottom margin on phones keeps
         // the editor's Save above the pinned Next bar.
-        <div ref={editorRef} className="mt-4 mb-24 scroll-mt-16 overflow-hidden rounded-lg border border-celadon bg-surface sm:mb-0">
+        <div ref={editorRef} className="mt-4 mb-24 scroll-mt-16 overflow-hidden rounded-2xl border border-celadon bg-surface sm:mb-0">
           <WordEditor
             wordId={editing}
             allCategoryNames={categoryNames}
@@ -468,7 +468,7 @@ function NextReview({ at, soon }: { at: Date; soon: number }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   // Wider on desktop, so long examples fit on one line.
-  return <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
+  return <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">{children}</main>;
 }
 
 // ---------------------------------------------------------------- question
@@ -739,9 +739,11 @@ function Question({
       {/* ---- feedback ---- */}
       {result && (
         <div className="mt-6">
+          {/* feedback-right / feedback-wrong (globals.css): a short pop or
+              shake — motion that answers, off with "reduce motion". */}
           <p
-            className={`rounded-md px-3 py-2.5 text-sm font-medium ${
-              result.correct ? "bg-celadon-soft text-celadon-deep" : "bg-clay-soft text-clay"
+            className={`rounded-xl px-3 py-2.5 text-sm font-medium ${
+              result.correct ? "feedback-right bg-celadon-soft text-celadon-deep" : "feedback-wrong bg-clay-soft text-clay"
             }`}
           >
             {feedbackLine(result, item, picked)}
@@ -854,7 +856,7 @@ function Intro({
 
   return (
     <div>
-      <div className="rounded-lg border border-line bg-surface p-6">
+      <div className="rounded-2xl border border-line bg-surface p-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <HanjaWord lemma={back.lemma} hanja={back.hanja} className="korean text-5xl leading-tight" />
           <SpeakButton text={back.lemma} />
@@ -945,7 +947,7 @@ function Front({ item }: { item: ReviewItem }) {
   const pos = posLabel(item.back.partOfSpeech);
   if (item.front.lemma) {
     return (
-      <div className="grid min-h-40 place-items-center rounded-lg bg-celadon-soft px-6 py-10">
+      <div className="grid min-h-40 place-items-center rounded-2xl bg-celadon-soft px-6 py-10">
         <div className="flex flex-col items-center gap-2">
           <p className="korean text-center text-5xl leading-tight">{item.front.lemma}</p>
           <SpeakButton text={item.front.lemma} />
@@ -954,7 +956,7 @@ function Front({ item }: { item: ReviewItem }) {
     );
   }
   return (
-    <div className="rounded-lg border border-line bg-surface px-6 py-8">
+    <div className="rounded-2xl border border-line bg-surface px-6 py-8">
       {item.front.meaning && (
         <p className={`font-semibold ${size.meaning}`}>
           {item.front.meaning}
@@ -1091,7 +1093,7 @@ function HanjaWord({
         <span
           role="dialog"
           aria-label={`Hanja ${shown.char}`}
-          className="absolute left-0 top-full z-20 mt-2 block w-72 max-w-[calc(100vw-3rem)] rounded-lg border border-line bg-surface p-3 text-left text-sm font-normal shadow-lg"
+          className="absolute left-0 top-full z-20 mt-2 block w-72 max-w-[calc(100vw-3rem)] rounded-2xl border border-line bg-surface p-3 text-left text-sm font-normal shadow-lg"
         >
           <span className="flex items-start gap-3">
             <span className="korean text-4xl leading-none text-celadon-deep">{shown.char}</span>
@@ -1144,7 +1146,7 @@ function Back({ item, onEdit }: { item: ReviewItem; onEdit: () => void }) {
   const level = levelLabel(back.level);
   const pos = posLabel(back.partOfSpeech);
   return (
-    <div className="mt-4 rounded-lg border border-line bg-surface p-5">
+    <div className="mt-4 rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <HanjaWord lemma={back.lemma} hanja={back.hanja} className="korean text-3xl" />
         <SpeakButton text={back.lemma} className="self-center" />

@@ -13,7 +13,7 @@ export const metadata = { title: "Statistics", robots: { index: false } };
 
 export default function StatsPage() {
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">통계</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Statistics</h1>

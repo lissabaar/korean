@@ -67,7 +67,7 @@ export default async function HanjaPage({ searchParams }: { searchParams: Promis
   }));
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
       <header className="mb-7">
         <p className="korean text-4xl text-celadon-deep">한자</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Hanja syllables</h1>

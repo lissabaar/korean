@@ -57,7 +57,7 @@ export default function HanjaBrowser({ cards, initialChar }: { cards: HanjaCard[
 
   if (cards.length === 0) {
     return (
-      <p className="rounded-lg border border-line bg-surface p-5 text-sm text-muted">
+      <p className="rounded-2xl border border-line bg-surface p-5 text-sm text-muted">
         None of your words come from hanja yet — or the dictionary did not say. Words like 학교, 공원 or 시간 will
         show up here.
       </p>
@@ -157,7 +157,7 @@ function CharCard({ card, open }: { card: HanjaCard; open: boolean }) {
   return (
     <li
       ref={ref}
-      className={`rounded-lg border bg-surface p-4 ${open ? "border-celadon" : "border-line"}`}
+      className={`rounded-2xl border bg-surface p-4 ${open ? "border-celadon" : "border-line"}`}
     >
       <div className="flex items-baseline gap-3">
         <span className="korean text-4xl leading-none">{card.char}</span>
@@ -229,7 +229,7 @@ function Practice({ cards }: { cards: HanjaCard[] }) {
       <p className="mb-2 text-xs text-muted">
         {index + 1} of {deck.length}
       </p>
-      <div className="rounded-lg border border-line bg-surface p-6 text-center">
+      <div className="rounded-2xl border border-line bg-surface p-6 text-center">
         <p className="korean text-7xl leading-tight">{card.char}</p>
         <p className="korean mt-2 text-2xl text-celadon-deep">{card.syllable}</p>
         {shown ? (

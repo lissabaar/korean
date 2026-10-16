@@ -130,7 +130,7 @@ export default function CategoryList({
   const reviewing = categories.filter((c) => c.reviewActive).length;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
       <header className="mb-6">
         <p className="korean text-4xl text-celadon-deep">분류</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Categories</h1>
@@ -165,7 +165,7 @@ export default function CategoryList({
           />
         </label>
         {q && (
-          <div className="mt-2 overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="mt-2 overflow-hidden rounded-2xl border border-line bg-surface">
             <p className="px-4 py-2 text-xs text-muted">
               {found.length === 0
                 ? "No words match."
@@ -319,7 +319,7 @@ function CategoryRow({
   const closePanel = useCallback(() => setPanel("none"), []);
 
   return (
-    <li className={`overflow-hidden rounded-lg border bg-surface ${special ? "border-dashed border-line" : "border-line"}`}>
+    <li className={`overflow-hidden rounded-2xl border bg-surface ${special ? "border-dashed border-line" : "border-line"}`}>
       {/* Row 1: icon, full name, actions. Row 2 on phones: the switches. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <button
@@ -548,7 +548,7 @@ function Resort({ onDone }: { onDone: () => void }) {
   const affordable = plan && (plan.creditsLeft === null || plan.creditsLeft >= plan.estimatedCredits);
 
   return (
-    <div className="mb-4 rounded-lg border border-line bg-surface p-4 text-sm">
+    <div className="mb-4 rounded-2xl border border-line bg-surface p-4 text-sm">
       {(stage === "idle" || stage === "loading" || stage === "done") && (
         <div className="flex flex-wrap items-center gap-3">
           <span className="min-w-0 flex-1 text-muted">

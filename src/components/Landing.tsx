@@ -29,7 +29,7 @@ const STRUCTURED_DATA = {
 /** The landing page; `status` is what the session starter shows (opening, or an error). */
 export default function Landing({ status }: { status?: React.ReactNode }) {
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-16 pt-12 sm:px-6">
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6">
       <script
         type="application/ld+json"
         // JSON-LD must be raw JSON in the page; it is built from constants above.
@@ -56,7 +56,7 @@ export default function Landing({ status }: { status?: React.ReactNode }) {
       <h2 className="mt-12 text-xl font-semibold">How it works</h2>
       <ul className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {SITE_POINTS.map((point) => (
-          <li key={point.title} className="rounded-lg border border-line bg-surface p-5">
+          <li key={point.title} className="rounded-2xl border border-line bg-surface p-5">
             <i className={`bi ${point.icon} text-2xl text-celadon-deep`} aria-hidden />
             <h3 className="mt-2 font-medium">{point.title}</h3>
             <p className="mt-1 text-sm text-muted">{point.text}</p>
