@@ -18,6 +18,8 @@ import StarterSeed from "@/components/StarterSeed";
 import OfflineSync from "@/components/OfflineSync";
 import { prisma } from "@/lib/clients";
 import { currentUser } from "@/lib/session";
+import { after } from "next/server";
+import { cleanUpAnonymous } from "@/lib/anonymous-cleanup";
 import { needsStarterCategories } from "@/lib/words/starter-seed";
 
 /**
@@ -27,6 +29,9 @@ import { needsStarterCategories } from "@/lib/words/starter-seed";
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await currentUser();
+  // After the page is sent: remove anonymous accounts nobody uses (at most
+  // once a day per server instance; lib/anonymous-cleanup.ts).
+  after(() => cleanUpAnonymous(prisma).catch((error) => console.error("Anonymous clean-up failed:", error)));
   // No session yet: the public landing page (what crawlers index), while the
   // browser starts an anonymous session and then shows the app.
   if (!user) return <Landing status={<StartAnonymous />} />;

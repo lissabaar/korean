@@ -198,7 +198,11 @@ browser by `StartAnonymous`, so crawlers never create rows). Everything works
 for them except AI (`ai-budget.ts` refuses with scope `anonymous`). On
 sign-up/sign-in the anonymous plugin calls `onLinkAccount` and then DELETES
 the anonymous user — `moveAnonymousData()` must run first or the words go
-with it. Pages in `(app)` use `currentUser()`, never a redirect to sign-in.
+with it. Automated browsers (`navigator.webdriver`, headless/bot user agents
+— deploy screenshots made empty accounts in pairs) get no anonymous account.
+`lib/anonymous-cleanup.ts` runs via `after()` in the app layout (once a day
+per instance): deletes anonymous accounts with no words older than a day,
+and ones unused for 30 days. Real accounts are never touched. Pages in `(app)` use `currentUser()`, never a redirect to sign-in.
 
 **Typed-in words are the user's own facts.**
 The one exception to "dictionaries decide": `words/manual.ts` stores what
@@ -485,8 +489,6 @@ Run Node through `npm run …`: the project `.npmrc` sets
 - Hanja practice is plain flip cards (no schedule); `SHARES_HANJA`
   relations are still unused.
 - Billing: no plans shown anywhere; see PAYMENTS.md
-- Anonymous users that never sign up are never cleaned up (and now get the
-  starter categories, ~380 words each)
 - Email verification: off (needs a mail provider such as Resend + a domain)
 - The old 10-word starter deck (`starter-deck.ts`, "No words yet?" button)
   is superseded by the starter categories — new accounts are seeded before
