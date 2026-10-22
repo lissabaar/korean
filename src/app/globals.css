@@ -15,6 +15,11 @@
   --color-celadon-deep: #3c5f52;
   --color-clay: #a9643c;
   --color-clay-soft: #f5ebe4;
+  /* Large filled areas (the home "do this now" tile). In dark mode the
+     accent turns light for contrast on small text, which made a big tile
+     glare — so big fills get their own, dim colour. */
+  --color-hero: #3c5f52;
+  --color-hero-ink: #f3f5f3;
 
   --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
   --font-korean: var(--font-gowun), "Apple SD Gothic Neo", "Malgun Gothic", serif;
@@ -39,6 +44,8 @@
     --color-celadon-deep: #a8c9b9;
     --color-clay: #c9875f;
     --color-clay-soft: #30241d;
+    --color-hero: #2a4239;
+    --color-hero-ink: #e8ece9;
     color-scheme: dark;
   }
 }
@@ -54,6 +61,8 @@
     --color-celadon-deep: #a8c9b9;
     --color-clay: #c9875f;
     --color-clay-soft: #30241d;
+    --color-hero: #2a4239;
+    --color-hero-ink: #e8ece9;
     color-scheme: dark;
 }
 

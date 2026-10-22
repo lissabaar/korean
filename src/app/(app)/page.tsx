@@ -117,13 +117,13 @@ function Hero({ due, learning, nextDue, words }: { due: number; learning: number
   return (
     <Link
       href={action.href}
-      className="group col-span-2 flex flex-col justify-between rounded-2xl bg-celadon-deep p-6 text-paper lg:row-span-2"
+      className="group col-span-2 flex flex-col justify-between rounded-2xl bg-hero p-6 text-hero-ink lg:row-span-2"
     >
       <p className="text-sm opacity-80">Now</p>
       <div>
         <p className="text-6xl font-bold tabular-nums tracking-tight">{action.count}</p>
         <p className="mt-1 text-lg">{action.what}</p>
-        <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-paper/15 px-4 py-2 text-sm font-medium transition-colors group-hover:bg-paper/25">
+        <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-hero-ink/15 px-4 py-2 text-sm font-medium transition-colors group-hover:bg-hero-ink/25">
           {action.cta}
           <i className="bi bi-arrow-right" aria-hidden />
         </span>
