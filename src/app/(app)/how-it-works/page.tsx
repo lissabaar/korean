@@ -120,8 +120,8 @@ export default async function HowItWorksPage() {
         </h2>
         <p className="mt-2">
           Learn and Review work without a connection. Install the app on your phone, then open it once while
-          online — it keeps the reviews due in the next {OFFLINE_DAYS} days and a batch of new words on the
-          device. Offline, answers are saved on the phone and sent automatically the next time you are online;
+          online — it keeps the reviews due in the next {OFFLINE_DAYS} days and every word you have not started
+          yet on the device. Offline, answers are saved on the phone and sent automatically the next time you are online;
           the review schedule counts them at the time you answered.
         </p>
         <h3 className="mt-4 font-medium">1. Install the app</h3>
@@ -147,8 +147,8 @@ export default async function HowItWorksPage() {
         <ul className="mt-1 list-disc space-y-1 pl-5">
           <li>Learn and Review work as usual; a note at the top says you are offline.</li>
           <li>
-            Adding words, editing them, categories, statistics and hanja need a connection. Without new cards
-            from the server, a learning session has no replacement for a skipped word.
+            Adding words, editing them, categories, statistics and hanja need a connection. A skipped word gets
+            no replacement in the session until you are online.
           </li>
         </ul>
       </section>

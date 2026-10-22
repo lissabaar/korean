@@ -5,8 +5,9 @@
  *   1. sends answers made offline (POST /api/offline/sync) and drops the
  *      ones the server took;
  *   2. refreshes the offline pack (GET /api/offline/pack) — reviews due in
- *      the next days and new words — when it is missing, older than
- *      PACK_MAX_AGE, or right after a sync;
+ *      the next days and every word not started yet — when it is missing,
+ *      older than PACK_MAX_AGE, or right after a sync (answers given online
+ *      update the kept pack as they happen, so it does not go stale between);
  *   3. registers the service worker (public/sw.js) that keeps the app's pages
  *      and files, so the app opens without a connection at all.
  * Runs on every page load and again whenever the browser comes back online.
@@ -20,12 +21,22 @@ import { useEffect } from "react";
 import { dropEvents, loadPack, queuedEvents, savePack, setCurrentOfflineUser } from "@/lib/offline/store";
 import type { OfflinePack } from "@/lib/offline/types";
 
-/** A pack older than this is rebuilt on the next page load. */
-const PACK_MAX_AGE_MS = 15 * 60 * 1000;
+/**
+ * A pack older than this is rebuilt on the next page load. Hours, not
+ * minutes: the full pack (all new words, ~2 000 cards) takes the server
+ * seconds to build and is a few MB to download.
+ */
+const PACK_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export default function OfflineSync({ userId }: { userId: string }) {
   useEffect(() => {
     setCurrentOfflineUser(userId);
+    // The first version kept the pack in localStorage; it lives in IndexedDB now.
+    try {
+      localStorage.removeItem(`hangugo:offline-pack:${userId}`);
+    } catch {
+      // Storage blocked: nothing to clean.
+    }
     // Production only: in development the worker would serve stale code.
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js").catch(() => {
@@ -51,13 +62,13 @@ export default function OfflineSync({ userId }: { userId: string }) {
             synced = true;
           }
         }
-        const pack = loadPack(userId);
+        const pack = await loadPack(userId);
         const stale = !pack || Date.now() - Date.parse(pack.createdAt) > PACK_MAX_AGE_MS;
         // Never rebuild over unsent answers: the pack would bring back cards
         // already answered offline.
         if ((stale || synced) && queuedEvents(userId).length === 0) {
           const response = await fetch("/api/offline/pack");
-          if (response.ok) savePack((await response.json()) as OfflinePack);
+          if (response.ok) await savePack((await response.json()) as OfflinePack);
         }
       } catch {
         // Connection dropped mid-way: everything stays queued for next time.

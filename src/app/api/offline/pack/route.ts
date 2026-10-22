@@ -14,6 +14,9 @@ import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/session";
 import { buildOfflinePack } from "@/lib/offline/pack";
 
+// Every word not started yet: a couple of thousand cards with their options.
+export const maxDuration = 60;
+
 /** The current user's offline pack. */
 export async function GET() {
   const userId = await getUserId();

@@ -13,11 +13,14 @@ import type { PrismaClient } from "@prisma/client";
 import { buildSession } from "../review/queue";
 import type { OfflinePack } from "./types";
 
-/** How far ahead reviews are packed — a week covers a long trip. */
-export const OFFLINE_DAYS = 7;
-/** Caps that keep the pack a few hundred KB in localStorage. */
-const MAX_REVIEWS = 400;
-const NEW_WORDS = 40;
+/** How far ahead reviews are packed — a month covers a long trip. */
+export const OFFLINE_DAYS = 30;
+/**
+ * Caps: every word not started yet goes in (owner: "all of them", ~1 KB a
+ * card, kept in IndexedDB); the caps only guard against a runaway pack.
+ */
+const MAX_REVIEWS = 3000;
+const NEW_WORDS = 5000;
 
 /** Everything the phone needs for offline sessions, for this user. */
 export async function buildOfflinePack(prisma: PrismaClient, userId: string): Promise<OfflinePack> {

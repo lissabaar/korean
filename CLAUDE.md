@@ -382,9 +382,12 @@ tracking — only strictly necessary storage, so no cookie banner;
 
 **Offline study (learn + review with no connection).** `lib/offline`:
 while online, `<OfflineSync/>` (app layout) keeps an `OfflinePack` in
-localStorage per account (GET `/api/offline/pack`: reviews due in the next
-`OFFLINE_DAYS` (7) via `buildSession({ dueUntil })`, 40 new words, card
-settings; rebuilt when older than 15 min, never over unsent answers). When a
+IndexedDB per account (GET `/api/offline/pack`: reviews due in the next
+`OFFLINE_DAYS` (30) via `buildSession({ dueUntil })`, every word not started
+yet (owner: all of them — ~1 KB a card, too big for localStorage), card
+settings; rebuilt when older than 6 h or after a sync, never over unsent
+answers; answers given online update the kept pack as they happen). The
+queue stays in localStorage. When a
 fetch fails offline, Review.tsx studies from the pack, grades with
 `gradeOffline` (the server's own answer.ts / session.ts functions) and queues
 `OfflineEvent`s (answers, intro start/skip/known) with their time and a

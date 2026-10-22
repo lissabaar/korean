@@ -190,17 +190,16 @@ export default function Review({ mode }: { mode: StudyMode }) {
         setTextSize(typeof data.textSize === "number" ? data.textSize : 1);
         setLoad("ready");
       })
-      .catch((cause) => {
+      .catch(async (cause) => {
         // No connection: study from the cards kept on this device.
-        const items = isOfflineError(cause) ? offlineSession(mode) : null;
-        const pack = items ? loadPack() : null;
-        if (items && pack) {
+        const kept = isOfflineError(cause) ? await offlineSession(mode) : null;
+        if (kept) {
           setOffline(true);
-          setQueue(shuffle(items));
-          setTotal(items.length);
-          setAutoPlay(pack.autoPlay);
-          setMyMeaningFirst(pack.myMeaningFirst);
-          setTextSize(pack.textSize);
+          setQueue(shuffle(kept.items));
+          setTotal(kept.items.length);
+          setAutoPlay(kept.pack.autoPlay);
+          setMyMeaningFirst(kept.pack.myMeaningFirst);
+          setTextSize(kept.pack.textSize);
           setLoad("ready");
           return;
         }
@@ -263,7 +262,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       enqueue({ kind: "intro", cardId: item.cardId, action: "start" });
       setOffline(true);
     }
-    markIntroduced(item.senseId);
+    void markIntroduced(item.senseId);
     setIntroduced((set) => new Set(set).add(item.senseId));
     setQueue(([head, ...rest]) => {
       const at = requeueGap(rest.length);
@@ -299,7 +298,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       enqueue({ kind: "intro", cardId: item.cardId, action });
       setOffline(true);
     }
-    forgetCard(item.cardId);
+    void forgetCard(item.cardId);
     setQueue((items) => {
       const rest = items.filter((q) => q.senseId !== item.senseId);
       // Spread the newcomers through the rest of the session.
@@ -579,8 +578,8 @@ function Question({
       setError(null);
       /** Keep the offline pack in step: the card moved on or is done for now. */
       const track = (result: AnswerResult) => {
-        if (item.phase === "LEARNING" && !result.graduated) updateLearning(item, result.learningStreak);
-        else forgetCard(item.cardId);
+        if (item.phase === "LEARNING" && !result.graduated) void updateLearning(item, result.learningStreak);
+        else void forgetCard(item.cardId);
       };
       try {
         if (offline) throw new TypeError("offline");
@@ -605,7 +604,7 @@ function Question({
         if (isOfflineError(cause)) {
           // No connection: grade here with the same rules as the server,
           // queue the answer for it, carry on.
-          const result = gradeOffline(item, body, usedHint, loadPack()?.acceptTypos ?? false);
+          const result = gradeOffline(item, body, usedHint, (await loadPack())?.acceptTypos ?? false);
           enqueue({ kind: "answer", cardId: item.cardId, usedHint, ...body });
           track(result);
           setResult(result);

@@ -5,7 +5,8 @@
  * (pack.ts, sync.ts) and the browser (store.ts, Review.tsx) import it.
  *
  * Offline mode in short: while online, the browser keeps an OfflinePack —
- * reviews due in the coming days and some new words — in localStorage.
+ * reviews due in the coming days and every word not started yet — in
+ * IndexedDB.
  * Without a connection, Review.tsx studies from it, grades answers in the
  * browser (grade.ts) and queues them as OfflineEvents; once online again the
  * queue goes to POST /api/offline/sync, which applies each event with its
@@ -21,7 +22,7 @@ export interface OfflinePack {
   createdAt: string;
   /** Reviews due within OFFLINE_DAYS — each shown once its due time comes. */
   review: ReviewItem[];
-  /** New words for learning sessions. */
+  /** Every word not started yet (and ones in progress), for learning sessions. */
   learn: ReviewItem[];
   /** New words per learning session (User.newPerSession). */
   newPerSession: number;
