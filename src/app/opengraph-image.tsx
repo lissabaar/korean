@@ -8,9 +8,10 @@
  */
 
 import { ImageResponse } from "next/og";
-import { SITE_NAME } from "@/lib/site";
+import { SITE_NAME, SITE_TAGLINE } from "@/lib/site";
+import { appIcon } from "@/lib/app-icon";
 
-export const alt = `${SITE_NAME} — learn Korean words from what you read`;
+export const alt = `${SITE_NAME} — ${SITE_TAGLINE}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -30,7 +31,13 @@ export default function OpengraphImage() {
           color: "#1e2622",
         }}
       >
-        <div style={{ fontSize: 40, color: "#3c5f52" }}>{SITE_NAME}</div>
+        {/* The app icon and the name next to it. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <div style={{ display: "flex", width: 120, height: 120, borderRadius: 28, overflow: "hidden" }}>
+            {appIcon(120)}
+          </div>
+          <div style={{ display: "flex", fontSize: 72, color: "#3c5f52", letterSpacing: 2 }}>{SITE_NAME}</div>
+        </div>
         <div style={{ marginTop: 24, fontSize: 72, fontWeight: 700, lineHeight: 1.1 }}>
           Learn Korean words from what you actually read
         </div>

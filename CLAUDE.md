@@ -1,4 +1,12 @@
-# Korean vocabulary app
+# INLEX — Korean vocabulary app
+
+**INLEX** (written in caps; chosen 2026-10-23 after checking app stores and
+the web for clashes in language learning — `lib/site.ts` SITE_NAME). The
+icon (`lib/app-icon.tsx`, drawn as SVG for every size: tab icon, home-screen
+icons, apple-icon, link preview) is a bold "in" over a highlighter stroke;
+the wordmark is `components/Logo.tsx`. Internal names (storage keys, the
+anonymous e-mail domain, the repo) keep "hangugo" — renaming them would drop
+data kept on phones.
 
 Flashcard app for learning Korean. Paste text → AI extracts words → dictionary
 looks them up → spaced repetition schedules reviews.

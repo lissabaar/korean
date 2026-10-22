@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useOnline } from "@/lib/offline/online";
+import Logo from "./Logo";
 
 /** Fired on window when a nav link to the current page is clicked; detail = href. */
 export const SAME_PAGE_EVENT = "hangugo:same-page";
@@ -52,8 +53,8 @@ export default function Nav({ email }: { email: string | null }) {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-10 border-b border-line bg-paper/90 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
-        <Link href="/" className="korean mr-2 text-xl text-celadon-deep" aria-label="Home">
-          단어
+        <Link href="/" className="mr-2" aria-label="Home">
+          <Logo />
         </Link>
         {LINKS.filter((link) => online || link.offline).map((link) => (
           <NavLink key={link.href} link={link} pathname={pathname} />

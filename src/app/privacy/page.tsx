@@ -9,6 +9,7 @@
  */
 
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata = { title: "Privacy" };
@@ -19,8 +20,8 @@ export default function PrivacyPage() {
   const p = "mt-2 text-muted";
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6">
-      <Link href="/" className="korean text-xl text-celadon-deep">
-        단어
+      <Link href="/" aria-label="Home">
+        <Logo />
       </Link>
       <h1 className="mt-4 text-2xl font-bold tracking-tight">Privacy</h1>
       <p className={p}>

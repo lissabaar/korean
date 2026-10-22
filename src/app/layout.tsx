@@ -12,7 +12,7 @@ import type { Metadata, Viewport } from "next";
 import { Gowun_Batang, Public_Sans } from "next/font/google";
 import "bootstrap-icons/font/bootstrap-icons.min.css";
 import "./globals.css";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -35,7 +35,7 @@ const gowun = Gowun_Batang({
  */
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: `${SITE_NAME} — learn Korean words from what you read`, template: `%s · ${SITE_NAME}` },
+  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s · ${SITE_NAME}` },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   keywords: ["Korean", "learn Korean", "Korean vocabulary", "flashcards", "spaced repetition", "Anki", "KRDict", "한국어"],
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: `${SITE_NAME} — learn Korean words from what you read`,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
     url: "/",
     locale: "en_US",

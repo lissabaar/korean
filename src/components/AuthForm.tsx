@@ -15,6 +15,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import { signIn, signUp } from "@/lib/auth-client";
 
 /**
@@ -63,7 +64,9 @@ export default function AuthForm({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
-      <p className="korean mb-3 text-5xl text-celadon-deep">단어</p>
+      <p className="mb-4">
+        <Logo size="lg" />
+      </p>
       <h1 className="mb-1 text-2xl font-bold tracking-tight">
         {isSignUp ? "Make an account" : "Sign in"}
       </h1>

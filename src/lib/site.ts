@@ -4,7 +4,16 @@
  * and the landing page. Safe to import anywhere (no secrets).
  */
 
-export const SITE_NAME = "Korean vocabulary";
+/**
+ * The app's name (chosen 2026-10-23, checked against app stores and the web
+ * for clashes in language learning). Written in caps. Internal names —
+ * storage keys, the anonymous accounts' e-mail domain — keep "hangugo" on
+ * purpose: renaming them would drop data kept on phones.
+ */
+export const SITE_NAME = "INLEX";
+
+/** What it is, in a few words: the title's second half and the tagline. */
+export const SITE_TAGLINE = "learn Korean words from what you read";
 
 export const SITE_DESCRIPTION =
   "Learn Korean words from what you actually read. Paste a text, a screenshot, subtitles or an Anki deck: the AI finds the words, the Korean learners' dictionary checks them, and spaced repetition keeps them.";
