@@ -5,9 +5,12 @@
  * app layout (production only). The browser runs it in the background and
  * routes the site's requests through the "fetch" handler below.
  *
- *   - Pages (Home, Learn, Review …): network first; every page that loads is
- *     kept, together with the script and style files it refers to. Offline,
- *     the kept copy is served — or the Review page as a fallback.
+ *   - Pages (Home, Learn, Review …): network first, but a page with a kept
+ *     copy waits for the network at most NAVIGATION_WAIT_MS — then the copy
+ *     is shown (a hanging request on plane Wi-Fi or a weak signal used to
+ *     leave the app on a blank screen). Every page that loads is kept,
+ *     together with the script and style files it refers to. Offline, the
+ *     kept copy is served — or the Review page as a fallback.
  *   - Built files (/_next/static, fonts): cache first — their names change
  *     with every deploy, so a kept file is never out of date.
  *   - API calls are never cached here: offline study uses the card pack the
@@ -18,7 +21,14 @@
 
 const CACHE = "hangugo-v1";
 /** Pages kept right away, so offline study works even before visiting them. */
-const PAGES = ["/", "/learn", "/review"];
+const PAGES = ["/", "/learn", "/review", "/how-it-works"];
+/** How long a page with a kept copy waits for the network. */
+const NAVIGATION_WAIT_MS = 3000;
+
+/** A promise that fails after `ms` — raced against a slow fetch. */
+function timeout(ms) {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms));
+}
 
 /** Keep a page and every /_next/static file its HTML refers to. */
 async function keepPage(cache, url, response) {
@@ -93,13 +103,20 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE);
-        try {
-          const response = await fetch(request);
+        const kept = await cache.match(url.pathname);
+        // Known offline: the copy at once, no waiting.
+        if (kept && self.navigator && self.navigator.onLine === false) return kept;
+        const network = fetch(request).then((response) => {
           if (response.ok) event.waitUntil(keepPage(cache, url.pathname, response.clone()));
           return response;
+        });
+        // Keep the page fresh even when the copy is shown this time.
+        event.waitUntil(network.catch(() => undefined));
+        try {
+          return await (kept ? Promise.race([network, timeout(NAVIGATION_WAIT_MS)]) : network);
         } catch {
           return (
-            (await cache.match(url.pathname)) ||
+            kept ||
             (await cache.match("/review")) ||
             new Response("Offline — open the app once with a connection first.", {
               status: 503,

@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useOnline } from "@/lib/offline/online";
 
 /** Fired on window when a nav link to the current page is clicked; detail = href. */
 export const SAME_PAGE_EVENT = "hangugo:same-page";
@@ -22,14 +23,16 @@ interface NavItem {
   /** Bootstrap Icons class — or `glyph`, a character shown as the icon. */
   icon?: string;
   glyph?: string;
+  /** Works offline (kept pages + the offline card pack); the rest is hidden then. */
+  offline?: boolean;
 }
 
 /** Left to right: home and how it works first (owner's order), then the rest. */
 const LINKS: NavItem[] = [
-  { href: "/", label: "Home", icon: "bi-house" },
-  { href: "/how-it-works", label: "How it works", icon: "bi-info-circle" },
-  { href: "/learn", label: "Learn", icon: "bi-stars" },
-  { href: "/review", label: "Review", icon: "bi-arrow-repeat" },
+  { href: "/", label: "Home", icon: "bi-house", offline: true },
+  { href: "/how-it-works", label: "How it works", icon: "bi-info-circle", offline: true },
+  { href: "/learn", label: "Learn", icon: "bi-stars", offline: true },
+  { href: "/review", label: "Review", icon: "bi-arrow-repeat", offline: true },
   { href: "/add", label: "Add", icon: "bi-plus-lg" },
   { href: "/categories", label: "Categories", icon: "bi-grid" },
   { href: "/stats", label: "Statistics", icon: "bi-bar-chart" },
@@ -43,15 +46,24 @@ const SETTINGS: NavItem = { href: "/settings", label: "Settings", icon: "bi-gear
 /** `email` is null for a visitor without an account. */
 export default function Nav({ email }: { email: string | null }) {
   const pathname = usePathname();
+  // Offline, pages that need the server (Add, Categories, Statistics, Hanja,
+  // Settings) are hidden instead of failing to open; a cloud mark says why.
+  const online = useOnline();
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-10 border-b border-line bg-paper/90 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
         <Link href="/" className="korean mr-2 text-xl text-celadon-deep" aria-label="Home">
           단어
         </Link>
-        {LINKS.map((link) => (
+        {LINKS.filter((link) => online || link.offline).map((link) => (
           <NavLink key={link.href} link={link} pathname={pathname} />
         ))}
+        {!online && (
+          <span className="ml-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted" title="No connection: Learn and Review work from the cards kept on this device">
+            <i className="bi bi-cloud-slash" aria-hidden />
+            <span className="hidden sm:inline">Offline</span>
+          </span>
+        )}
         <div className="ml-auto flex items-center">
           {email === null ? (
             // No account yet. Sign-in links to sign-up, and either way the words
@@ -64,7 +76,7 @@ export default function Nav({ email }: { email: string | null }) {
               <span className="hidden sm:inline">Sign in</span>
             </Link>
           ) : null}
-          <NavLink link={SETTINGS} pathname={pathname} />
+          {online && <NavLink link={SETTINGS} pathname={pathname} />}
         </div>
       </nav>
     </header>

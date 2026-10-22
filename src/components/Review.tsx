@@ -35,6 +35,7 @@ import {
   updateLearning,
 } from "@/lib/offline/store";
 import { gradeOffline } from "@/lib/offline/grade";
+import { fetchWithTimeout, isOnline, markOffline, markOnline } from "@/lib/offline/online";
 import SpeakButton, { speakKorean } from "./SpeakButton";
 import WordEditor from "./WordEditor";
 
@@ -177,10 +178,13 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/review/session?mode=${mode}`)
+    // Known offline: straight to the kept cards. Otherwise the server gets a
+    // few seconds — a hanging request used to keep the screen empty.
+    (isOnline() ? fetchWithTimeout(`/api/review/session?mode=${mode}`, {}, 5000) : Promise.reject(new TypeError("offline")))
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not load reviews.");
+        markOnline();
         setQueue(shuffle(data.items));
         setTotal(data.items.length);
         setStats(data.stats);
@@ -193,6 +197,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       .catch(async (cause) => {
         // No connection: study from the cards kept on this device.
         const kept = isOfflineError(cause) ? await offlineSession(mode) : null;
+        if (isOfflineError(cause)) markOffline();
         if (kept) {
           setOffline(true);
           setQueue(shuffle(kept.items));
@@ -250,7 +255,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
     setEditing(null);
     try {
       if (offline) throw new TypeError("offline");
-      const response = await fetch("/api/review/intro", {
+      const response = await fetchWithTimeout("/api/review/intro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardId: item.cardId, action: "start" }),
@@ -261,6 +266,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       if (!isOfflineError(cause)) throw cause;
       enqueue({ kind: "intro", cardId: item.cardId, action: "start" });
       setOffline(true);
+      markOffline();
     }
     void markIntroduced(item.senseId);
     setIntroduced((set) => new Set(set).add(item.senseId));
@@ -280,7 +286,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
     let replacement: ReviewItem[] = [];
     try {
       if (offline) throw new TypeError("offline");
-      const response = await fetch("/api/review/intro", {
+      const response = await fetchWithTimeout("/api/review/intro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -297,6 +303,7 @@ export default function Review({ mode }: { mode: StudyMode }) {
       if (!isOfflineError(cause)) throw cause;
       enqueue({ kind: "intro", cardId: item.cardId, action });
       setOffline(true);
+      markOffline();
     }
     void forgetCard(item.cardId);
     setQueue((items) => {
@@ -583,7 +590,7 @@ function Question({
       };
       try {
         if (offline) throw new TypeError("offline");
-        const response = await fetch("/api/review/answer", {
+        const response = await fetchWithTimeout("/api/review/answer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cardId: item.cardId, usedHint, ...body }),
@@ -609,6 +616,7 @@ function Question({
           track(result);
           setResult(result);
           onOffline?.();
+          markOffline();
           if (autoPlay) speakKorean(item.back.lemma);
         } else {
           setError(cause instanceof Error ? cause.message : "Could not save that answer.");

@@ -402,6 +402,11 @@ service worker (`public/sw.js`, production only) keeps pages + their
 /_next/static files so the app opens offline; `app/manifest.ts`,
 `/pwa-icon/[size]`, `app/apple-icon.tsx` make it installable. Adding words,
 editing, categories, stats and hanja need a connection.
+Never wait long for the server: `lib/offline/online.ts` (`isOnline`,
+`fetchWithTimeout`, mark* from Review.tsx) — known offline skips the request,
+otherwise 4–5 s then the kept cards; the service worker shows a kept page
+after 3 s. Offline, the nav hides Add, Categories, Statistics, Hanja and
+Settings (`useOnline`).
 
 **Layout.** Every app page is `<main className="mx-auto max-w-6xl px-4 … sm:px-6">`
 — the nav's width (owner: one wide width for all pages); only the sign-in /
