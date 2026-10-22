@@ -613,3 +613,14 @@ model HanjaChar {
   // English meaning from Unihan; null when Unihan has none.
   definition String?
 }
+
+// Answers and intro choices made offline (lib/offline), by the id the
+// browser gave each one. A sync that is retried — the connection dropped
+// before the reply — must not apply an answer twice (FSRS would count it).
+model OfflineEvent {
+  id          String   @id
+  userId      String
+  processedAt DateTime @default(now())
+
+  @@index([userId])
+}

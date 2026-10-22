@@ -81,6 +81,11 @@ export async function submitAnswer(
   prisma: PrismaClient,
   userId: string,
   input: AnswerInput,
+  /**
+   * `now`: when the answer was given. Answers made offline (lib/offline) are
+   * applied later with their real time, so FSRS sees the true gaps.
+   */
+  options: { now?: Date } = {},
 ): Promise<AnswerResult> {
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, userId },
@@ -113,7 +118,7 @@ export async function submitAnswer(
   const { sense } = card;
   const { entry } = sense;
   const exercise = pickExercise(card, card.user.learningGoal);
-  const now = new Date();
+  const now = options.now ?? new Date();
 
   // ---------------------------------------------------------------- grade
 

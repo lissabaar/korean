@@ -237,6 +237,28 @@ try {
     }
   });
 
+  // ------------------------------------------------------------ 7b. offline: pack, sync once
+  await scenario("offline study", async () => {
+    const { buildOfflinePack } = await import("../src/lib/offline/pack.ts");
+    const { applyOfflineEvents } = await import("../src/lib/offline/sync.ts");
+    const pack = await buildOfflinePack(prisma, userId);
+    check("offline pack has new words and settings", pack.learn.length > 0 && typeof pack.acceptTypos === "boolean" && pack.learn.every((i: any) => i.due), `${pack.learn.length} new, ${pack.review.length} reviews`);
+    const item = pack.learn.find((i: any) => i.intro) ?? pack.learn[0];
+    const before = await prisma.card.findUnique({ where: { id: item.cardId } });
+    const at = new Date(Date.now() - 3600_000).toISOString();
+    const events = [
+      { id: `t-${item.cardId}-intro`, kind: "intro", cardId: item.cardId, at, action: "start" },
+      { id: `t-${item.cardId}-a1`, kind: "answer", cardId: item.cardId, at, answer: item.back.lemma },
+    ];
+    const first = await applyOfflineEvents(prisma, userId, events);
+    const after = await prisma.card.findUnique({ where: { id: item.cardId } });
+    check("offline answers applied with their own time", first.applied === 2 && after.learningStreak === before.learningStreak + 1 && after.introducedAt?.toISOString() === at, `${JSON.stringify(first)} streak ${after.learningStreak}`);
+    const again = await applyOfflineEvents(prisma, userId, events);
+    const still = await prisma.card.findUnique({ where: { id: item.cardId } });
+    check("a retried sync applies nothing twice", again.applied === 0 && again.skipped === 2 && still.learningStreak === after.learningStreak, JSON.stringify(again));
+    await prisma.offlineEvent.deleteMany({ where: { userId } });
+  });
+
   // ------------------------------------------------------------ 8. reviews, stats, background jobs
   await scenario("review + stats", async () => {
     await prisma.card.updateMany({ where: { userId, phase: "SCHEDULED" }, data: { due: new Date(Date.now() - 1000) } });

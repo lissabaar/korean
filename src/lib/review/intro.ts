@@ -31,7 +31,15 @@ export class IntroCardNotFoundError extends Error {}
 export async function introduceWord(
   prisma: PrismaClient,
   userId: string,
-  input: { cardId: string; action: IntroAction; sessionSenseIds?: string[] },
+  input: {
+    cardId: string;
+    action: IntroAction;
+    sessionSenseIds?: string[];
+    /** When it happened — an offline action synced later keeps its time. */
+    at?: Date;
+    /** No replacement cards (the offline sync has no session to fill). */
+    noReplacement?: boolean;
+  },
 ): Promise<{ replacement: ReviewItem[] }> {
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, userId, phase: "LEARNING" },
@@ -39,7 +47,7 @@ export async function introduceWord(
   });
   if (!card) throw new IntroCardNotFoundError(`No learning card ${input.cardId}`);
 
-  const now = new Date();
+  const now = input.at ?? new Date();
   if (input.action === "start") {
     await prisma.card.updateMany({
       where: { userId, senseId: card.senseId, introducedAt: null },
@@ -70,6 +78,7 @@ export async function introduceWord(
       data: { snoozedUntil: new Date(now.getTime() + SKIP_DAYS * day) },
     });
   }
+  if (input.noReplacement) return { replacement: [] };
   // Keep the session the size it was: bring in the next new word instead.
   const replacement = await buildSession(prisma, userId, "learn", {
     excludeSenseIds: [...new Set([...(input.sessionSenseIds ?? []), card.senseId])],

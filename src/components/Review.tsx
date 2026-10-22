@@ -25,6 +25,16 @@ import type { AnswerResult } from "@/lib/review/submit";
 import { stepsToLearn, typedFromStreak } from "@/lib/review/steps";
 import { levelLabel, posLabel } from "@/lib/dictionary/labels";
 import type { WordDetails } from "@/lib/words/edit";
+import {
+  enqueue,
+  forgetCard,
+  isOfflineError,
+  loadPack,
+  markIntroduced,
+  offlineSession,
+  updateLearning,
+} from "@/lib/offline/store";
+import { gradeOffline } from "@/lib/offline/grade";
 import SpeakButton, { speakKorean } from "./SpeakButton";
 import WordEditor from "./WordEditor";
 
@@ -159,6 +169,12 @@ export default function Review({ mode }: { mode: StudyMode }) {
   const [myMeaningFirst, setMyMeaningFirst] = useState(false);
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
   const [textSize, setTextSize] = useState(1);
+  /**
+   * No connection: the session comes from the offline pack and answers are
+   * graded on the device and queued (lib/offline); <OfflineSync/> sends them
+   * once online again.
+   */
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     fetch(`/api/review/session?mode=${mode}`)
@@ -175,7 +191,26 @@ export default function Review({ mode }: { mode: StudyMode }) {
         setLoad("ready");
       })
       .catch((cause) => {
-        setError(cause instanceof Error ? cause.message : "Could not load reviews.");
+        // No connection: study from the cards kept on this device.
+        const items = isOfflineError(cause) ? offlineSession(mode) : null;
+        const pack = items ? loadPack() : null;
+        if (items && pack) {
+          setOffline(true);
+          setQueue(shuffle(items));
+          setTotal(items.length);
+          setAutoPlay(pack.autoPlay);
+          setMyMeaningFirst(pack.myMeaningFirst);
+          setTextSize(pack.textSize);
+          setLoad("ready");
+          return;
+        }
+        setError(
+          isOfflineError(cause)
+            ? "You are offline, and no cards are saved on this device yet. Open the app once with a connection: it keeps the next days' cards for offline study."
+            : cause instanceof Error
+              ? cause.message
+              : "Could not load reviews.",
+        );
         setLoad("error");
       });
   }, [mode]);
@@ -214,12 +249,21 @@ export default function Review({ mode }: { mode: StudyMode }) {
   /** "Start learning": the word joins the drill a few cards later. */
   async function startWord(item: ReviewItem) {
     setEditing(null);
-    const response = await fetch("/api/review/intro", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cardId: item.cardId, action: "start" }),
-    });
-    if (!response.ok) throw new Error((await response.json()).error ?? "Could not save that.");
+    try {
+      if (offline) throw new TypeError("offline");
+      const response = await fetch("/api/review/intro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: item.cardId, action: "start" }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Could not save that.");
+    } catch (cause) {
+      // Offline: remembered on the device, sent later.
+      if (!isOfflineError(cause)) throw cause;
+      enqueue({ kind: "intro", cardId: item.cardId, action: "start" });
+      setOffline(true);
+    }
+    markIntroduced(item.senseId);
     setIntroduced((set) => new Set(set).add(item.senseId));
     setQueue(([head, ...rest]) => {
       const at = requeueGap(rest.length);
@@ -234,18 +278,28 @@ export default function Review({ mode }: { mode: StudyMode }) {
    */
   async function skipWord(item: ReviewItem, action: "skip" | "known" = "skip") {
     setEditing(null);
-    const response = await fetch("/api/review/intro", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cardId: item.cardId,
-        action,
-        sessionSenseIds: [...new Set(queue.map((q) => q.senseId))],
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? "Could not save that.");
-    const replacement: ReviewItem[] = data.replacement ?? [];
+    let replacement: ReviewItem[] = [];
+    try {
+      if (offline) throw new TypeError("offline");
+      const response = await fetch("/api/review/intro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cardId: item.cardId,
+          action,
+          sessionSenseIds: [...new Set(queue.map((q) => q.senseId))],
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not save that.");
+      replacement = data.replacement ?? [];
+    } catch (cause) {
+      // Offline: remembered and sent later; no replacement word until then.
+      if (!isOfflineError(cause)) throw cause;
+      enqueue({ kind: "intro", cardId: item.cardId, action });
+      setOffline(true);
+    }
+    forgetCard(item.cardId);
     setQueue((items) => {
       const rest = items.filter((q) => q.senseId !== item.senseId);
       // Spread the newcomers through the rest of the session.
@@ -379,6 +433,12 @@ export default function Review({ mode }: { mode: StudyMode }) {
             style={{ width: `${Math.round(progress * 100)}%` }}
           />
         </div>
+        {offline && (
+          <p className="mt-2 flex items-center gap-2 rounded-xl bg-celadon-soft px-3 py-2 text-xs text-celadon-deep">
+            <i className="bi bi-cloud-slash" aria-hidden />
+            Offline. Your answers are kept on this device and sent when you are back online.
+          </p>
+        )}
       </div>
 
       <TextSizeContext.Provider value={TEXT_SIZES[textSize] ?? TEXT_SIZES[1]}>
@@ -401,6 +461,8 @@ export default function Review({ mode }: { mode: StudyMode }) {
           autoPlay={autoPlay}
           onEdit={() => setEditing(current.entryId)}
           editing={editing === current.entryId}
+          offline={offline}
+          onOffline={() => setOffline(true)}
         />
       )}
 
@@ -479,6 +541,8 @@ function Question({
   autoPlay,
   onEdit,
   editing = false,
+  offline = false,
+  onOffline,
 }: {
   item: ReviewItem;
   onDone: (r: AnswerResult) => void;
@@ -490,6 +554,10 @@ function Question({
    * pressing it instead of Save (the pinned bar is right there) lost the edit.
    */
   editing?: boolean;
+  /** Offline session: grade on the device right away (no request to wait for). */
+  offline?: boolean;
+  /** An answer could not reach the server: the session is offline from now on. */
+  onOffline?: () => void;
 }) {
   const [result, setResult] = useState<AnswerResult | null>(null);
   // The card text size (Settings) also sizes the answer field and options.
@@ -509,7 +577,13 @@ function Question({
     async (body: { answer?: string; knewIt?: boolean }) => {
       setBusy(true);
       setError(null);
+      /** Keep the offline pack in step: the card moved on or is done for now. */
+      const track = (result: AnswerResult) => {
+        if (item.phase === "LEARNING" && !result.graduated) updateLearning(item, result.learningStreak);
+        else forgetCard(item.cardId);
+      };
       try {
+        if (offline) throw new TypeError("offline");
         const response = await fetch("/api/review/answer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -524,15 +598,27 @@ function Question({
         }
         if (!response.ok) throw new Error(data.error ?? "Could not save that answer.");
         setResult(data);
+        track(data);
         // Hear the word right after answering, while it is on screen.
         if (autoPlay) speakKorean(item.back.lemma);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not save that answer.");
+        if (isOfflineError(cause)) {
+          // No connection: grade here with the same rules as the server,
+          // queue the answer for it, carry on.
+          const result = gradeOffline(item, body, usedHint, loadPack()?.acceptTypos ?? false);
+          enqueue({ kind: "answer", cardId: item.cardId, usedHint, ...body });
+          track(result);
+          setResult(result);
+          onOffline?.();
+          if (autoPlay) speakKorean(item.back.lemma);
+        } else {
+          setError(cause instanceof Error ? cause.message : "Could not save that answer.");
+        }
       } finally {
         setBusy(false);
       }
     },
-    [item.cardId, usedHint, autoPlay, item.back.lemma],
+    [item, usedHint, autoPlay, offline, onOffline],
   );
 
   const choose = useCallback(

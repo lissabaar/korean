@@ -380,6 +380,22 @@ description; root metadata has a title template, Open Graph and canonical;
 tracking — only strictly necessary storage, so no cookie banner;
 `/privacy` must stay true when that changes.
 
+**Offline study (learn + review with no connection).** `lib/offline`:
+while online, `<OfflineSync/>` (app layout) keeps an `OfflinePack` in
+localStorage per account (GET `/api/offline/pack`: reviews due in the next
+`OFFLINE_DAYS` (7) via `buildSession({ dueUntil })`, 40 new words, card
+settings; rebuilt when older than 15 min, never over unsent answers). When a
+fetch fails offline, Review.tsx studies from the pack, grades with
+`gradeOffline` (the server's own answer.ts / session.ts functions) and queues
+`OfflineEvent`s (answers, intro start/skip/known) with their time and a
+random id. Back online, POST `/api/offline/sync` applies them oldest first
+with `submitAnswer(…, { now })` / `introduceWord({ at })` — re-graded from the
+card rows — and the `OfflineEvent` table makes each id apply once. The
+service worker (`public/sw.js`, production only) keeps pages + their
+/_next/static files so the app opens offline; `app/manifest.ts`,
+`/pwa-icon/[size]`, `app/apple-icon.tsx` make it installable. Adding words,
+editing, categories, stats and hanja need a connection.
+
 **Layout.** Every app page is `<main className="mx-auto max-w-6xl px-4 … sm:px-6">`
 — the nav's width (owner: one wide width for all pages); only the sign-in /
 sign-up forms stay narrow. Cards and panels are `rounded-2xl` with a hairline

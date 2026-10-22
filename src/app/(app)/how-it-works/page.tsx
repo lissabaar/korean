@@ -17,6 +17,7 @@ import { KNOWN_FIRST_REVIEW_DAYS, SKIP_DAYS } from "@/lib/review/intro";
 import { clampMasteredAfterDays, MASTERY_STREAK } from "@/lib/review/mastery";
 import { CHOICE_REVIEWS_BEFORE_TYPING, clampLearningGoal } from "@/lib/review/session";
 import { PICKS_AFTER_TYPING_MISS, stepsToLearn, typedFromStreak } from "@/lib/review/steps";
+import { OFFLINE_DAYS } from "@/lib/offline/pack";
 
 // Lives in the app (it shows the user's own numbers): kept out of search results.
 export const metadata = { title: "How learning works", robots: { index: false } };
@@ -108,6 +109,49 @@ export default async function HowItWorksPage() {
           the word back to review.
         </p>
       </Stage>
+
+      {/* Offline: how to install the app and get cards onto the phone first.
+          Matches lib/offline (OFFLINE_DAYS of reviews, 40 new words) and
+          public/sw.js. */}
+      <section id="offline" className="mt-6 scroll-mt-20 rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed">
+        <h2 className="flex items-center gap-2 text-base font-medium">
+          <i className="bi bi-airplane text-celadon-deep" aria-hidden />
+          Studying offline — on a plane, in the metro
+        </h2>
+        <p className="mt-2">
+          Learn and Review work without a connection. Install the app on your phone, then open it once while
+          online — it keeps the reviews due in the next {OFFLINE_DAYS} days and a batch of new words on the
+          device. Offline, answers are saved on the phone and sent automatically the next time you are online;
+          the review schedule counts them at the time you answered.
+        </p>
+        <h3 className="mt-4 font-medium">1. Install the app</h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          <li>
+            <b>iPhone / iPad (Safari):</b> open this site, tap Share <i className="bi bi-box-arrow-up" aria-hidden /> →
+            “Add to Home Screen” → Add.
+          </li>
+          <li>
+            <b>Android (Chrome):</b> menu <i className="bi bi-three-dots-vertical" aria-hidden /> → “Install app” (or
+            “Add to Home screen”).
+          </li>
+          <li>
+            <b>Computer (Chrome, Edge):</b> the install icon at the right end of the address bar, or menu → “Install”.
+          </li>
+        </ul>
+        <h3 className="mt-4 font-medium">2. Before you go</h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          <li>Open the installed app while you still have a connection, and open Learn and Review once.</li>
+          <li>That is all: the cards are refreshed every time you use the app online.</li>
+        </ul>
+        <h3 className="mt-4 font-medium">3. Offline</h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          <li>Learn and Review work as usual; a note at the top says you are offline.</li>
+          <li>
+            Adding words, editing them, categories, statistics and hanja need a connection. Without new cards
+            from the server, a learning session has no replacement for a skipped word.
+          </li>
+        </ul>
+      </section>
 
       <div className="mt-8 flex flex-wrap gap-3 text-sm">
         <Link href="/stats" className="rounded-md bg-celadon-deep px-4 py-2.5 font-medium text-paper">

@@ -170,6 +170,11 @@ export interface ReviewItem {
   learningStreak: number;
   /** Correct answers in a row this user needs to learn a word. */
   learningGoal: number;
+  /**
+   * When the card is due (ISO). An offline pack (lib/offline) holds reviews
+   * due in the coming days; the browser shows each once its time comes.
+   */
+  due: string;
 
   /** Options for CHOICE. Null means the deck is too small: self-graded. */
   choices: string[] | null;
@@ -278,6 +283,10 @@ export interface SessionOptions {
   excludeSenseIds?: string[];
   /** Override the number of new-word cards. */
   newLimit?: number;
+  /** Reviews due up to this time (default: now) — the offline pack looks days ahead. */
+  dueUntil?: Date;
+  /** Cap on reviews (default REVIEWS_PER_SESSION). */
+  reviewLimit?: number;
 }
 
 /**
@@ -296,10 +305,10 @@ export async function buildSession(
 
   const [scheduled, learning] = await Promise.all([
     mode === "learn" ? [] : mode === "mastered" ? pickLearningCards(prisma, mastered, MASTERED_PER_SESSION) : prisma.card.findMany({
-      where: { ...review, due: { lte: now } },
+      where: { ...review, due: { lte: options.dueUntil ?? now } },
       include: cardInclude,
       orderBy: { due: "asc" },
-      take: REVIEWS_PER_SESSION,
+      take: options.reviewLimit ?? REVIEWS_PER_SESSION,
     }),
     mode === "review" || mode === "mastered"
       ? []
@@ -369,6 +378,7 @@ export async function buildSession(
 
     return {
       cardId: card.id,
+      due: card.due.toISOString(),
       senseId: sense.id,
       entryId: entry.id,
       categories: entry.categories.map((c) => c.category.name).sort(),

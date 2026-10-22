@@ -15,6 +15,7 @@ import Nav from "@/components/Nav";
 import Landing from "@/components/Landing";
 import StartAnonymous from "@/components/StartAnonymous";
 import StarterSeed from "@/components/StarterSeed";
+import OfflineSync from "@/components/OfflineSync";
 import { prisma } from "@/lib/clients";
 import { currentUser } from "@/lib/session";
 import { needsStarterCategories } from "@/lib/words/starter-seed";
@@ -35,6 +36,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       {needsStarter && <StarterSeed />}
+      {/* Keeps cards and the app itself on the device for offline study. */}
+      <OfflineSync userId={user.id} />
       <Nav email={user.isAnonymous ? null : user.email} />
       {children}
       {/* Required by the dictionary's licence (CC BY-SA 2.0 KR): name the source. */}

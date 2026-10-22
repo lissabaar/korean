@@ -327,6 +327,17 @@ export default function SettingsPanel({
       </section>
 
       <section className={section}>
+        <h2 className="font-medium">Use it offline</h2>
+        <p className="mt-1 text-sm text-muted">
+          Install the app on your phone and Learn and Review keep working without a connection — on a plane, in
+          the metro. Answers sync when you are back online.
+        </p>
+        <Link href="/how-it-works#offline" className="mt-3 inline-block text-sm text-celadon-deep underline underline-offset-4">
+          How to install and use it offline
+        </Link>
+      </section>
+
+      <section className={section}>
         <h2 className="font-medium">Theme</h2>
         <p className="mt-1 text-sm text-muted">Light or dark, or the same as this phone or computer. Saved in this browser.</p>
         <div className="mt-3">
