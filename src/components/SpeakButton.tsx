@@ -26,18 +26,48 @@ function koreanVoice(): SpeechSynthesisVoice | undefined {
 }
 
 /**
- * Say a Korean word aloud with the browser's voice (cancels whatever is still
- * speaking). Does nothing where speech is not supported.
+ * iPhone (Safari and the installed app) speaks only after speech was started
+ * once from a tap. Auto-play after an answer comes after a server request,
+ * no longer "inside" the tap, and stayed silent. So the first tap or key
+ * press anywhere starts a silent utterance, which unlocks speech for the rest
+ * of the visit.
+ */
+if (typeof window !== "undefined" && "speechSynthesis" in window) {
+  const unlock = () => {
+    const silent = new SpeechSynthesisUtterance(" ");
+    silent.volume = 0;
+    window.speechSynthesis.speak(silent);
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
+/**
+ * Say a Korean word aloud with the browser's voice. Does nothing where speech
+ * is not supported.
+ *
+ * Only what is still speaking is cancelled, and then the new word starts a
+ * moment later: on iPhone, cancel() followed at once by speak() often says
+ * nothing at all (a WebKit bug) — that was the "no sound" in the app.
  */
 export function speakKorean(text: string): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
+  const synth = window.speechSynthesis;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "ko-KR";
   const voice = koreanVoice();
   if (voice) utterance.voice = voice;
   utterance.rate = 0.9;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  // Chrome can be left paused (e.g. after the tab was in the background).
+  synth.resume();
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+    setTimeout(() => synth.speak(utterance), 80);
+  } else {
+    synth.speak(utterance);
+  }
 }
 
 const subscribe = () => () => {};

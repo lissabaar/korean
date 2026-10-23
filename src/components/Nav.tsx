@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useOnline } from "@/lib/offline/online";
 import Logo from "./Logo";
 
@@ -50,6 +51,25 @@ export default function Nav({ email }: { email: string | null }) {
   // Offline, pages that need the server (Add, Categories, Statistics, Hanja,
   // Settings) are hidden instead of failing to open; a cloud mark says why.
   const online = useOnline();
+  // The link just tapped, until its page shows: its icon turns into a spinner
+  // at once, so a slow page (offline, weak signal) does not look frozen.
+  const [pending, setPending] = useState<string | null>(null);
+  // A new page is on screen: the wait is over. (Reset during render when the
+  // path changes — React's pattern for state derived from a prop.)
+  const [shownPath, setShownPath] = useState(pathname);
+  if (shownPath !== pathname) {
+    setShownPath(pathname);
+    setPending(null);
+  }
+  // Safety net: a navigation that never finishes does not spin forever.
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setPending(null), 15000);
+    return () => clearTimeout(timer);
+  }, [pending]);
+  const go = (href: string) => {
+    if (href !== pathname) setPending(href);
+  };
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-10 border-b border-line bg-paper/90 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center gap-0.5 px-3 py-2 sm:gap-1 sm:px-6">
@@ -57,7 +77,7 @@ export default function Nav({ email }: { email: string | null }) {
           <Logo />
         </Link>
         {LINKS.filter((link) => online || link.offline).map((link) => (
-          <NavLink key={link.href} link={link} pathname={pathname} />
+          <NavLink key={link.href} link={link} pathname={pathname} online={online} pending={pending === link.href} onGo={go} />
         ))}
         {!online && (
           <span className="ml-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted" title="No connection: Learn and Review work from the cards kept on this device">
@@ -77,16 +97,54 @@ export default function Nav({ email }: { email: string | null }) {
               <span className="hidden sm:inline">Sign in</span>
             </Link>
           ) : null}
-          {online && <NavLink link={SETTINGS} pathname={pathname} />}
+          {online && <NavLink link={SETTINGS} pathname={pathname} online pending={pending === SETTINGS.href} onGo={go} />}
         </div>
       </nav>
     </header>
   );
 }
 
-/** One nav entry: icon (or glyph), with its label on wide screens. */
-function NavLink({ link, pathname }: { link: NavItem; pathname: string }) {
+/**
+ * One nav entry: icon (or glyph), with its label on wide screens. Offline it
+ * is a plain link: a full page load the service worker answers from the kept
+ * copy at once, instead of Next.js first asking the server for the page's
+ * data (which hung without a connection). `pending` shows a spinner in place
+ * of the icon while the page loads.
+ */
+function NavLink({
+  link,
+  pathname,
+  online,
+  pending,
+  onGo,
+}: {
+  link: NavItem;
+  pathname: string;
+  online: boolean;
+  pending: boolean;
+  onGo: (href: string) => void;
+}) {
   const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+  const className = `rounded-md px-1.5 py-1.5 text-sm sm:px-2 ${
+    active ? "bg-celadon-soft font-medium text-celadon-deep" : "text-muted hover:text-ink"
+  }`;
+  const icon = pending ? (
+    <span className="inline-block size-3.5 animate-spin rounded-full border-2 border-celadon border-t-transparent align-[-0.15em] lg:mr-1.5" aria-hidden />
+  ) : link.glyph ? (
+    <span className="korean font-semibold leading-none lg:mr-1.5" aria-hidden>
+      {link.glyph}
+    </span>
+  ) : (
+    <i className={`bi ${link.icon} lg:mr-1.5`} aria-hidden />
+  );
+  if (!online) {
+    return (
+      <a href={link.href} aria-current={active ? "page" : undefined} aria-label={link.label} onClick={() => onGo(link.href)} className={className}>
+        {icon}
+        <span className="hidden lg:inline">{link.label}</span>
+      </a>
+    );
+  }
   return (
     <Link
       href={link.href}
@@ -97,18 +155,11 @@ function NavLink({ link, pathname }: { link: NavItem; pathname: string }) {
       // nothing). Tell the page instead; /add starts over (AddWords).
       onClick={() => {
         if (active) window.dispatchEvent(new CustomEvent(SAME_PAGE_EVENT, { detail: link.href }));
+        else onGo(link.href);
       }}
-      className={`rounded-md px-1.5 py-1.5 text-sm sm:px-2 ${
-        active ? "bg-celadon-soft font-medium text-celadon-deep" : "text-muted hover:text-ink"
-      }`}
+      className={className}
     >
-      {link.glyph ? (
-        <span className="korean font-semibold leading-none lg:mr-1.5" aria-hidden>
-          {link.glyph}
-        </span>
-      ) : (
-        <i className={`bi ${link.icon} lg:mr-1.5`} aria-hidden />
-      )}
+      {icon}
       {/* Icons only below lg: nine labels do not fit on a phone or tablet. */}
       <span className="hidden lg:inline">{link.label}</span>
     </Link>

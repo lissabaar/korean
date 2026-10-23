@@ -414,7 +414,10 @@ Never wait long for the server: `lib/offline/online.ts` (`isOnline`,
 `fetchWithTimeout`, mark* from Review.tsx) — known offline skips the request,
 otherwise 4–5 s then the kept cards; the service worker shows a kept page
 after 3 s. Offline, the nav hides Add, Categories, Statistics, Hanja and
-Settings (`useOnline`).
+Settings (`useOnline`) and its links become plain `<a>` (full load from the
+kept page, no RSC request); the SW fails RSC requests after 2.5 s (or at once
+when offline) so Next.js falls back to a full load. The tapped nav icon spins
+until the page shows; `(app)/loading.tsx` is the page-level spinner.
 
 **Layout.** Every app page is `<main className="mx-auto max-w-6xl px-4 … sm:px-6">`
 — the nav's width (owner: one wide width for all pages); only the sign-in /
@@ -476,7 +479,10 @@ GOOGLE_CLIENT_SECRET
 
 **Pronunciation** uses the browser's speech synthesis (`SpeakButton`,
 `speakKorean`) — free and offline; `User.autoPlayAudio` speaks the word
-after each answer. Cloud TTS would be the upgrade if quality is not enough.
+after each answer. iPhone quirks handled there: cancel() only when something
+is speaking and speak() 80 ms later (cancel+speak at once was silent), and
+the first tap starts a silent utterance to unlock speech for auto-play.
+Cards: swipe right-to-left = Next once the answer is shown. Cloud TTS would be the upgrade if quality is not enough.
 
 ## Common commands
 

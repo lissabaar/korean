@@ -659,8 +659,26 @@ function Question({
 
   const recall = item.direction === "RECALL";
 
+  // Swipe right to left = Next, once the answer is shown (phones). Only a
+  // clearly sideways move counts, so scrolling the card never triggers it;
+  // not while the word editor is open (a swipe there is for its fields).
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (event: React.TouchEvent) => {
+    const touch = event.touches[0];
+    swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+  const onTouchEnd = (event: React.TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || !result || editing) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (dx < -60 && Math.abs(dx) > 1.5 * Math.abs(dy)) onDone(result);
+  };
+
   return (
-    <div>
+    <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {/* scroll-mt clears the sticky nav when this is scrolled into view. */}
       <div ref={frontRef} className="scroll-mt-16">
         <Front item={item} />
@@ -862,6 +880,7 @@ function Question({
             >
               Next
             </button>
+            <p className="mt-1.5 text-center text-xs text-muted sm:hidden">or swipe left</p>
           </div>
         </div>
       )}

@@ -24,6 +24,8 @@ const CACHE = "hangugo-v1";
 const PAGES = ["/", "/learn", "/review", "/how-it-works"];
 /** How long a page with a kept copy waits for the network. */
 const NAVIGATION_WAIT_MS = 3000;
+/** How long in-app navigation data waits before the full-page fallback. */
+const RSC_WAIT_MS = 2500;
 
 /** A promise that fails after `ms` — raced against a slow fetch. */
 function timeout(ms) {
@@ -127,7 +129,16 @@ self.addEventListener("fetch", (event) => {
       })(),
     );
   }
-  // Everything else (in-app navigation data, images): straight to the
-  // network. When it fails offline, Next.js falls back to a full page load,
-  // which the handler above serves from the kept copy.
+  // In-app navigation data (Next.js asks for a page's data with an "RSC"
+  // header): known offline, fail at once; otherwise give the network
+  // RSC_WAIT_MS. Next.js then falls back to a full page load, which the
+  // handler above serves from the kept copy — instead of hanging.
+  if (request.headers.get("RSC") === "1" || url.searchParams.has("_rsc")) {
+    if (self.navigator && self.navigator.onLine === false) {
+      event.respondWith(Response.error());
+      return;
+    }
+    event.respondWith(Promise.race([fetch(request), timeout(RSC_WAIT_MS)]).catch(() => Response.error()));
+  }
+  // Everything else (images): straight to the network.
 });
