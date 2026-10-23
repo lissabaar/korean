@@ -659,26 +659,36 @@ function Question({
 
   const recall = item.direction === "RECALL";
 
-  // Swipe right to left = Next, once the answer is shown (phones). Only a
-  // clearly sideways move counts, so scrolling the card never triggers it;
-  // not while the word editor is open (a swipe there is for its fields).
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (event: React.TouchEvent) => {
-    const touch = event.touches[0];
-    swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-  };
-  const onTouchEnd = (event: React.TouchEvent) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    const touch = event.changedTouches[0];
-    if (!start || !touch || !result || editing) return;
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-    if (dx < -60 && Math.abs(dx) > 1.5 * Math.abs(dy)) onDone(result);
-  };
+  // Swipe right to left anywhere on the screen = Next, once the answer is
+  // shown (phones). Listened to on the whole window — on the card alone it
+  // only caught swipes that started inside it. Only a clearly sideways move
+  // counts, so scrolling never triggers it; not while the word editor is
+  // open (a swipe there is for its fields).
+  useEffect(() => {
+    if (!result || editing) return;
+    let start: { x: number; y: number } | null = null;
+    const down = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      start = touch && event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+    };
+    const up = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      start = null;
+      if (dx < -60 && Math.abs(dx) > 1.5 * Math.abs(dy)) onDone(result);
+    };
+    window.addEventListener("touchstart", down, { passive: true });
+    window.addEventListener("touchend", up);
+    return () => {
+      window.removeEventListener("touchstart", down);
+      window.removeEventListener("touchend", up);
+    };
+  }, [result, editing, onDone]);
 
   return (
-    <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div>
       {/* scroll-mt clears the sticky nav when this is scrolled into view. */}
       <div ref={frontRef} className="scroll-mt-16">
         <Front item={item} />
