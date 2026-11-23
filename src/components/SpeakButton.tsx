@@ -43,6 +43,11 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
     silent.onend = silent.onerror = () => {
       unlocking = false;
     };
+    // Safety net: iOS may never fire "end" for a silent utterance, and the
+    // flag must not stay set for the whole visit.
+    setTimeout(() => {
+      unlocking = false;
+    }, 500);
     window.speechSynthesis.speak(silent);
     window.removeEventListener("pointerdown", unlock);
     window.removeEventListener("keydown", unlock);
