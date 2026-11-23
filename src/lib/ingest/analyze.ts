@@ -7,7 +7,7 @@
  * hundred entries is not.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { AiClient } from "../ai";
 import type { PrismaClient } from "@prisma/client";
 import { cachedLookupMany } from "../dictionary/cached";
 import {
@@ -128,7 +128,7 @@ export interface AnalyzeOptions {
  */
 export async function analyzeText(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   keys: DictionaryKeys,
   options: AnalyzeOptions,
 ): Promise<AnalysisResult> {
@@ -151,7 +151,7 @@ export async function analyzeText(
   });
   const allowedOwn = new Set(existingCategories.map((category) => category.name));
 
-  const extraction = await extractWords(source, anthropic, {
+  const extraction = await extractWords(source, ai, {
     maxWords,
     phrases,
     existingCategories: existingCategories.map((category) => category.name),

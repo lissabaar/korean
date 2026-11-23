@@ -7,7 +7,7 @@
  * stored with an English translation, and metered like any other AI call.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { AiClient } from "../ai";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -46,7 +46,7 @@ export interface FillResult {
  */
 export async function fillMissingExamples(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   keys: DictionaryKeys,
   userId: string,
 ): Promise<FillResult> {
@@ -150,7 +150,7 @@ export async function fillMissingExamples(
       throw error;
     }
 
-    const response = await anthropic.messages.parse({
+    const response = await ai.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 8000,
       system:
@@ -254,7 +254,7 @@ export async function dictionaryExamples(
  */
 export async function writeExample(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   userId: string,
   entryId: string,
 ): Promise<ExampleSuggestion> {
@@ -262,7 +262,7 @@ export async function writeExample(
   const { unlimited } = await assertCanUseAi(prisma, userId);
   const sense = entry.senses[0];
   const meaning = sense?.translation ?? sense?.userMeaning ?? "";
-  const response = await anthropic.messages.parse({
+  const response = await ai.messages.parse({
     model: EXTRACTION_MODEL,
     max_tokens: 1000,
     system:

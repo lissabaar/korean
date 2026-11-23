@@ -8,7 +8,7 @@
  * translated for them alone and never enter the shared table.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { AiClient } from "../ai";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -60,7 +60,7 @@ const shareable = (example: Shown) => example.source !== "USER";
  */
 export async function translateExamples(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   userId: string,
 ): Promise<TranslateResult> {
   const pending = await untranslated(prisma, userId);
@@ -99,7 +99,7 @@ export async function translateExamples(
       throw error;
     }
 
-    const response = await anthropic.messages.parse({
+    const response = await ai.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 6000,
       system:
@@ -136,7 +136,7 @@ export async function translateExamples(
  */
 export async function translateOneExample(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   userId: string,
   exampleId: string,
 ): Promise<string | null> {
@@ -158,7 +158,7 @@ export async function translateOneExample(
       if (error instanceof AiQuotaError) return null;
       throw error;
     }
-    const response = await anthropic.messages.parse({
+    const response = await ai.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 500,
       system:

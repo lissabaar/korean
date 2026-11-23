@@ -14,7 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { AiQuotaError } from "@/lib/ai-budget";
-import { anthropic, dictionaryKeys, prisma } from "@/lib/clients";
+import { ai, dictionaryKeys, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 import { EditError } from "@/lib/words/edit";
 import { dictionaryExamples, writeExample } from "@/lib/words/examples";
@@ -40,7 +40,7 @@ export async function POST(_request: Request, { params }: Params) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   try {
-    return NextResponse.json({ example: await writeExample(prisma, anthropic, userId, (await params).id) });
+    return NextResponse.json({ example: await writeExample(prisma, ai, userId, (await params).id) });
   } catch (error) {
     if (error instanceof EditError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (error instanceof AiQuotaError) {

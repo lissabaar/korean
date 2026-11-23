@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { anthropic, prisma } from "@/lib/clients";
+import { ai, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 import { ResortError, resortBatch, resortPlan } from "@/lib/words/resort";
 
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const cursor = typeof body.cursor === "string" ? body.cursor : null;
   try {
-    return NextResponse.json(await resortBatch(prisma, anthropic, userId, cursor));
+    return NextResponse.json(await resortBatch(prisma, ai, userId, cursor));
   } catch (error) {
     if (error instanceof ResortError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

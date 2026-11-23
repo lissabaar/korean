@@ -19,8 +19,12 @@ looks them up → spaced repetition schedules reviews.
   `url = env(...)` in the datasource and the `prisma-client-js` generator,
   which this schema uses. Upgrading is a deliberate migration, not a bump.
 - **Better Auth** for auth (not NextAuth)
-- **Anthropic SDK** (`claude-sonnet-4-6`, no thinking) — AI only supplements dictionaries,
-  never replaces them. Extraction uses structured outputs
+- **AI provider: Claude or Gemini**, chosen by `AI_PROVIDER` (`lib/ai.ts`).
+  Claude = Anthropic SDK (`claude-sonnet-4-6`, no thinking); Gemini = `@google/genai`
+  through the adapter `lib/ai-gemini.ts` (default `gemini-3.5-flash-lite`, lowest
+  thinking level). Every call goes through `AiClient.messages.parse` (same shape as
+  the Anthropic SDK's), never through an SDK directly. AI only supplements
+  dictionaries, never replaces them. Extraction uses structured outputs
   (`messages.parse` + Zod schema); never go back to "please answer in JSON"
   in the prompt — the model then sometimes answers in prose.
 - **ts-fsrs** for spaced repetition scheduling
@@ -44,7 +48,9 @@ src/lib/
   auth-client.ts            client-side auth helpers ("use client")
   session.ts                server-side session helpers
   db.ts                     Prisma singleton
-  clients.ts                Anthropic client + dictionary keys
+  ai.ts                     AI_PROVIDER, AI_MODEL, the AiClient interface (no SDK, no secrets)
+  ai-gemini.ts              Gemini adapter: imitates Anthropic's messages.parse (schema, stop reasons, usage)
+  clients.ts                `ai` client (Claude or Gemini) + dictionary keys
   dictionary/krdict.ts      KRDict → STDICT lookup chain (both free, XML)
   words/
     manual.ts               word typed in by hand (source USER), no AI
@@ -465,7 +471,11 @@ Never create a second Prisma instance.
 ```
 DATABASE_URL          # Neon pooled string (host has -pooler)
 DIRECT_URL            # same without -pooler; prisma migrate needs it
-ANTHROPIC_API_KEY
+AI_PROVIDER           # "anthropic" (default) or "gemini"
+ANTHROPIC_API_KEY     # required when AI_PROVIDER is anthropic
+GEMINI_API_KEY        # required when AI_PROVIDER=gemini (aistudio.google.com/apikey)
+GEMINI_MODEL          # optional, default gemini-3.5-flash-lite
+GEMINI_THINKING       # optional: minimal (default) | low | medium | high
 KRDICT_API_KEY
 STDICT_API_KEY        # optional fallback
 BETTER_AUTH_SECRET
@@ -517,6 +527,14 @@ Run Node through `npm run …`: the project `.npmrc` sets
 
 ## Decisions already made
 
+- **AI provider is switchable (2026-11-23).** Owner asked for a cheaper / free
+  provider that does not block her passport's country. Gemini (free AI Studio
+  key) was added next to Claude; `AI_PROVIDER` picks one for the whole app.
+  Quality on real imports is not measured yet — compare in `AiUsage` and by
+  eye before relying on it (Korean lemmatisation is the risky part; the
+  dictionary check rejects bad lemmas, which is the safety net). The free
+  Gemini tier lets Google use submitted text to improve its products —
+  `/privacy` says so when `AI_PROVIDER=gemini`; keep that text true.
 - **Model: Sonnet 4.6, not 5.5.** 5.5 was tried: its thinking cannot be
   turned off, and on real imports it averaged ~4 800 output tokens per call
   vs ~360 on 4.6 (≈5× the cost). Don't switch back without re-measuring

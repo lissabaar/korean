@@ -16,7 +16,7 @@
  * the cursor is null.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { AiClient } from "../ai";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -114,7 +114,7 @@ export class ResortError extends Error {}
  */
 export async function resortBatch(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   userId: string,
   cursor: string | null,
 ): Promise<ResortBatchResult> {
@@ -147,7 +147,7 @@ export async function resortBatch(
   }
 
   const names = targets.map((c) => c.name);
-  const response = await anthropic.messages.parse({
+  const response = await ai.messages.parse({
     model: EXTRACTION_MODEL,
     max_tokens: 8000,
     system: `You sort Korean vocabulary into a learner's categories. For every numbered word, pick the one category from the list that fits its meaning best, copied verbatim. Use "${UNCATEGORISED}" only when nothing else fits at all. Never invent a category. Return every number given.\n\nCategories:\n${names.join("\n")}`,

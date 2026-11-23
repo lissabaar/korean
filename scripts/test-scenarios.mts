@@ -3,7 +3,7 @@
 /**
  * End-to-end scenario test of the app's logic (everything behind the UI),
  * on the real database with throwaway users that are deleted at the end.
- * Makes a few real AI calls (about 5 cents, on the project's Anthropic key).
+ * Makes a few real AI calls (about 5 cents on Claude; free on Gemini's free tier — the provider is AI_PROVIDER in .env).
  * Run after larger changes:  npm run test:scenarios
  * Covers: adding words (own meanings, a sense the dictionary lacks, idioms,
  * "put these in X", phrases only), learning (intro, skip, drill, graduation),
@@ -12,7 +12,7 @@
  * the AI budget, anonymous → account, deleting a word. The UI itself
  * (clicks, image tiling in the browser) is not covered.
  */
-const { prisma, anthropic, dictionaryKeys } = await import("../src/lib/clients.ts");
+const { prisma, ai, dictionaryKeys } = await import("../src/lib/clients.ts");
 const { analyzeText } = await import("../src/lib/ingest/analyze.ts");
 const { commitWords } = await import("../src/lib/ingest/commit.ts");
 const { buildSession, getDeckStats } = await import("../src/lib/review/queue.ts");
@@ -58,7 +58,7 @@ let words: any[] = [];
 try {
   // ------------------------------------------------------------ 1. add a word list with own meanings
   await scenario("add word list", async () => {
-    const result = await analyzeText(prisma, anthropic, dictionaryKeys, {
+    const result = await analyzeText(prisma, ai, dictionaryKeys, {
       userId, unlimitedAi: false, phrases: true,
       source: { kind: "text", text: "놓다 — класть, помещать\n달달하다 — приторный, сладкий\n사과 — яблоко\n공원 — парк\n첫 단추를 끼우다 — хорошо начать дело" },
     });
@@ -78,7 +78,7 @@ try {
 
   // ------------------------------------------------------------ 2. "put these in X" note → locked category
   await scenario("requested category", async () => {
-    const result = await analyzeText(prisma, anthropic, dictionaryKeys, {
+    const result = await analyzeText(prisma, ai, dictionaryKeys, {
       userId, unlimitedAi: false,
       source: { kind: "text", text: "저는 아침에 커피를 마시고 빵을 먹어요.", note: "добавь все слова в категорию завтрак" },
     });
@@ -91,7 +91,7 @@ try {
 
   // ------------------------------------------------------------ 3. phrases only
   await scenario("phrases only", async () => {
-    const result = await analyzeText(prisma, anthropic, dictionaryKeys, {
+    const result = await analyzeText(prisma, ai, dictionaryKeys, {
       userId, unlimitedAi: false, phrases: "only",
       source: { kind: "text", text: "만나서 반갑습니다. 저는 학생이에요. 잘 부탁드립니다." },
     });
@@ -192,11 +192,11 @@ try {
     const noh = await prisma.entry.findFirst({ where: { userId, lemma: "놓다" } });
     const ex = await dictionaryExamples(prisma, dictionaryKeys, userId, noh.id);
     check("dictionary examples for the editor", ex.length > 0, ex[0]?.text);
-    const ai = await writeExample(prisma, anthropic, userId, noh.id);
-    check("AI example comes with translation", Boolean(ai.text && ai.translation), `${ai.text} / ${ai.translation}`);
+    const written = await writeExample(prisma, ai, userId, noh.id);
+    check("AI example comes with translation", Boolean(written.text && written.translation), `${written.text} / ${written.translation}`);
     const { untranslatedExampleId } = await edit.updateWord(prisma, userId, noh.id, { example: "저는 책을 책상 위에 놓았어요." });
     check("typed example reported untranslated", Boolean(untranslatedExampleId));
-    const english = await translateOneExample(prisma, anthropic, userId, untranslatedExampleId!);
+    const english = await translateOneExample(prisma, ai, userId, untranslatedExampleId!);
     const details = await edit.getWord(prisma, userId, noh.id);
     check("typed example translated on save", Boolean(english) && details.exampleEnglish === english, english ?? "");
     const senses = await listSenses(prisma, dictionaryKeys, userId, noh.id);
@@ -224,7 +224,7 @@ try {
     check("re-sort plan skips locked words", plan.lockedWords === lockedWords && plan.estimatedCredits > 0, `${plan.words} words, ~${plan.estimatedCredits} credits`);
     const lockedBefore = await prisma.entryCategory.findMany({ where: { category: { userId, locked: true } } });
     let cursor: string | null = null;
-    for (let i = 0; i < 5; i++) { const r = await resortBatch(prisma, anthropic, userId, cursor); cursor = r.nextCursor; if (!cursor) break; }
+    for (let i = 0; i < 5; i++) { const r = await resortBatch(prisma, ai, userId, cursor); cursor = r.nextCursor; if (!cursor) break; }
     const lockedAfter = await prisma.entryCategory.findMany({ where: { category: { userId, locked: true } } });
     check("re-sort left locked words where they were", lockedBefore.length === lockedAfter.length);
     const perWord = await prisma.entry.findMany({ where: { userId, categories: { none: { category: { locked: true } } } }, select: { _count: { select: { categories: true } } } });
@@ -271,9 +271,9 @@ try {
     check("deck stats", stats.words > 0, JSON.stringify(stats));
     const v = await verifyPending(prisma, dictionaryKeys, userId);
     check("verify runs", v.remaining === 0);
-    const fill = await fillMissingExamples(prisma, anthropic, dictionaryKeys, userId);
+    const fill = await fillMissingExamples(prisma, ai, dictionaryKeys, userId);
     check("fill examples runs", typeof fill.remaining === "number", JSON.stringify(fill));
-    const tr = await translateExamples(prisma, anthropic, userId);
+    const tr = await translateExamples(prisma, ai, userId);
     check("translate examples runs", typeof tr.remaining === "number", JSON.stringify(tr));
   });
 

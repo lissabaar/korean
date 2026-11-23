@@ -7,8 +7,9 @@
  * A shared daily budget across all free users caps the worst case (someone
  * registering a hundred accounts). The owner's emails are unlimited.
  *
- * The real hard stop is still a spend limit in the Anthropic console; this
- * is the polite layer in front of it.
+ * The real hard stop is still a spend limit with the AI provider (the
+ * Anthropic console, or the billing cap of the Gemini key); this is the
+ * polite layer in front of it.
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -26,6 +27,11 @@ const PRICES: Record<string, { input: number; output: number }> = {
   // The server-side fallback for Sonnet 5.5 refusals runs on Sonnet 5.
   "claude-sonnet-5": { input: 2, output: 10 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
+  // Gemini paid-tier prices ($ per million tokens). On the free tier Google
+  // charges nothing, but the credits are still counted at these prices — the
+  // meter stays a fair limit if the key is switched to a paid one.
+  "gemini-3.5-flash-lite": { input: 0.3, output: 2.5 },
+  "gemini-3.1-flash-lite": { input: 0.25, output: 1.5 },
 };
 
 /** Token counts as both the regular and the beta Messages API report them. */
@@ -74,7 +80,9 @@ export function costMicros(model: string, usage: TokenUsage): number {
     usage.input_tokens +
     (usage.cache_creation_input_tokens ?? 0) +
     (usage.cache_read_input_tokens ?? 0);
-  return input * price.input + usage.output_tokens * price.output;
+  // Whole micro-dollars: AiUsage.costMicros is an integer column, and some
+  // Gemini prices are below 1 per token.
+  return Math.round(input * price.input + usage.output_tokens * price.output);
 }
 
 export interface AiBalance {

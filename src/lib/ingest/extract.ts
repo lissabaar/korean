@@ -15,18 +15,21 @@
  * discarded as a failed analysis.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { AI_MODEL, type AiClient, type AiContentBlock } from "../ai";
 import type { TokenUsage } from "../ai-budget";
 import { z } from "zod";
 import { BASE_CATEGORIES } from "./categories";
 
 /**
- * Sonnet 4.6, without thinking. Sonnet 5.5 was tried (cheaper per token)
- * but its thinking cannot be switched off: measured on real imports it wrote
- * ~4 800 output tokens per call against ~360 here — about 5× the cost.
+ * The model every call uses (re-exported from ai.ts, where the provider is
+ * chosen). With Claude it is Sonnet 4.6, without thinking: Sonnet 5.5 was
+ * tried (cheaper per token) but its thinking cannot be switched off —
+ * measured on real imports it wrote ~4 800 output tokens per call against
+ * ~360 — about 5× the cost. With AI_PROVIDER=gemini it is GEMINI_MODEL, run
+ * at the lowest thinking level for the same reason (see ai-gemini.ts).
  */
-export const EXTRACTION_MODEL = "claude-sonnet-4-6";
+export const EXTRACTION_MODEL = AI_MODEL;
 
 /** Words plus what the call cost, so the caller can meter it. */
 export interface Extraction {
@@ -231,7 +234,7 @@ function buildInstructions(options: ExtractOptions): string {
 function buildContent(
   source: ExtractSource,
   options: ExtractOptions,
-): Anthropic.ContentBlockParam[] {
+): AiContentBlock[] {
   const instructions = buildInstructions(options);
   if (source.kind === "text") {
     const note = source.note?.trim()
@@ -256,9 +259,9 @@ function buildContent(
 
 /** One structured-output call; throws when the model did not finish. */
 async function requestWords(
-  client: Anthropic,
+  client: AiClient,
   system: string,
-  content: string | Anthropic.ContentBlockParam[],
+  content: string | AiContentBlock[],
   signal?: AbortSignal,
 ): Promise<Extraction> {
   const response = await client.messages.parse(
@@ -299,7 +302,7 @@ async function requestWords(
  */
 export async function extractWords(
   source: ExtractSource,
-  client: Anthropic,
+  client: AiClient,
   options: ExtractOptions = {},
 ): Promise<Extraction> {
   const { words, ...meta } = await requestWords(

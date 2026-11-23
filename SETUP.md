@@ -61,7 +61,9 @@ npm install
 |---|---|
 | `DATABASE_URL` | Neon → твой проект → **Connect** → строка подключения (с `-pooler` в адресе) |
 | `DIRECT_URL` | та же строка, но **без** `-pooler` в адресе хоста |
-| `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys |
+| `AI_PROVIDER` | `anthropic` (по умолчанию) или `gemini` — какой ИИ отвечает |
+| `ANTHROPIC_API_KEY` | нужен при `AI_PROVIDER=anthropic`: console.anthropic.com → API Keys |
+| `GEMINI_API_KEY` | нужен при `AI_PROVIDER=gemini`: aistudio.google.com/apikey (бесплатно, без карты). Необязательно: `GEMINI_MODEL` (по умолчанию `gemini-3.5-flash-lite`), `GEMINI_THINKING` (`minimal` по умолчанию) |
 | `KRDICT_API_KEY` | krdict.korean.go.kr → 오픈 API → 인증키 (ключ из письма) |
 | `STDICT_API_KEY` | необязательно, можно оставить пустым |
 | `BETTER_AUTH_SECRET` | любая случайная строка от 32 символов: `npx auth secret` |

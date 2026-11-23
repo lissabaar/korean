@@ -5,14 +5,28 @@
  *
  * Next.js page (server component): static text, public, indexable. Outside
  * the (app) group, so it needs no session. Keep it true when adding anything
- * that stores data or sends it somewhere (analytics, payments, email).
+ * that stores data or sends it somewhere (analytics, payments, email). The AI
+ * paragraph follows AI_PROVIDER (lib/ai.ts), so it names whoever really
+ * receives the text.
  */
 
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import { aiProvider } from "@/lib/ai";
 import { SITE_NAME } from "@/lib/site";
 
 export const metadata = { title: "Privacy" };
+
+/** What happens to text sent to Claude. */
+const CLAUDE_TEXT = "Anthropic's Claude to find the words; Anthropic does not use them to train models.";
+
+/**
+ * What happens to text sent to Gemini. Google's terms differ by tier: on the
+ * free tier submitted content may be used to improve its products, on the
+ * paid tier it is not — so the page says both rather than guess the tier.
+ */
+const GEMINI_TEXT =
+  "Google's Gemini to find the words. On Google's free Gemini tier, Google may use submitted text to improve its products; on its paid tier it does not.";
 
 /** The privacy page. */
 export default function PrivacyPage() {
@@ -47,8 +61,7 @@ export default function PrivacyPage() {
       <h2 className={h2}>Where it goes</h2>
       <p className={p}>
         The site runs on Vercel and stores data in a Neon PostgreSQL database. Text and images you
-        add are sent to Anthropic&apos;s Claude to find the words; Anthropic does not use them to
-        train models. Files are read in your browser: only their text, or a reduced copy of an image,
+        add are sent to {aiProvider() === "gemini" ? GEMINI_TEXT : CLAUDE_TEXT} Files are read in your browser: only their text, or a reduced copy of an image,
         is sent. Dictionary data comes from the Korean learners&apos; dictionary (한국어기초사전) of the
         National Institute of Korean Language.
       </p>

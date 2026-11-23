@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { anthropic, prisma } from "@/lib/clients";
+import { ai, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 import { translateExamples } from "@/lib/words/example-translations";
 
@@ -23,7 +23,7 @@ export async function POST() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   try {
-    return NextResponse.json(await translateExamples(prisma, anthropic, userId));
+    return NextResponse.json(await translateExamples(prisma, ai, userId));
   } catch (error) {
     console.error("Translating examples failed:", error);
     return NextResponse.json({ error: "Could not translate examples. Try again." }, { status: 500 });

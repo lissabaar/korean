@@ -13,7 +13,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { anthropic, prisma } from "@/lib/clients";
+import { ai, prisma } from "@/lib/clients";
 import { translateOneExample } from "@/lib/words/example-translations";
 import { getUserId } from "@/lib/session";
 import { deleteWord, EditError, getWord, updateWord } from "@/lib/words/edit";
@@ -71,7 +71,7 @@ export async function PATCH(request: Request, { params }: Params) {
     // A new example without English: translate it now, so the card shows it
     // at once. A failure here must not fail the save itself.
     if (untranslatedExampleId) {
-      await translateOneExample(prisma, anthropic, userId, untranslatedExampleId).catch((error) =>
+      await translateOneExample(prisma, ai, userId, untranslatedExampleId).catch((error) =>
         console.error("Translating the edited example failed:", error),
       );
     }

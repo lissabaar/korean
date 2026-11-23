@@ -34,7 +34,9 @@ npm run dev                 # http://localhost:3000
 | Key | Where | Cost |
 |---|---|---|
 | `DATABASE_URL`, `DIRECT_URL` | [Neon](https://neon.tech) → Connect: pooled and direct strings | free tier |
-| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) | pay per use |
+| `AI_PROVIDER` | `anthropic` (default) or `gemini` | — |
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) — when `AI_PROVIDER=anthropic` | pay per use |
+| `GEMINI_API_KEY` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — when `AI_PROVIDER=gemini` (optional `GEMINI_MODEL`, `GEMINI_THINKING`) | free tier, then pay per use |
 | `KRDICT_API_KEY` | [krdict.korean.go.kr](https://krdict.korean.go.kr/openApi/openApiRegister) | free, 50 000 requests/day |
 | `STDICT_API_KEY` | [stdict.korean.go.kr](https://stdict.korean.go.kr/openapi/openApiInfo.do) | free, optional fallback |
 | `BETTER_AUTH_SECRET` | `npx auth secret` or any 32-byte random string | — |
@@ -69,7 +71,8 @@ src/lib/
   auth.ts                     Better Auth config
   session.ts                  session helpers for pages and routes
   db.ts                       Prisma client singleton
-  clients.ts                  Anthropic client, dictionary keys
+  ai.ts, ai-gemini.ts         which AI provider (Claude / Gemini) and the one call both answer
+  clients.ts                  AI client, dictionary keys
   dictionary/krdict.ts        KRDict → STDICT lookup chain
   ingest/
     extract.ts                model-side analysis (structured outputs)

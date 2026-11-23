@@ -11,7 +11,7 @@
  * (source AI). The user's own meaning is never touched.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
+import type { AiClient } from "../ai";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -48,7 +48,7 @@ export interface MeaningFillResult {
  */
 export async function fillEnglishMeanings(
   prisma: PrismaClient,
-  anthropic: Anthropic,
+  ai: AiClient,
   keys: DictionaryKeys,
   userId: string,
 ): Promise<MeaningFillResult> {
@@ -117,7 +117,7 @@ export async function fillEnglishMeanings(
       throw error;
     }
 
-    const response = await anthropic.messages.parse({
+    const response = await ai.messages.parse({
       model: EXTRACTION_MODEL,
       max_tokens: 4000,
       system:

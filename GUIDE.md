@@ -41,7 +41,7 @@ Next.js, какой путь проходят данные и какой фай�
 | **PostgreSQL на Neon** | база данных в облаке (регион São Paulo) | — |
 | **Prisma 6** | ORM: таблицы описаны в `prisma/schema.prisma`, а в коде к ним обращаются как к объектам: `prisma.card.findMany({ where: ... })`. Изменения схемы оформляются миграциями в `prisma/migrations/` | `src/lib/db.ts`, весь `src/lib/` |
 | **Better Auth** | вход и регистрация: почта и пароль, Google, анонимные пользователи | `src/lib/auth.ts`, `auth-client.ts`, `session.ts` |
-| **Anthropic SDK** (Claude Sonnet 4.6) | ИИ: находит слова в тексте и на картинках, пишет примеры и переводы. Ответ приходит строго по схеме (Zod), а не свободным текстом | `src/lib/ingest/extract.ts`, `src/lib/words/*` |
+| **ИИ: Claude (Anthropic SDK, Sonnet 4.6) или Gemini (Google, `@google/genai`)** | ИИ: находит слова в тексте и на картинках, пишет примеры и переводы. Ответ приходит строго по схеме (Zod), а не свободным текстом. Провайдер выбирает переменная `AI_PROVIDER` | `src/lib/ai.ts`, `src/lib/ai-gemini.ts`, `src/lib/ingest/extract.ts`, `src/lib/words/*` |
 | **Zod** | описание формы данных, по которому проверяется ответ модели | `extract.ts`, `examples.ts` |
 | **KRDict API** | бесплатный корейский словарь для изучающих (National Institute of Korean Language). Отвечает в XML | `src/lib/dictionary/` |
 | **fast-xml-parser** | разбор XML-ответов словаря | `krdict.ts` |
@@ -131,7 +131,7 @@ api/settings/route.ts (сервер) проверяет данные и пише
    │  вызывает функцию из
    ▼
  Логика (src/lib/**) ──► Prisma ──► PostgreSQL (Neon)
-   ├──► Anthropic (Claude)       — только через ai-budget.ts (счётчик денег)
+   ├──► ИИ (Claude или Gemini)   — только через ai-budget.ts (счётчик денег)
    └──► KRDict                   — только через dictionary/cached.ts (общий кэш)
 ```
 
@@ -323,7 +323,9 @@ hangugo/
 │   └── lib/                         ЛОГИКА (в основном сервер)
 │       ├── db.ts                    единственный клиент Prisma (база)
 │       ├── site.ts                  название, адрес, описание сайта (SEO, превью, лендинг)
-│       ├── clients.ts               клиент Anthropic + ключи словаря (секреты)
+│       ├── clients.ts               ИИ-клиент (Claude или Gemini) + ключи словаря (секреты)
+│       ├── ai.ts                    выбор провайдера (AI_PROVIDER), модель, общий интерфейс вызова ИИ
+│       ├── ai-gemini.ts             адаптер Gemini: тот же вызов `messages.parse`, что у Claude
 │       ├── auth.ts                  настройка Better Auth (почта, Google, анонимы)
 │       ├── auth-client.ts           то же для браузера: signIn, signUp, signOut
 │       ├── session.ts               кто делает запрос: getUserId(), currentUser()

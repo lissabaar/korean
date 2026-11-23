@@ -14,7 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { analyzeText } from "@/lib/ingest/analyze";
-import { anthropic, dictionaryKeys, prisma } from "@/lib/clients";
+import { ai, dictionaryKeys, prisma } from "@/lib/clients";
 import { getUserId } from "@/lib/session";
 import { AiQuotaError, assertCanUseAi, getAiBalance } from "@/lib/ai-budget";
 import { DictionaryError } from "@/lib/dictionary/krdict";
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Sign in first." }, { status: 401 });
     }
     const budget = await assertCanUseAi(prisma, userId);
-    const result = await analyzeText(prisma, anthropic, dictionaryKeys, {
+    const result = await analyzeText(prisma, ai, dictionaryKeys, {
       userId,
       source,
       unlimitedAi: budget.unlimited,

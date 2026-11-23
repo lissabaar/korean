@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@google/genai": "^3.6.1",
     "@prisma/client": "^6.19.3",
     "better-auth": "^1.7.7",
     "bootstrap-icons": "^1.13.1",
