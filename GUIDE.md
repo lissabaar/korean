@@ -47,7 +47,8 @@ Next.js, какой путь проходят данные и какой фай�
 | **fast-xml-parser** | разбор XML-ответов словаря | `krdict.ts` |
 | **ts-fsrs** | алгоритм интервального повторения FSRS: по ответу решает, когда показать карточку в следующий раз | `src/lib/review/session.ts` |
 | **fflate, fzstd, sql.js, papaparse** | чтение файлов прямо в браузере: zip, zstd-сжатие, SQLite внутри колоды Anki, CSV | `src/lib/import/` |
-| **Web Speech API** | озвучка слов голосом браузера: бесплатно и без интернета | `SpeakButton.tsx` |
+| **Web Speech API** | запасная озвучка голосом браузера: бесплатно и без интернета (на iPhone выключается беззвучным режимом) | `SpeakButton.tsx` |
+| **Gemini TTS** | озвучка слов аудиофайлом: слово озвучивается один раз, файл хранится в таблице `WordAudio` и играет всем бесплатно; работает при беззвучном режиме iPhone | `lib/tts.ts`, `app/api/tts/route.ts` |
 | **Vercel** | хостинг: сам собирает и выкладывает сайт после каждого `git push` в main | `vercel.json` (регион `gru1`) |
 
 ---
@@ -301,7 +302,7 @@ hangugo/
 │   │   ├── ManualWord.tsx           форма «добавить слово вручную» + поиск в словаре
 │   │   ├── CategorySelect.tsx       выпадающий список категорий с «новая категория…»
 │   │   ├── Review.tsx               экран учёбы: знакомство, вопрос, ответ, обратная сторона
-│   │   ├── SpeakButton.tsx          кнопка озвучки + speakKorean()
+│   │   ├── SpeakButton.tsx          кнопка озвучки + speakKorean(): сначала аудиофайл из /api/tts, запасной вариант — голос браузера
 │   │   ├── CategoryList.tsx         экран /categories (+ поиск по всем словам)
 │   │   ├── IconPicker.tsx           выбор иконки категории
 │   │   ├── WordEditor.tsx           редактирование слова: значения для учёбы, «Add example»
@@ -330,6 +331,7 @@ hangugo/
 │       ├── auth-client.ts           то же для браузера: signIn, signUp, signOut
 │       ├── session.ts               кто делает запрос: getUserId(), currentUser()
 │       ├── ai-budget.ts             кредиты на ИИ, журнал расходов, дневной лимит
+│       ├── tts.ts                   озвучка слова через Gemini TTS (PCM → WAV); файл кэшируется в WordAudio
 │       ├── stats.ts                 числа для /stats (GET /api/stats?tz=…)
 │       ├── anonymous-cleanup.ts     раз в день удаляет брошенные анонимные аккаунты (пустые — через сутки, остальные — через 30 дней)
 │       ├── hanja.ts                 какой слог слова из какого иероглифа, значения, слова с иероглифом

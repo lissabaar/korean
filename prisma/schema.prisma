@@ -557,6 +557,17 @@ model GeneratedExample {
   @@unique([lemma, meaning])
 }
 
+// Spoken Korean for the speaker button, made once by Gemini TTS and shared by
+// everyone (a word's sound is not personal). `key` = hash of voice + text;
+// `data` is a ready-to-play WAV file (24 kHz, 16-bit, mono).
+model WordAudio {
+  key       String   @id
+  text      String
+  voice     String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
 // Typed-in dictionary lookups per user per day, for the plan's daily limit.
 model DictionaryUsage {
   userId String

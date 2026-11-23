@@ -487,9 +487,16 @@ GOOGLE_CLIENT_ID      # optional; with the secret, shows "Continue with Google"
 GOOGLE_CLIENT_SECRET
 ```
 
-**Pronunciation** uses the browser's speech synthesis (`SpeakButton`,
-`speakKorean`) — free and offline; `User.autoPlayAudio` speaks the word
-after each answer. iPhone quirks handled there: cancel() only when something
+**Pronunciation** (`SpeakButton`, `speakKorean`): first a real audio file from
+`/api/tts` (Gemini TTS, `lib/tts.ts`; model `GEMINI_TTS_MODEL`, voice
+`GEMINI_TTS_VOICE`), made ONCE per text and kept in `WordAudio` for all users
+— audio files play on iPhone with the silent switch on, the browser's speech
+does not (owner needs this; 2026-11-23). Generation is metered like any model
+call (`assertCanUseAi`/`recordAiUsage`); stored files are free to everyone.
+Any failure (offline, anonymous, no credits, no key) falls back to the
+browser's speech synthesis — free and offline. `User.autoPlayAudio` speaks the
+word after each answer; one shared `<audio>` element is primed on the first
+tap so auto-play works. iPhone quirks of the speech fallback: cancel() only when something
 is speaking and speak() 80 ms later (cancel+speak at once was silent), and
 the first tap starts a silent utterance to unlock speech for auto-play.
 Cards: swipe right-to-left = Next once the answer is shown. Cloud TTS would be the upgrade if quality is not enough.

@@ -32,6 +32,8 @@ const PRICES: Record<string, { input: number; output: number }> = {
   // meter stays a fair limit if the key is switched to a paid one.
   "gemini-3.5-flash-lite": { input: 0.3, output: 2.5 },
   "gemini-3.1-flash-lite": { input: 0.25, output: 1.5 },
+  // Gemini text-to-speech (output = audio tokens, ~25 per second of speech).
+  "gemini-2.5-flash-preview-tts": { input: 0.5, output: 10 },
 };
 
 /** Token counts as both the regular and the beta Messages API report them. */

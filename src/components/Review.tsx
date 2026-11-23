@@ -606,7 +606,7 @@ function Question({
         setResult(data);
         track(data);
         // Hear the word right after answering, while it is on screen.
-        if (autoPlay) speakKorean(item.back.lemma);
+        if (autoPlay) void speakKorean(item.back.lemma);
       } catch (cause) {
         if (isOfflineError(cause)) {
           // No connection: grade here with the same rules as the server,
@@ -617,7 +617,7 @@ function Question({
           setResult(result);
           onOffline?.();
           markOffline();
-          if (autoPlay) speakKorean(item.back.lemma);
+          if (autoPlay) void speakKorean(item.back.lemma);
         } else {
           setError(cause instanceof Error ? cause.message : "Could not save that answer.");
         }
@@ -961,7 +961,7 @@ function Intro({
 
   useEffect(() => {
     startRef.current?.focus();
-    if (autoPlay) speakKorean(item.back.lemma);
+    if (autoPlay) void speakKorean(item.back.lemma);
   }, [autoPlay, item.back.lemma]);
 
   /** Press a button: call the parent's action and show an error if it fails. */
