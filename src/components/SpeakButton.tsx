@@ -32,10 +32,17 @@ function koreanVoice(): SpeechSynthesisVoice | undefined {
  * press anywhere starts a silent utterance, which unlocks speech for the rest
  * of the visit.
  */
+let unlocking = false;
 if (typeof window !== "undefined" && "speechSynthesis" in window) {
   const unlock = () => {
     const silent = new SpeechSynthesisUtterance(" ");
     silent.volume = 0;
+    // While this silent utterance is queued, speakKorean() must not treat it
+    // as "something is speaking" (see there).
+    unlocking = true;
+    silent.onend = silent.onerror = () => {
+      unlocking = false;
+    };
     window.speechSynthesis.speak(silent);
     window.removeEventListener("pointerdown", unlock);
     window.removeEventListener("keydown", unlock);
@@ -62,7 +69,14 @@ export function speakKorean(text: string): void {
   utterance.rate = 0.9;
   // Chrome can be left paused (e.g. after the tab was in the background).
   synth.resume();
-  if (synth.speaking || synth.pending) {
+  if (unlocking) {
+    // The very first tap on the page was this speaker button: the unlock
+    // above has just queued its silent utterance, so synth.speaking is true.
+    // Cancelling it and speaking 80 ms later would run outside the tap and
+    // stay silent on iPhone. Speaking at once, inside the tap, queues the word
+    // right behind the silent one (it ends instantly).
+    synth.speak(utterance);
+  } else if (synth.speaking || synth.pending) {
     synth.cancel();
     setTimeout(() => synth.speak(utterance), 80);
   } else {
