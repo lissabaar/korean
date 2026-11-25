@@ -785,28 +785,51 @@ function Question({
 
       {!item.selfGraded && item.exercise === "TYPING" && (
         <form
-          className="mt-6"
+          className="mt-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (!result && typed.trim()) submit({ answer: typed });
           }}
         >
-          {/* Layout: caption + Hint on one line, then the field with Check on
-              its right. Everything the learner presses sits at the height of
-              the field, never below it: on iPhone, Safari's floating address
-              pill hovers just under the field while the keyboard is open and
-              covered a Check button placed below. */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-muted">
-                {recall ? "Type the Korean word" : "Type the meaning in English"}
-              </span>
-              {item.hint && !result && (
+          {/* No caption line above the field (it is the input's placeholder and
+              aria-label instead) and tight spacing: with the keyboard open,
+              Safari's floating address pill hovers over the lower part of
+              the screen and covered the Check button. A shorter form keeps
+              the buttons above it, with nothing scrolling. */}
+          <input
+            ref={inputRef}
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            disabled={Boolean(result) || busy}
+            lang={recall ? "ko" : "en"}
+            placeholder={recall ? "Type the Korean word" : "Type the meaning in English"}
+            aria-label={recall ? "Type the Korean word" : "Type the meaning in English"}
+            // Keyboard suggestions would give the answer away. Browsers honour
+            // these; a system predictive bar can still need turning off.
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-gramm="false"
+            className={`w-full rounded-md border border-line bg-surface px-4 py-3 outline-none placeholder:font-sans placeholder:text-base placeholder:text-muted focus:border-celadon ${
+              recall ? `korean ${size.input}` : size.inputEn
+            }`}
+          />
+          {!result && (
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={busy || !typed.trim()}
+                className="flex-1 rounded-md bg-celadon-deep px-4 py-3 font-medium text-paper disabled:opacity-50"
+              >
+                Check
+              </button>
+              {item.hint && (
                 <button
                   type="button"
                   onClick={() => setUsedHint(true)}
                   disabled={usedHint}
-                  className="rounded-md border border-line px-3 py-1 text-sm"
+                  className="rounded-md border border-line px-4 py-3 text-sm"
                 >
                   {usedHint ? (
                     // Follows the typing: the next letter/syllable still to write.
@@ -829,36 +852,7 @@ function Question({
                 </button>
               )}
             </div>
-            <div className="flex items-stretch gap-2">
-              <input
-                ref={inputRef}
-                value={typed}
-                onChange={(event) => setTyped(event.target.value)}
-                disabled={Boolean(result) || busy}
-                lang={recall ? "ko" : "en"}
-                aria-label={recall ? "Type the Korean word" : "Type the meaning in English"}
-                // Keyboard suggestions would give the answer away. Browsers honour
-                // these; a system predictive bar can still need turning off.
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                data-gramm="false"
-                className={`min-w-0 flex-1 rounded-md border border-line bg-surface px-4 py-3 outline-none focus:border-celadon ${
-                  recall ? `korean ${size.input}` : size.inputEn
-                }`}
-              />
-              {!result && (
-                <button
-                  type="submit"
-                  disabled={busy || !typed.trim()}
-                  className="rounded-md bg-celadon-deep px-4 font-medium text-paper disabled:opacity-50"
-                >
-                  Check
-                </button>
-              )}
-            </div>
-          </div>
+          )}
           {!recall && !result && (
             <p className="mt-2 text-xs text-muted">Any of the word&apos;s meanings counts.</p>
           )}
