@@ -576,9 +576,6 @@ function Question({
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // The typed-answer form, and whether its field has focus (keyboard open).
-  const formRef = useRef<HTMLFormElement>(null);
-  const [typingFocused, setTypingFocused] = useState(false);
   const nextRef = useRef<HTMLButtonElement>(null);
   const frontRef = useRef<HTMLDivElement>(null);
 
@@ -788,11 +785,7 @@ function Question({
 
       {!item.selfGraded && item.exercise === "TYPING" && (
         <form
-          ref={formRef}
-          // While the answer field is focused the keyboard is open and Safari's
-          // floating address pill sits above it, covering the Check button.
-          // Extra space below lets the page scroll the buttons clear of it.
-          className={`mt-6 ${typingFocused ? "pb-40" : ""}`}
+          className="mt-6"
           onSubmit={(event) => {
             event.preventDefault();
             if (!result && typed.trim()) submit({ answer: typed });
@@ -805,13 +798,6 @@ function Question({
             <input
               ref={inputRef}
               value={typed}
-              onFocus={() => {
-                setTypingFocused(true);
-                // After the keyboard has slid up, put the form in the middle of
-                // what is left of the screen (above the address pill).
-                setTimeout(() => formRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }), 350);
-              }}
-              onBlur={() => setTypingFocused(false)}
               onChange={(event) => setTyped(event.target.value)}
               disabled={Boolean(result) || busy}
               lang={recall ? "ko" : "en"}
