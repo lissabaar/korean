@@ -576,6 +576,8 @@ function Question({
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Page scroll position at the moment the answer field is tapped (see its onFocus).
+  const keepScrollY = useRef<number | null>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const frontRef = useRef<HTMLDivElement>(null);
 
@@ -800,6 +802,22 @@ function Question({
             ref={inputRef}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
+            // iPhone scrolls the page by itself when a field is tapped (to keep
+            // it above the keyboard). The whole form is already in view, so
+            // the card should stay where it is: remember the scroll position
+            // before the tap and put it back while the keyboard slides up.
+            onPointerDown={() => {
+              keepScrollY.current = window.scrollY;
+            }}
+            onFocus={() => {
+              const y = keepScrollY.current ?? window.scrollY;
+              keepScrollY.current = null;
+              for (const delay of [0, 60, 150, 300, 500]) {
+                setTimeout(() => {
+                  if (window.scrollY !== y) window.scrollTo(0, y);
+                }, delay);
+              }
+            }}
             disabled={Boolean(result) || busy}
             lang={recall ? "ko" : "en"}
             placeholder={recall ? "Type the Korean word" : "Type the meaning in English"}
